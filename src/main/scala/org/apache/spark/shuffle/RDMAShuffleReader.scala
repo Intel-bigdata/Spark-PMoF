@@ -28,7 +28,7 @@ private[spark] class RDMAShuffleReader[K, C](
   override def read(): Iterator[Product2[K, C]] = {
     val wrappedStreams: RDMAShuffleBlockFetcherIterator = new RDMAShuffleBlockFetcherIterator(
       context,
-      RDMATransferService.getTransferServiceInstance,
+      RDMATransferService.getTransferServiceInstance(blockManager),
       blockManager,
       mapOutputTracker.getMapSizesByExecutorId(handle.shuffleId, startPartition, endPartition),
       serializerManager.wrapStream,

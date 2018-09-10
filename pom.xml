@@ -16,6 +16,11 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-network-common_2.11</artifactId>
+            <version>2.3.0</version>
+        </dependency>
+        <dependency>
             <groupId>com.intel.hpnl</groupId>
             <artifactId>hpnl</artifactId>
             <version>0.5</version>

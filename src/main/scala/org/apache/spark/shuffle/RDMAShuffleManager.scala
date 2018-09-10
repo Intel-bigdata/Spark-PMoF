@@ -2,9 +2,9 @@ package org.apache.spark.shuffle
 
 import java.util.concurrent.ConcurrentHashMap
 
-import org.apache.spark.{ShuffleDependency, SparkConf, SparkEnv, TaskContext}
 import org.apache.spark.internal.Logging
 import org.apache.spark.shuffle.sort._
+import org.apache.spark.{ShuffleDependency, SparkConf, SparkEnv, TaskContext}
 
 private[spark] class RDMAShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
   if (!conf.getBoolean("spark.shuffle.spill", defaultValue = true)) logWarning("spark.shuffle.spill was set to false")

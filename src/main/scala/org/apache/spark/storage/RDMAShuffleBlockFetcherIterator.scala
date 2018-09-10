@@ -457,7 +457,7 @@ final class RDMAShuffleBlockFetcherIterator(
     }
 
     currentResult = result.asInstanceOf[SuccessFetchResult]
-    (currentResult.blockId, new BufferReleasingInputStream(input, this))
+    (currentResult.blockId, new RDMABufferReleasingInputStream(input, this))
   }
 
   private def fetchUpToMaxBytes(): Unit = {
@@ -529,7 +529,7 @@ final class RDMAShuffleBlockFetcherIterator(
 /**
   * Helper class that ensures a ManagedBuffer is released upon InputStream.close()
   */
-private class BufferReleasingInputStream(
+private class RDMABufferReleasingInputStream(
                                           private val delegate: InputStream,
                                           private val iterator: RDMAShuffleBlockFetcherIterator)
   extends InputStream {
