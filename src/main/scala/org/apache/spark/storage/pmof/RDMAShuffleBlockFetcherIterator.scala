@@ -1,4 +1,5 @@
-package org.apache.spark.storage
+package org.apache.spark.storage.pmof
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -22,11 +23,12 @@ import java.util.concurrent.LinkedBlockingQueue
 
 import javax.annotation.concurrent.GuardedBy
 import org.apache.spark.internal.Logging
-import org.apache.spark.network.RDMATransferService
 import org.apache.spark.network.buffer.{FileSegmentManagedBuffer, ManagedBuffer}
 import org.apache.spark.network.client.ChunkReceivedCallback
+import org.apache.spark.network.pmof.RDMATransferService
 import org.apache.spark.network.shuffle.{ShuffleClient, TempFileManager}
 import org.apache.spark.shuffle.FetchFailedException
+import org.apache.spark.storage._
 import org.apache.spark.util.Utils
 import org.apache.spark.util.io.ChunkedByteBufferOutputStream
 import org.apache.spark.{SparkException, TaskContext}
@@ -72,7 +74,7 @@ final class RDMAShuffleBlockFetcherIterator(
                                          detectCorrupt: Boolean)
   extends Iterator[(BlockId, InputStream)] with TempFileManager with Logging {
 
-  import ShuffleBlockFetcherIterator._
+  import RDMAShuffleBlockFetcherIterator._
 
   /**
     * Total number of blocks to fetch. This can be smaller than the total number of blocks
@@ -561,7 +563,7 @@ private class RDMABufferReleasingInputStream(
 }
 
 private[storage]
-object ShuffleBlockFetcherIterator {
+object RDMAShuffleBlockFetcherIterator {
 
   /**
     * A request to fetch blocks from a remote BlockManager.

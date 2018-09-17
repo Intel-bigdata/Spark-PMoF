@@ -1,5 +1,5 @@
-import org.apache.spark.network.RDMAClientFactory
-import org.apache.spark.network.RDMAClient
+import org.apache.spark.network.pmof.RDMAClient
+import org.apache.spark.network.pmof.RDMAClientFactory
 
 object ClientTest {
   val connectionNum: Int = 10

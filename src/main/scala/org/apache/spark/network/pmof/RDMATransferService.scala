@@ -1,24 +1,23 @@
-package org.apache.spark.network
+package org.apache.spark.network.pmof
 
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.Random
+import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.spark.{SparkConf, SparkEnv}
-import org.apache.spark.internal.config.DRIVER_BIND_ADDRESS
+import org.apache.spark.network.BlockDataManager
 import org.apache.spark.network.client.ChunkReceivedCallback
 import org.apache.spark.network.shuffle.protocol.OpenBlocks
 import org.apache.spark.network.shuffle.{BlockFetchingListener, TempFileManager}
 import org.apache.spark.serializer.JavaSerializer
+import org.apache.spark.storage.BlockManager
+import org.apache.spark.{SparkConf, SparkEnv}
 
-class RDMATransferService(conf: SparkConf, val hostname: String, override val port: Int) extends TransferService {
+class RDMATransferService(conf: SparkConf, val hostname: String, var port: Int) extends TransferService {
 
   private var server: RDMAServer = _
   private var recvHandler: ServerRecvHandler = _
   private var clientFactory: RDMAClientFactory = _
   private var appId: String = _
-  private var blockDataManager: BlockDataManager = _
   private var nextReqId: AtomicInteger = _
-  private var initialized = 0
 
   private val serializer = new JavaSerializer(conf)
 
@@ -43,26 +42,23 @@ class RDMATransferService(conf: SparkConf, val hostname: String, override val po
   override def close(): Unit = {
     if (clientFactory != null) {
       clientFactory.stop()
+      clientFactory.waitToStop()
     }
     if (server != null) {
       server.stop()
+      server.waitToStop()
     }
   }
 
-  override def init(blockDataManager: BlockDataManager): Unit = {
-    if (initialized == 1) {
-      return
-    } else {
-      initialized = 1
-    }
+  override def init(blockManager: BlockDataManager): Unit = {
     this.server = new RDMAServer(hostname, port)
     this.appId = conf.getAppId
-    this.blockDataManager = blockDataManager
-    this.recvHandler = new ServerRecvHandler(server, appId, serializer, blockDataManager)
+    this.recvHandler = new ServerRecvHandler(server, appId, serializer, blockManager)
     this.server.setRecvHandler(recvHandler)
     this.clientFactory = new RDMAClientFactory()
     this.server.init()
     this.server.start()
+    this.port = server.port
     val random = new Random().nextInt(Integer.MAX_VALUE)
     this.nextReqId = new AtomicInteger(random)
   }
@@ -71,12 +67,17 @@ class RDMATransferService(conf: SparkConf, val hostname: String, override val po
 object RDMATransferService {
   val env: SparkEnv = SparkEnv.get
   val conf: SparkConf = env.conf
-  val bindAddress: String = conf.get(DRIVER_BIND_ADDRESS)
-  val port: Int = conf.get("spark.driver.port").toInt
-  private val transferService = new RDMATransferService(conf, bindAddress, port)
-  def getTransferServiceInstance(blockDataManager: BlockDataManager): RDMATransferService = {
-    transferService.init(blockDataManager)
-    transferService
+  private var initialized = 0
+  private var transferService: RDMATransferService = _
+  def getTransferServiceInstance(blockManager: BlockManager): RDMATransferService = synchronized {
+    if (initialized == 0) {
+      transferService = new RDMATransferService(conf, blockManager.shuffleServerId.host, 0)
+      transferService.init(blockManager)
+      initialized = 1
+      transferService
+    } else {
+      transferService
+    }
   }
 }
 

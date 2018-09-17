@@ -1,12 +1,11 @@
-package org.apache.spark.network
+package org.apache.spark.network.pmof
 
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 
+import com.intel.hpnl.core._
 import org.apache.spark.network.buffer.NioManagedBuffer
 import org.apache.spark.network.client.ChunkReceivedCallback
-
-import com.intel.hpnl.core.{Connection, CqService, EqService, Handler, Buffer}
 
 class RDMAClient(address: String, port: Int) {
   val eqService = new EqService(address, port.toString, false)
@@ -39,15 +38,13 @@ class RDMAClient(address: String, port: Int) {
   }
 
   def stop(): Unit = {
-    eqService.shutdown()
+    cqService.shutdown()
   }
 
   def waitToStop(): Unit = {
-    eqService.waitToStop()
-    con.shutdown()
-    eqService.join()
-    cqService.shutdown()
     cqService.join()
+    eqService.shutdown()
+    eqService.join()
   }
 
   def setCon(con: Connection): Unit = {

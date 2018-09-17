@@ -1,4 +1,4 @@
-package org.apache.spark.network
+package org.apache.spark.network.pmof
 
 import java.net.{InetSocketAddress, SocketAddress}
 import java.util.concurrent.ConcurrentHashMap
@@ -23,7 +23,7 @@ class RDMAClientFactory {
 
   def getClient(address: String, port: Int): RDMAClient = {
     val socketAddress: InetSocketAddress = InetSocketAddress.createUnresolved(address, port)
-    return conPool.get(socketAddress).getOrElse(null)
+    conPool.getOrElse(socketAddress, null)
   }
 
   def stop(): Unit = {

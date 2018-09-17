@@ -1,14 +1,23 @@
-package org.apache.spark.network
+package org.apache.spark.network.pmof
 
 import java.nio.ByteBuffer
 
+import org.apache.spark.network.BlockDataManager
 import org.apache.spark.network.shuffle.protocol.{BlockTransferMessage, OpenBlocks}
 import org.apache.spark.serializer.Serializer
 import org.apache.spark.storage.BlockId
 
-import com.intel.hpnl.core.{Connection, CqService, EqService, Handler, Buffer}
+import com.intel.hpnl.core.EqService
+import com.intel.hpnl.core.CqService
+import com.intel.hpnl.core.Buffer
+import com.intel.hpnl.core.Connection
+import com.intel.hpnl.core.Handler
+import com.intel.hpnl.core.Utils
 
-class RDMAServer(address: String, port: Int) {
+class RDMAServer(address: String, var port: Int) {
+  if (port == 0) {
+    port = Utils.getPort
+  }
   val eqService = new EqService(address, port.toString, true)
   val cqService = new CqService(eqService, 1, eqService.getNativeHandle)
 
@@ -30,14 +39,13 @@ class RDMAServer(address: String, port: Int) {
   }
 
   def stop(): Unit = {
-    eqService.shutdown()
+    cqService.shutdown()
   }
 
   def waitToStop(): Unit = {
-    eqService.waitToStop()
-    eqService.join()
-    cqService.shutdown()
     cqService.join()
+    eqService.shutdown()
+    eqService.join()
   }
 
   def setRecvHandler(handler: Handler): Unit = {
