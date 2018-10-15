@@ -3,9 +3,6 @@ package org.apache.spark.network.pmof
 import java.nio.ByteBuffer
 
 import org.apache.spark.network.BlockDataManager
-import org.apache.spark.network.shuffle.protocol.{BlockTransferMessage, OpenBlocks}
-import org.apache.spark.serializer.Serializer
-import org.apache.spark.storage.BlockId
 
 import com.intel.hpnl.core.EqService
 import com.intel.hpnl.core.CqService
@@ -14,7 +11,7 @@ import com.intel.hpnl.core.Connection
 import com.intel.hpnl.core.Handler
 import com.intel.hpnl.core.Utils
 
-class RDMAServer(address: String, var port: Int) {
+class RdmaServer(address: String, var port: Int) {
   if (port == 0) {
     port = Utils.getPort
   }
@@ -53,19 +50,23 @@ class RDMAServer(address: String, var port: Int) {
   }
 }
 
-class ServerRecvHandler(server: RDMAServer, appid: String, serializer: Serializer, blockManager: BlockDataManager) extends Handler {
+class ServerRecvHandler(server: RdmaServer, appid: String,
+                        blockManager: BlockDataManager, blockTracker: RdmaBlockTracker,
+                        isDriver: Boolean) extends Handler {
   override def handle(con: Connection, rdmaBufferId: Int, blockBufferSize: Int): Unit = {
     val buffer: Buffer = con.getRecvBuffer(rdmaBufferId)
     val rpcMessage: ByteBuffer = buffer.get(blockBufferSize)
-    val message = BlockTransferMessage.Decoder.fromByteBuffer(rpcMessage)
-    val openBlocks = message.asInstanceOf[OpenBlocks]
-    val blocksNum = openBlocks.blockIds.length
+
+    val msgType = buffer.getType
     val seq = buffer.getSeq
-    for (i <- (0 until blocksNum).view) {
-      val nioBuffer: ByteBuffer = blockManager.getBlockData(BlockId.apply(openBlocks.blockIds(i))).nioByteBuffer()
+    if (msgType == MessageType.REGISTER_BLOCK.id()) {
+      blockTracker.asInstanceOf[RdmaBlockTrackerDriver].registerBlockStatus(rpcMessage)
+    } else if (msgType == MessageType.FETCH_BLOCK_STATUS.id()) {
+      val byteBuffer = blockTracker.asInstanceOf[RdmaBlockTrackerDriver].getBlockStatus
       val sendBuffer = con.getSendBuffer
-      sendBuffer.put(nioBuffer, i, seq)
-      con.send(sendBuffer.getByteBuffer.remaining(), sendBuffer.getRdmaBufferId)
+      sendBuffer.put(byteBuffer, msgType, 0, seq)
+      con.send(sendBuffer.remaining(), sendBuffer.getRdmaBufferId)
+    } else {
     }
   }
 }

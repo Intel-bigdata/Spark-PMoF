@@ -1,19 +1,18 @@
 package org.apache.spark.network.pmof
 
 import java.nio.ByteBuffer
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
 import com.intel.hpnl.core._
-import org.apache.spark.network.buffer.NioManagedBuffer
-import org.apache.spark.network.client.ChunkReceivedCallback
 
-class RDMAClient(address: String, port: Int) {
+class RdmaClient(address: String, port: Int, blockTracker: RdmaBlockTracker, isDriver: Boolean) {
   val eqService = new EqService(address, port.toString, false)
   val cqService = new CqService(eqService, 1, eqService.getNativeHandle)
   val connectHandler = new ClientConnectHandler(this)
-  val recvHandler = new ClientRecvHandler(this)
+  val recvHandler = new ClientRecvHandler(this, blockTracker, isDriver)
 
-  val outstandingFetches:ConcurrentHashMap[Int, ChunkReceivedCallback] = new ConcurrentHashMap[Int, ChunkReceivedCallback]()
+  val outstandingFetches:ConcurrentHashMap[Int, BlockTrackerCallback] = new ConcurrentHashMap[Int, BlockTrackerCallback]()
 
   final val SINGLE_BUFFER_SIZE: Int = 65536
   final val BUFFER_NUM: Int = 32
@@ -56,32 +55,36 @@ class RDMAClient(address: String, port: Int) {
     this.con
   }
 
-  def send(byteBuffer: ByteBuffer, seq: Int, callback: ChunkReceivedCallback): Unit = {
+  def send(byteBuffer: ByteBuffer, messageType: MessageType, seq: Int, callback: BlockTrackerCallback): Unit = {
     assert(con != null)
     outstandingFetches.put(seq, callback)
     val sendBuffer = this.con.getSendBuffer
-    sendBuffer.put(byteBuffer, 0, seq)
-    con.send(sendBuffer.getByteBuffer.remaining(), sendBuffer.getRdmaBufferId)
+    sendBuffer.put(byteBuffer, messageType.id(),  0, seq)
+    con.send(sendBuffer.remaining(), sendBuffer.getRdmaBufferId)
   }
 
-  def getOutStandingFetches(seq: Int): ChunkReceivedCallback = {
+  def getOutStandingFetches(seq: Int): BlockTrackerCallback = {
     outstandingFetches.get(seq)
   }
 }
 
-class ClientConnectHandler(client: RDMAClient) extends Handler {
+class ClientConnectHandler(client: RdmaClient) extends Handler {
   override def handle(connection: Connection, rdmaBufferId: Int, bufferBufferSize: Int): Unit = {
     client.setCon(connection)
   }
 }
 
-class ClientRecvHandler(client: RDMAClient) extends Handler {
+class ClientRecvHandler(client: RdmaClient, blockTracker: RdmaBlockTracker, isDriver: Boolean) extends Handler {
   override def handle(con: Connection, rdmaBufferId: Int, blockBufferSize: Int): Unit = {
     val buffer: Buffer = con.getRecvBuffer(rdmaBufferId)
-    val rpcMessage: ByteBuffer = buffer.get(blockBufferSize)
+    val rpcMessage = buffer.get(blockBufferSize)
+    val msgType = buffer.getType
     val seq = buffer.getSeq
     val callback = client.getOutStandingFetches(seq)
-    val managedBuffer = new NioManagedBuffer(rpcMessage)
-    callback.onSuccess(buffer.getBlockBufferId, managedBuffer)
+    if (msgType == MessageType.FETCH_BLOCK_STATUS.id()) {
+      callback.onSuccess(0, rpcMessage)
+    } else {
+      callback.onFailure(0, new IOException())
+    }
   }
 }

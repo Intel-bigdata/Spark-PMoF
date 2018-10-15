@@ -2,11 +2,11 @@ package org.apache.spark.shuffle.pmof
 
 import org.apache.spark._
 import org.apache.spark.internal.{Logging, config}
-import org.apache.spark.network.pmof.RDMATransferService
+import org.apache.spark.network.pmof.RdmaBlockTracker
 import org.apache.spark.serializer.SerializerManager
 import org.apache.spark.shuffle.{BaseShuffleHandle, ShuffleReader}
 import org.apache.spark.storage.BlockManager
-import org.apache.spark.storage.pmof.RDMAShuffleBlockFetcherIterator
+import org.apache.spark.storage.pmof.RdmaShuffleBlockFetcherIterator
 import org.apache.spark.util.CompletionIterator
 import org.apache.spark.util.collection.ExternalSorter
 
@@ -14,11 +14,12 @@ import org.apache.spark.util.collection.ExternalSorter
   * Fetches and reads the partitions in range [startPartition, endPartition) from a shuffle by
   * requesting them from other nodes' block stores.
   */
-private[spark] class RDMAShuffleReader[K, C](
+private[spark] class RdmaShuffleReader[K, C](
           handle: BaseShuffleHandle[K, _, C],
           startPartition: Int,
           endPartition: Int,
           context: TaskContext,
+          blockTracker: RdmaBlockTracker,
           serializerManager: SerializerManager = SparkEnv.get.serializerManager,
           blockManager: BlockManager = SparkEnv.get.blockManager,
           mapOutputTracker: MapOutputTracker = SparkEnv.get.mapOutputTracker)
@@ -28,10 +29,10 @@ private[spark] class RDMAShuffleReader[K, C](
 
   /** Read the combined key-values for this reduce task */
   override def read(): Iterator[Product2[K, C]] = {
-    val wrappedStreams: RDMAShuffleBlockFetcherIterator = new RDMAShuffleBlockFetcherIterator(
+    val wrappedStreams: RdmaShuffleBlockFetcherIterator = new RdmaShuffleBlockFetcherIterator(
       context,
-      RDMATransferService.getTransferServiceInstance(blockManager),
       blockManager,
+      blockTracker,
       mapOutputTracker.getMapSizesByExecutorId(handle.shuffleId, startPartition, endPartition),
       serializerManager.wrapStream,
       // Note: we use getSizeAsMb when no suffix is provided for backwards compatibility

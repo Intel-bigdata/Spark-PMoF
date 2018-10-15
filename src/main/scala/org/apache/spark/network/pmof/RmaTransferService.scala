@@ -1,25 +1,21 @@
 package org.apache.spark.network.pmof
 
+import java.nio.ByteBuffer
 import java.util.Random
 import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.spark.network.BlockDataManager
-import org.apache.spark.network.client.ChunkReceivedCallback
 import org.apache.spark.network.shuffle.protocol.OpenBlocks
 import org.apache.spark.network.shuffle.{BlockFetchingListener, TempFileManager}
-import org.apache.spark.serializer.JavaSerializer
-import org.apache.spark.storage.BlockManager
-import org.apache.spark.{SparkConf, SparkEnv}
+import org.apache.spark.SparkConf
 
-class RDMATransferService(conf: SparkConf, val hostname: String, var port: Int) extends TransferService {
+class RmaTransferService(conf: SparkConf, val hostname: String, var port: Int, blockTracker: RdmaBlockTracker, isDriver: Boolean) extends TransferService {
 
-  private var server: RDMAServer = _
+  private var server: RdmaServer = _
   private var recvHandler: ServerRecvHandler = _
-  private var clientFactory: RDMAClientFactory = _
+  private var clientFactory: RdmaClientFactory = _
   private var appId: String = _
   private var nextReqId: AtomicInteger = _
-
-  private val serializer = new JavaSerializer(conf)
 
   override def fetchBlocks(host: String,
                            port: Int,
@@ -32,11 +28,23 @@ class RDMATransferService(conf: SparkConf, val hostname: String, var port: Int) 
                   reqPort: Int,
                   execId: String,
                   blockIds: Array[String],
-                  callback: ChunkReceivedCallback,
+                  callback: BlockTrackerCallback,
                   tempFileManager: TempFileManager): Unit = {
     val client = clientFactory.createClient(reqHost, reqPort)
-    val openBlocks: OpenBlocks = new OpenBlocks(appId, execId, blockIds)
-    client.send(openBlocks.toByteBuffer, nextReqId.getAndIncrement(), callback)
+  }
+
+  def registerBlockStatus(reqHost: String,
+                     reqPort: Int,
+                     byteBuffer: ByteBuffer): Unit = {
+    val client = clientFactory.createClient(reqHost, reqPort)
+    client.send(byteBuffer, MessageType.REGISTER_BLOCK, nextReqId.getAndIncrement(), null)
+  }
+
+  def fetchBlockStatus(reqHost: String,
+                       reqPort: Int,
+                       callback: BlockTrackerCallback): Unit = {
+    val client = clientFactory.createClient(reqHost, reqPort)
+    client.send(null, MessageType.FETCH_BLOCK_STATUS, nextReqId.getAndIncrement(), callback)
   }
 
   override def close(): Unit = {
@@ -50,12 +58,15 @@ class RDMATransferService(conf: SparkConf, val hostname: String, var port: Int) 
     }
   }
 
-  override def init(blockManager: BlockDataManager): Unit = {
-    this.server = new RDMAServer(hostname, port)
+  def init(blockManager: BlockDataManager): Unit = {
+    this.server = new RdmaServer(hostname, port)
     this.appId = conf.getAppId
-    this.recvHandler = new ServerRecvHandler(server, appId, serializer, blockManager)
+
+    this.recvHandler = new ServerRecvHandler(server, appId, blockManager, blockTracker, isDriver)
     this.server.setRecvHandler(recvHandler)
-    this.clientFactory = new RDMAClientFactory()
+
+    this.clientFactory = new RdmaClientFactory(blockTracker, isDriver)
+
     this.server.init()
     this.server.start()
     this.port = server.port
@@ -63,21 +74,3 @@ class RDMATransferService(conf: SparkConf, val hostname: String, var port: Int) 
     this.nextReqId = new AtomicInteger(random)
   }
 }
-
-object RDMATransferService {
-  val env: SparkEnv = SparkEnv.get
-  val conf: SparkConf = env.conf
-  private var initialized = 0
-  private var transferService: RDMATransferService = _
-  def getTransferServiceInstance(blockManager: BlockManager): RDMATransferService = synchronized {
-    if (initialized == 0) {
-      transferService = new RDMATransferService(conf, blockManager.shuffleServerId.host, 0)
-      transferService.init(blockManager)
-      initialized = 1
-      transferService
-    } else {
-      transferService
-    }
-  }
-}
-

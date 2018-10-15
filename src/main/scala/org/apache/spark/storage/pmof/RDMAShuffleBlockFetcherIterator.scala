@@ -24,9 +24,8 @@ import java.util.concurrent.LinkedBlockingQueue
 import javax.annotation.concurrent.GuardedBy
 import org.apache.spark.internal.Logging
 import org.apache.spark.network.buffer.{FileSegmentManagedBuffer, ManagedBuffer}
-import org.apache.spark.network.client.ChunkReceivedCallback
-import org.apache.spark.network.pmof.RDMATransferService
-import org.apache.spark.network.shuffle.{ShuffleClient, TempFileManager}
+import org.apache.spark.network.pmof.{BlockTrackerCallback, RdmaBlockTracker, RdmaBlockTrackerExecutor}
+import org.apache.spark.network.shuffle.TempFileManager
 import org.apache.spark.shuffle.FetchFailedException
 import org.apache.spark.storage._
 import org.apache.spark.util.Utils
@@ -47,9 +46,9 @@ import scala.collection.mutable.ArrayBuffer
   * using too much memory.
   *
   * @param context [[TaskContext]], used for metrics update
-  * @param shuffleClient [[ShuffleClient]] for fetching remote blocks
   * @param blockManager [[BlockManager]] for reading local blocks
-  * @param blocksByAddress list of blocks to fetch grouped by the [[BlockManagerId]].
+  * @param blockTracker
+  * @param blocksByAddress list of blocks to fetch grouped by the [[BlockManagerId.
   *                        For each block we also require the size (in bytes as a long field) in
   *                        order to throttle the memory usage.
   * @param streamWrapper A function to wrap the returned input stream.
@@ -61,10 +60,10 @@ import scala.collection.mutable.ArrayBuffer
   * @param detectCorrupt whether to detect any corruption in fetched blocks.
   */
 private[spark]
-final class RDMAShuffleBlockFetcherIterator(
+final class RdmaShuffleBlockFetcherIterator(
                                          context: TaskContext,
-                                         shuffleClient: ShuffleClient,
                                          blockManager: BlockManager,
+                                         blockTracker: RdmaBlockTracker,
                                          blocksByAddress: Seq[(BlockManagerId, Seq[(BlockId, Long)])],
                                          streamWrapper: (BlockId, InputStream) => InputStream,
                                          maxBytesInFlight: Long,
@@ -74,7 +73,7 @@ final class RDMAShuffleBlockFetcherIterator(
                                          detectCorrupt: Boolean)
   extends Iterator[(BlockId, InputStream)] with TempFileManager with Logging {
 
-  import RDMAShuffleBlockFetcherIterator._
+  import RdmaShuffleBlockFetcherIterator._
 
   /**
     * Total number of blocks to fetch. This can be smaller than the total number of blocks
@@ -222,9 +221,9 @@ final class RDMAShuffleBlockFetcherIterator(
     val blockIds = req.blocks.map(_._1.toString)
     val address = req.address
 
-    val blockFetchingCallback = new ChunkReceivedCallback {
-      override def onSuccess(blockBufferId: Int, buf: ManagedBuffer): Unit = {
-        RDMAShuffleBlockFetcherIterator.this.synchronized {
+    val blockFetchingCallback = new BlockTrackerCallback {
+      override def onSuccess(blockBufferId: Int, buf: ByteBuffer): Unit = {
+        RdmaShuffleBlockFetcherIterator.this.synchronized {
           if (!isZombie) {
             // Increment the ref count because we need to pass this to a different thread.
             // This needs to be released after use.
@@ -251,10 +250,10 @@ final class RDMAShuffleBlockFetcherIterator(
     // already encrypted and compressed over the wire(w.r.t. the related configs), we can just fetch
     // the data and write it to file directly.
     if (req.size > maxReqSizeShuffleToMem) {
-      shuffleClient.asInstanceOf[RDMATransferService].fetchBlocks(address.host, address.port, address.executorId, blockIds.toArray,
+      blockTracker.asInstanceOf[RdmaBlockTrackerExecutor].fetchBlocks(address.host, address.port, address.executorId, blockIds.toArray,
         blockFetchingCallback, this)
     } else {
-      shuffleClient.asInstanceOf[RDMATransferService].fetchBlocks(address.host, address.port, address.executorId, blockIds.toArray,
+      blockTracker.asInstanceOf[RdmaBlockTrackerExecutor].fetchBlocks(address.host, address.port, address.executorId, blockIds.toArray,
         blockFetchingCallback, null)
     }
   }
@@ -533,7 +532,7 @@ final class RDMAShuffleBlockFetcherIterator(
   */
 private class RDMABufferReleasingInputStream(
                                           private val delegate: InputStream,
-                                          private val iterator: RDMAShuffleBlockFetcherIterator)
+                                          private val iterator: RdmaShuffleBlockFetcherIterator)
   extends InputStream {
   private[this] var closed = false
 
@@ -563,7 +562,7 @@ private class RDMABufferReleasingInputStream(
 }
 
 private[storage]
-object RDMAShuffleBlockFetcherIterator {
+object RdmaShuffleBlockFetcherIterator {
 
   /**
     * A request to fetch blocks from a remote BlockManager.
@@ -614,4 +613,3 @@ object RDMAShuffleBlockFetcherIterator {
                                                   e: Throwable)
     extends FetchResult
 }
-
