@@ -21,8 +21,8 @@ class RDMAServer(address: String, var port: Int) {
   val eqService = new EqService(address, port.toString, true)
   val cqService = new CqService(eqService, 1, eqService.getNativeHandle)
 
-  final val SINGLE_BUFFER_SIZE = 65536
-  final val BUFFER_NUM = 32
+  final val SINGLE_BUFFER_SIZE = 33554432
+  final val BUFFER_NUM = 128
 
   def init(): Unit = {
     for (i <- 0 to BUFFER_NUM) {
@@ -64,8 +64,8 @@ class ServerRecvHandler(server: RDMAServer, appid: String, serializer: Serialize
     for (i <- (0 until blocksNum).view) {
       val nioBuffer: ByteBuffer = blockManager.getBlockData(BlockId.apply(openBlocks.blockIds(i))).nioByteBuffer()
       val sendBuffer = con.getSendBuffer
-      sendBuffer.put(nioBuffer, i, seq)
-      con.send(sendBuffer.getByteBuffer.remaining(), sendBuffer.getRdmaBufferId)
+      sendBuffer.put(nioBuffer, 0, i, seq)
+      con.send(sendBuffer.remaining(), sendBuffer.getRdmaBufferId)
     }
   }
 }

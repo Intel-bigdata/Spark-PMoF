@@ -15,8 +15,8 @@ class RDMAClient(address: String, port: Int) {
 
   val outstandingFetches:ConcurrentHashMap[Int, ChunkReceivedCallback] = new ConcurrentHashMap[Int, ChunkReceivedCallback]()
 
-  final val SINGLE_BUFFER_SIZE: Int = 65536
-  final val BUFFER_NUM: Int = 32
+  final val SINGLE_BUFFER_SIZE: Int = 33554432
+  final val BUFFER_NUM: Int = 16
   private var con: Connection = _
 
   def init(): Unit = {
@@ -60,8 +60,8 @@ class RDMAClient(address: String, port: Int) {
     assert(con != null)
     outstandingFetches.put(seq, callback)
     val sendBuffer = this.con.getSendBuffer
-    sendBuffer.put(byteBuffer, 0, seq)
-    con.send(sendBuffer.getByteBuffer.remaining(), sendBuffer.getRdmaBufferId)
+    sendBuffer.put(byteBuffer, 0, 0, seq)
+    con.send(sendBuffer.remaining(), sendBuffer.getRdmaBufferId)
   }
 
   def getOutStandingFetches(seq: Int): ChunkReceivedCallback = {
