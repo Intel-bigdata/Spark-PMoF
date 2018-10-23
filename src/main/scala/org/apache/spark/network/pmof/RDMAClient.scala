@@ -4,6 +4,8 @@ import java.nio.ByteBuffer
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
+import org.apache.spark.network.buffer.{ManagedBuffer, NioManagedBuffer}
+
 import com.intel.hpnl.core._
 
 class RdmaClient(address: String, port: Int, blockTracker: RdmaBlockTracker, isDriver: Boolean) {
@@ -82,7 +84,8 @@ class ClientRecvHandler(client: RdmaClient, blockTracker: RdmaBlockTracker, isDr
     val seq = buffer.getSeq
     val callback = client.getOutStandingFetches(seq)
     if (msgType == MessageType.FETCH_BLOCK_STATUS.id()) {
-      callback.onSuccess(0, rpcMessage)
+      // convert ByteBuffer to ManagedBuffer
+      callback.onSuccess(0, new NioManagedBuffer(rpcMessage))
     } else {
       callback.onFailure(0, new IOException())
     }

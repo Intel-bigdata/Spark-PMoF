@@ -222,7 +222,7 @@ final class RdmaShuffleBlockFetcherIterator(
     val address = req.address
 
     val blockFetchingCallback = new BlockTrackerCallback {
-      override def onSuccess(blockBufferId: Int, buf: ByteBuffer): Unit = {
+      override def onSuccess(blockBufferId: Int, buf: ManagedBuffer): Unit = {
         RdmaShuffleBlockFetcherIterator.this.synchronized {
           if (!isZombie) {
             // Increment the ref count because we need to pass this to a different thread.

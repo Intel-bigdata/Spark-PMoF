@@ -74,12 +74,16 @@ private[spark] class RdmaShuffleWriter[K, V, C](
       val partitionLengths = sorter.writePartitionedFile(blockId, tmp)
       shuffleBlockResolver.writeIndexFileAndCommit(dep.shuffleId, mapId, partitionLengths, tmp)
       val shuffleServerId = blockManager.shuffleServerId
-      val blockManagerId: BlockManagerId =
-        BlockManagerId(shuffleServerId.executorId, shuffleServerId.host,
-          blockTracker.port, shuffleServerId.topologyInfo)
-      mapStatus = MapStatus(blockManagerId, partitionLengths)
-      // TODO: send block status to driver
-      blockTracker.asInstanceOf[RdmaBlockTrackerExecutor].registerBlockStatus()
+      if (blockTracker.enable_rdma) {
+        val blockManagerId: BlockManagerId =
+          BlockManagerId(shuffleServerId.executorId, shuffleServerId.host,
+            blockTracker.port, shuffleServerId.topologyInfo)
+        mapStatus = MapStatus(blockManagerId, partitionLengths)
+        // TODO: send block status to driver
+        //blockTracker.asInstanceOf[RdmaBlockTrackerExecutor].registerBlockStatus()
+      } else {
+        mapStatus = MapStatus(shuffleServerId, partitionLengths)
+      }
 
     } finally {
       if (tmp.exists() && !tmp.delete()) {

@@ -1,6 +1,8 @@
 package org.apache.spark.network.pmof
 
 import java.nio.ByteBuffer
+import org.apache.spark.network.buffer.ManagedBuffer;
+import org.apache.spark.internal.Logging
 
 import org.apache.spark.network.shuffle.TempFileManager
 import org.apache.spark.storage.BlockManager
@@ -9,6 +11,7 @@ import org.apache.spark.{SparkConf, SparkEnv}
 private[spark] abstract class RdmaBlockTracker {
   var host: String = _
   var port: Int = _
+  var enable_rdma: Boolean = true
   protected val env: SparkEnv = SparkEnv.get
   protected var conf: SparkConf = env.conf
   protected var blockManager: BlockManager = env.blockManager
@@ -66,8 +69,8 @@ private[spark] class RdmaBlockTrackerExecutor extends RdmaBlockTracker {
 
   def fetchBlockStatus(): Unit = {
     val blockStatusReceivedCallback = new BlockTrackerCallback {
-      override def onSuccess(chunkIndex: Int, buffer: ByteBuffer): Unit = {
-        val blockStatusMessage = blockStatusSerializer.deserialize(buffer)
+      override def onSuccess(chunkIndex: Int, buffer: ManagedBuffer): Unit = {
+        val blockStatusMessage = blockStatusSerializer.deserialize(buffer.nioByteBuffer())
         globalStatusMsg.enqueue(blockStatusMessage)
       }
 
@@ -87,14 +90,26 @@ private[spark] class RdmaBlockTrackerExecutor extends RdmaBlockTracker {
   }
 }
 
-object RdmaBlockTracker {
-  private val rdmaBlockTrackerDriver = new RdmaBlockTrackerDriver
-  private val rdmaBlockTrackerExecutor = new RdmaBlockTrackerExecutor
-  def getBlockTracker(isDriver: Boolean): RdmaBlockTracker = synchronized {
-    if (isDriver) {
-      rdmaBlockTrackerDriver
+private[spark] class RdmaBlockTrackerDisable extends RdmaBlockTracker {
+  host = ""
+  port = 0
+  enable_rdma = false
+  def registerBlockStatus(byteBuffer: ByteBuffer): Unit = {}
+}
+
+object RdmaBlockTracker extends Logging {
+  def getBlockTracker(isDriver: Boolean, enable_rdma: Boolean): RdmaBlockTracker = synchronized {
+    if (!enable_rdma) {
+      logInfo("Using RdmaBlockTrackerDisable");
+      new RdmaBlockTrackerDisable
     } else {
-      rdmaBlockTrackerExecutor
+      if (isDriver) {
+        logInfo("Using RdmaBlockTrackerDriver");
+        new RdmaBlockTrackerDriver
+      } else {
+        logInfo("Using RdmaBlockTrackerExecutor");
+        new RdmaBlockTrackerDriver
+      }
     }
   }
 }
