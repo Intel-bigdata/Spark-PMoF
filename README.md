@@ -26,7 +26,7 @@ This plugin current supports Spark 2.3 and works well on various Network fabrics
 ```shell
 spark.driver.extraClassPath SSO-PATH/target/sso-0.1-jar-with-dependencies.jar
 spark.executor.extraClassPath SSO-PATH/target/sso-0.1-jar-with-dependencies.jar
-spark.shuffle.manager org.apache.spark.shuffle.pmof.RDMAShuffleManager
+spark.shuffle.manager org.apache.spark.shuffle.pmof.RdmaShuffleManager
 ```
 
 ## Contact
