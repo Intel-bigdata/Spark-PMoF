@@ -4,7 +4,6 @@ import java.util.Random
 import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.spark.network.BlockDataManager
-import org.apache.spark.network.client.ChunkReceivedCallback
 import org.apache.spark.network.shuffle.protocol.OpenBlocks
 import org.apache.spark.network.shuffle.{BlockFetchingListener, TempFileManager}
 import org.apache.spark.serializer.JavaSerializer
@@ -32,11 +31,29 @@ class RDMATransferService(conf: SparkConf, val hostname: String, var port: Int) 
                   reqPort: Int,
                   execId: String,
                   blockIds: Array[String],
-                  callback: ChunkReceivedCallback,
-                  tempFileManager: TempFileManager): Unit = {
+                  msgType: Byte,
+                  callback: ReceivedCallback): Unit = {
     val client = clientFactory.createClient(reqHost, reqPort)
-    val openBlocks: OpenBlocks = new OpenBlocks(appId, execId, blockIds)
-    client.send(openBlocks.toByteBuffer, nextReqId.getAndIncrement(), callback)
+    for (i <- 0 until blockIds.length) {
+      val bss = new Array[String](1)
+      bss(0) = blockIds(i)
+      val openBlocks: OpenBlocks = new OpenBlocks(appId, execId, bss)
+      client.send(openBlocks.toByteBuffer, nextReqId.getAndIncrement(), i, msgType, callback)
+    }
+  }
+
+  def fetchBlockSize(reqHost: String,
+                     reqPort: Int,
+                     execId: String,
+                     blockId: String,
+                     blockIndex: Int,
+                     msgType: Byte,
+                     callback: ReceivedCallback): Unit = {
+    val client = clientFactory.createClient(reqHost, reqPort)
+    val bss = new Array[String](1)
+    bss(0) = blockId
+    val openBlocks: OpenBlocks = new OpenBlocks(appId, execId, bss)
+    client.send(openBlocks.toByteBuffer, nextReqId.getAndIncrement(), blockIndex, msgType, callback)
   }
 
   override def close(): Unit = {
@@ -67,6 +84,7 @@ class RDMATransferService(conf: SparkConf, val hostname: String, var port: Int) 
 object RDMATransferService {
   val env: SparkEnv = SparkEnv.get
   val conf: SparkConf = env.conf
+  val CHUNKSIZE: Int = 1024*1024
   private var initialized = 0
   private var transferService: RDMATransferService = _
   def getTransferServiceInstance(blockManager: BlockManager): RDMATransferService = synchronized {

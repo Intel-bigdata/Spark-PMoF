@@ -23,10 +23,10 @@ import java.util.concurrent.LinkedBlockingQueue
 
 import javax.annotation.concurrent.GuardedBy
 import org.apache.spark.internal.Logging
-import org.apache.spark.network.buffer.{FileSegmentManagedBuffer, ManagedBuffer}
-import org.apache.spark.network.client.ChunkReceivedCallback
-import org.apache.spark.network.pmof.RDMATransferService
+import org.apache.spark.network.buffer.{FileSegmentManagedBuffer, ManagedBuffer, NioManagedBuffer}
 import org.apache.spark.network.shuffle.{ShuffleClient, TempFileManager}
+import org.apache.spark.network.pmof.ReceivedCallback
+import org.apache.spark.network.pmof.RDMATransferService
 import org.apache.spark.shuffle.FetchFailedException
 import org.apache.spark.storage._
 import org.apache.spark.util.Utils
@@ -222,27 +222,48 @@ final class RDMAShuffleBlockFetcherIterator(
     val blockIds = req.blocks.map(_._1.toString)
     val address = req.address
 
-    val blockFetchingCallback = new ChunkReceivedCallback {
-      override def onSuccess(blockBufferId: Int, buf: ManagedBuffer): Unit = {
+    val blockBufs = new Array[ByteBuffer](blockIds.size)
+    val blockBufRemainingSize = new Array[Long](blockIds.size)
+    val blockFetchingCallback = new ReceivedCallback {
+      override def onSuccess(blockIndex: Int, chunkIndex: Int, msgType: Byte, byteBuffer: ByteBuffer): Unit = {
         RDMAShuffleBlockFetcherIterator.this.synchronized {
           if (!isZombie) {
             // Increment the ref count because we need to pass this to a different thread.
             // This needs to be released after use.
-            buf.retain()
-            val blockIdAray = blockIds.toArray
-            val blockId = blockIdAray(blockBufferId)
-            remainingBlocks -= blockId
-            results.put(SuccessFetchResult(BlockId(blockId), address, sizeMap(blockId), buf,
-              remainingBlocks.isEmpty))
-            logDebug("remainingBlocks: " + remainingBlocks)
+            if (msgType == 0) {
+              val reqBufSize = byteBuffer.getInt()
+              blockBufs(blockIndex) = ByteBuffer.allocate(reqBufSize)
+              blockBufRemainingSize(blockIndex) = reqBufSize
+              shuffleClient.asInstanceOf[RDMATransferService].fetchBlockSize(address.host, address.port, address.executorId,
+                blockIds(blockIndex), blockIndex, 1.toByte, this)
+            } else {
+              blockBufRemainingSize(blockIndex) -= byteBuffer.remaining()
+              val offset: Int = chunkIndex*(RDMATransferService.CHUNKSIZE-9)
+              val len: Int = byteBuffer.remaining()
+              val end: Int = offset+len
+              for (i <- offset until end) {
+                blockBufs(blockIndex).put(i, byteBuffer.get())
+              }
+              if (blockBufRemainingSize(blockIndex) == 0) {
+                blockBufs(blockIndex).flip()
+                val resultBuf = new NioManagedBuffer(blockBufs(blockIndex))
+                resultBuf.retain()
+                val blockIdAray = blockIds.toArray
+                val blockId = blockIdAray(blockIndex)
+                remainingBlocks -= blockId
+                results.put(SuccessFetchResult(BlockId(blockId), address, sizeMap(blockId), resultBuf,
+                  remainingBlocks.isEmpty))
+                logDebug("remainingBlocks: " + remainingBlocks)
+              }
+            }
           }
         }
       }
 
-      override def onFailure(blockBufferId: Int, e: Throwable): Unit = {
+      override def onFailure(blockIndex: Int, chunkIndex: Int, e: Throwable): Unit = {
         logError(s"Failed to get block(s) from ${req.address.host}:${req.address.port}", e)
         val blockIdAray = blockIds.toArray
-        val blockId = blockIdAray(blockBufferId)
+        val blockId = blockIdAray(blockIndex)
         results.put(FailureFetchResult(BlockId(blockId), address, e))
       }
     }
@@ -250,13 +271,8 @@ final class RDMAShuffleBlockFetcherIterator(
     // Fetch remote shuffle blocks to disk when the request is too large. Since the shuffle data is
     // already encrypted and compressed over the wire(w.r.t. the related configs), we can just fetch
     // the data and write it to file directly.
-    if (req.size > maxReqSizeShuffleToMem) {
-      shuffleClient.asInstanceOf[RDMATransferService].fetchBlocks(address.host, address.port, address.executorId, blockIds.toArray,
-        blockFetchingCallback, this)
-    } else {
-      shuffleClient.asInstanceOf[RDMATransferService].fetchBlocks(address.host, address.port, address.executorId, blockIds.toArray,
-        blockFetchingCallback, null)
-    }
+    shuffleClient.asInstanceOf[RDMATransferService].fetchBlocks(address.host, address.port, address.executorId,
+      blockIds.toArray, 0.toByte, blockFetchingCallback)
   }
 
   private[this] def splitLocalRemoteBlocks(): ArrayBuffer[FetchRequest] = {
