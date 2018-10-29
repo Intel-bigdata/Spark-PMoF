@@ -1,5 +1,3 @@
-package org.apache.spark.shuffle.pmof
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -17,77 +15,153 @@ package org.apache.spark.shuffle.pmof
  * limitations under the License.
  */
 
+package org.apache.spark.shuffle.pmof
+
 import org.apache.spark._
 import org.apache.spark.internal.Logging
 import org.apache.spark.network.pmof.RdmaTransferService
 import org.apache.spark.scheduler.MapStatus
 import org.apache.spark.shuffle.{BaseShuffleHandle, IndexShuffleBlockResolver, ShuffleWriter}
-import org.apache.spark.storage.{BlockManagerId, ShuffleBlockId}
+import org.apache.spark.shuffle.IndexShuffleBlockResolver.NOOP_REDUCE_ID
+import org.apache.spark.serializer.{SerializationStream, SerializerInstance, SerializerManager}
+import org.apache.spark.storage._
+
+import org.apache.spark.storage.pmof.PersistentMemoryHandler
+import org.apache.spark.network.pmof.{RdmaBlockTracker, RdmaBlockTrackerExecutor}
+
 import org.apache.spark.util.Utils
-import org.apache.spark.util.collection.ExternalSorter
+import java.util.UUID
+import java.io.{ByteArrayOutputStream, OutputStream}
+
+//import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.Queue
+
+private[spark] class PersistentMemoryWriterPartition(
+    serializerManager: SerializerManager,
+    serializerInstance: SerializerInstance,
+    val blockId: BlockId
+) extends Logging {
+  var bs: OutputStream = null
+  var objStream: SerializationStream = null
+  var initialized = false
+  var stream: ByteArrayOutputStream = _
+  var size: Long = 0
+  //var objStream: ObjectOutputStream = _
+
+  def set(key: Any, value: Any) {
+    if (!initialized) {
+      stream = new ByteArrayOutputStream()
+      bs = serializerManager.wrapStream(blockId, stream)
+      objStream = serializerInstance.serializeStream(bs)
+      initialized = true
+    }
+    objStream.writeObject(key)
+    objStream.writeObject(value)
+  }
+
+  def get() : Array[Byte] = {
+    if (initialized) {
+      objStream.flush()
+      var data = stream.toByteArray
+      size = data.size
+      data
+    } else {
+      Array[Byte]()
+    }
+  }
+  
+  def close() {
+    if (initialized) {
+      //logInfo("PersistentMemoryHandlerPartition: stream closed.")
+      objStream.close()
+      bs.close()
+      stream.close()
+    }
+  }
+}
 
 private[spark] class RdmaShuffleWriter[K, V, C](
                                                  shuffleBlockResolver: IndexShuffleBlockResolver,
                                                  handle: BaseShuffleHandle[K, V, C],
                                                  mapId: Int,
-                                                 context: TaskContext)
+                                                 context: TaskContext,
+                                                 blockTracker: RdmaBlockTracker,
+                                                 path_pre: String,
+                                                 maxPoolSize: Long,
+                                                 maxStages: Int,
+                                                 maxMaps: Int
+                                                 )
+>>>>>>> 1f977c4... [Feature] Enable PMDK(LLPL) support:src/main/scala/org/apache/spark/shuffle/pmof/RDMAShuffleWriter.scala
   extends ShuffleWriter[K, V] with Logging {
-
   private val dep = handle.dependency
-
   private val blockManager = SparkEnv.get.blockManager
+  private var mapStatus: MapStatus = _
+  private val writeMetrics = context.taskMetrics().shuffleWriteMetrics
+  private val stageId = dep.shuffleId
+  private val partitioner = dep.partitioner
+  private val numPartitions = partitioner.numPartitions
+  private val serInstance: SerializerInstance = dep.serializer.newInstance()
+  private val shuffleDataBlockName = ShuffleDataBlockId(stageId, mapId, NOOP_REDUCE_ID).name
 
-  private var sorter: ExternalSorter[K, V, _] = _
+  val blockId = new TempShuffleBlockId(UUID.randomUUID())
+  var path = path_pre + "_" + SparkEnv.get.executorId
+  //logInfo("Using spark pmof PersistentMemoryHandler, path is " + path)
+  var persistentMemoryWriter = PersistentMemoryHandler.getPersistentMemoryHandler(path, maxPoolSize, maxStages, maxMaps)
+  persistentMemoryWriter.initializeShuffle(stageId, mapId, numPartitions)
+  var partitionLengths = Array.fill[Long](numPartitions)(0)
 
-  // Are we in the process of stopping? Because map tasks can call stop() with success = true
-  // and then call stop() with success = false if they get an exception, we want to make sure
-  // we don't try deleting files, etc twice.
+  /**
+   * Are we in the process of stopping? Because map tasks can call stop() with success = true
+   * and then call stop() with success = false if they get an exception, we want to make sure
+   * we don't try deleting files, etc twice.
+   */
   private var stopping = false
 
-  private var mapStatus: MapStatus = _
-
-  private val writeMetrics = context.taskMetrics().shuffleWriteMetrics
-
-  /** Write a bunch of records to this task's output */
+  /** 
+  * Call PMDK to write data to persistent memory
+  * Original Spark writer will do write and mergesort in this function,
+  * while by using pmdk, we can do that once since pmdk supports transaction.
+  */
   override def write(records: Iterator[Product2[K, V]]): Unit = {
-    sorter = if (dep.mapSideCombine) {
-      require(dep.aggregator.isDefined, "Map-side combine without Aggregator specified!")
-      new ExternalSorter[K, V, C](
-        context, dep.aggregator, Some(dep.partitioner), dep.keyOrdering, dep.serializer)
-    } else {
-      // In this case we pass neither an aggregator nor an ordering to the sorter, because we don't
-      // care whether the keys get sorted in each partition; that will be done on the reduce side
-      // if the operation being run is sortByKey.
-      new ExternalSorter[K, V, V](
-        context, aggregator = None, Some(dep.partitioner), ordering = None, dep.serializer)
-    }
-    sorter.insertAll(records)
+    // TODO: keep checking if data need to spill to disk when PM capacity is not enough.
+    // TODO: currently, we apply processed records to PM.
 
-    // Don't bother including the time to open the merged output file in the shuffle write time,
-    // because it just opens a single file, so is typically too fast to measure accurately
-    // (see SPARK-3570).
-    val output = shuffleBlockResolver.getDataFile(dep.shuffleId, mapId)
-    val tmp = Utils.tempFileWith(output)
-    try {
-      val blockId = ShuffleBlockId(dep.shuffleId, mapId, IndexShuffleBlockResolver.NOOP_REDUCE_ID)
-      val partitionLengths = sorter.writePartitionedFile(blockId, tmp)
-      shuffleBlockResolver.writeIndexFileAndCommit(dep.shuffleId, mapId, partitionLengths, tmp)
-      val shuffleServerId = blockManager.shuffleServerId
-      if (blockTracker.enable_rdma) {
-        val blockManagerId: BlockManagerId =
-          BlockManagerId(shuffleServerId.executorId, shuffleServerId.host,
-            RdmaTransferService.getTransferServiceInstance(blockManager).port, shuffleServerId.topologyInfo)
+    var partitionBufferArray = Array.fill[PersistentMemoryWriterPartition](numPartitions)(new PersistentMemoryWriterPartition(blockManager.serializerManager, serInstance, blockId))
+    if (dep.mapSideCombine) { // do aggragation
+      if (dep.aggregator.isDefined) {
+        var iter = dep.aggregator.get.combineValuesByKey(records, context)
+        while (iter.hasNext) {     
+          // since we need to write same partition (key, value) togethor, do a partition index here
+          val elem = iter.next()
+          var partitionId: Int = partitioner.getPartition(elem._1)
+          partitionBufferArray(partitionId).set(elem._1, elem._2)
+        }
+      } else if (dep.aggregator.isEmpty) {
+        throw new IllegalStateException("Aggregator is empty for map-side combine")
+      }
+    } else { // no aggregation
+      while (records.hasNext) {     
+        // since we need to write same partition (key, value) togethor, do a partition index here
+        val elem = records.next()
+        var partitionId: Int = partitioner.getPartition(elem._1)
+        partitionBufferArray(partitionId).set(elem._1, elem._2)
+      }
+    }
+    for (i <- 0 to (numPartitions - 1)) {
+      persistentMemoryWriter.write(stageId, mapId, i,  partitionBufferArray(i).get())
+      partitionLengths(i) = partitionBufferArray(i).size
+      partitionBufferArray(i).close()
+    }
+
+    if (blockTracker.enable_rdma) {
+      val blockManagerId: BlockManagerId =
+          BlockManagerId(blockManager.shuffleServerId.executorId, blockManager.shuffleServerId.host,
+            blockTracker.port, blockManager.shuffleServerId.topologyInfo)
         mapStatus = MapStatus(blockManagerId, partitionLengths)
         // TODO: send block status to driver
         //blockTracker.asInstanceOf[RdmaBlockTrackerExecutor].registerBlockStatus()
-      } else {
-        mapStatus = MapStatus(shuffleServerId, partitionLengths)
-      }
-
-    } finally {
-      if (tmp.exists() && !tmp.delete()) {
-        logError(s"Error while deleting temp file ${tmp.getAbsolutePath}")
-      }
+    } else {
+      mapStatus = MapStatus(blockManager.shuffleServerId, partitionLengths)
     }
   }
 
@@ -105,26 +179,8 @@ private[spark] class RdmaShuffleWriter[K, V, C](
       }
     } finally {
       // Clean up our sorter, which may have its own intermediate files
-      if (sorter != null) {
-        val startTime = System.nanoTime()
-        sorter.stop()
-        writeMetrics.incWriteTime(System.nanoTime - startTime)
-        sorter = null
-      }
+      val startTime = System.nanoTime()
+      writeMetrics.incWriteTime(System.nanoTime - startTime)
     }
   }
 }
-
-private[spark] object RdmaShuffleWriter {
-  def shouldBypassMergeSort(conf: SparkConf, dep: ShuffleDependency[_, _, _]): Boolean = {
-    // We cannot bypass sorting if we need to do map-side aggregation.
-    if (dep.mapSideCombine) {
-      require(dep.aggregator.isDefined, "Map-side combine without Aggregator specified!")
-      false
-    } else {
-      val bypassMergeThreshold: Int = conf.getInt("spark.shuffle.sort.bypassMergeThreshold", 200)
-      dep.partitioner.numPartitions <= bypassMergeThreshold
-    }
-  }
-}
-
