@@ -25,6 +25,11 @@
             <artifactId>hpnl</artifactId>
             <version>0.5</version>
         </dependency>
+        <dependency>
+            <groupId>lib</groupId>
+            <artifactId>llpl</artifactId>
+            <version>0.01</version>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
