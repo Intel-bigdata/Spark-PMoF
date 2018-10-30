@@ -34,11 +34,11 @@ class RDMATransferService(conf: SparkConf, val hostname: String, var port: Int) 
                   msgType: Byte,
                   callback: ReceivedCallback): Unit = {
     val client = clientFactory.createClient(reqHost, reqPort)
-    for (i <- 0 until blockIds.length) {
+    for (i <- blockIds.indices) {
       val bss = new Array[String](1)
       bss(0) = blockIds(i)
       val openBlocks: OpenBlocks = new OpenBlocks(appId, execId, bss)
-      client.send(openBlocks.toByteBuffer, nextReqId.getAndIncrement(), i, msgType, callback)
+      client.send(openBlocks.toByteBuffer, nextReqId.getAndIncrement(), i, msgType, callback, isDeferred = false)
     }
   }
 
@@ -53,7 +53,7 @@ class RDMATransferService(conf: SparkConf, val hostname: String, var port: Int) 
     val bss = new Array[String](1)
     bss(0) = blockId
     val openBlocks: OpenBlocks = new OpenBlocks(appId, execId, bss)
-    client.send(openBlocks.toByteBuffer, nextReqId.getAndIncrement(), blockIndex, msgType, callback)
+    client.send(openBlocks.toByteBuffer, nextReqId.getAndIncrement(), blockIndex, msgType, callback, isDeferred = false)
   }
 
   override def close(): Unit = {
@@ -84,7 +84,7 @@ class RDMATransferService(conf: SparkConf, val hostname: String, var port: Int) 
 object RDMATransferService {
   val env: SparkEnv = SparkEnv.get
   val conf: SparkConf = env.conf
-  val CHUNKSIZE: Int = 1024*1024
+  val CHUNKSIZE: Int = 1024*256
   private var initialized = 0
   private var transferService: RDMATransferService = _
   def getTransferServiceInstance(blockManager: BlockManager): RDMATransferService = synchronized {

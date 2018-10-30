@@ -1,7 +1,7 @@
 package org.apache.spark.network.pmof
 
 import java.nio.ByteBuffer
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.{ConcurrentHashMap, LinkedBlockingDeque}
 
 import com.intel.hpnl.core._
 
@@ -18,6 +18,8 @@ class RDMAClient(address: String, port: Int) {
   final val BUFFER_NUM: Int = 16
   private var con: Connection = _
 
+  private val deferredReqList = new LinkedBlockingDeque[ClientDeferredReq]()
+
   def init(): Unit = {
     for (i <- 0 until BUFFER_NUM) {
       val recvBuffer = ByteBuffer.allocateDirect(SINGLE_BUFFER_SIZE)
@@ -25,6 +27,11 @@ class RDMAClient(address: String, port: Int) {
       eqService.setRecvBuffer(recvBuffer, SINGLE_BUFFER_SIZE, i)
       eqService.setSendBuffer(sendBuffer, SINGLE_BUFFER_SIZE, i)
     }
+    cqService.addExternalEvent(new ExternalHandler {
+      override def handle(): Unit = {
+        handleDeferredReq()
+      }
+    })
   }
 
   def start(): Unit = {
@@ -55,11 +62,37 @@ class RDMAClient(address: String, port: Int) {
     this.con
   }
 
-  def send(byteBuffer: ByteBuffer, seq: Int, blockIndex: Int, msgType: Byte, callback: ReceivedCallback): Unit = {
+  def handleDeferredReq(): Unit = {
+    if (!deferredReqList.isEmpty) {
+      val deferredReq = deferredReqList.pollFirst()
+      val byteBuffer = deferredReq.byteBuffer
+      val seq = deferredReq.seq
+      val blockIndex = deferredReq.blockIndex
+      val msgType = deferredReq.msgType
+      val callback = deferredReq.callback
+      val sendBuffer = this.con.getSendBuffer(false)
+      if (sendBuffer == null) {
+        deferredReqList.addFirst(new ClientDeferredReq(byteBuffer, seq, blockIndex, msgType, callback))
+      } else {
+        send(byteBuffer, seq, blockIndex, msgType, callback, isDeferred = true)
+      }
+    }
+  }
+
+  def send(byteBuffer: ByteBuffer, seq: Int, blockIndex: Int, msgType: Byte,
+           callback: ReceivedCallback, isDeferred: Boolean): Unit = {
     assert(con != null)
     outstandingFetches.putIfAbsent(seq, callback)
     seqToBlockIndex.putIfAbsent(seq, blockIndex)
-    val sendBuffer = this.con.getSendBuffer(true)
+    val sendBuffer = this.con.getSendBuffer(false)
+    if (sendBuffer == null) {
+      if (isDeferred) {
+        deferredReqList.addFirst(new ClientDeferredReq(byteBuffer, seq, blockIndex, msgType, callback))
+      } else {
+        deferredReqList.addLast(new ClientDeferredReq(byteBuffer, seq, blockIndex, msgType, callback))
+      }
+      return
+    }
     sendBuffer.put(byteBuffer, msgType, 0, seq)
     con.send(sendBuffer.remaining(), sendBuffer.getRdmaBufferId)
   }
@@ -90,3 +123,6 @@ class ClientRecvHandler(client: RDMAClient) extends Handler {
     callback.onSuccess(client.getSeqToBlockIndex(seq), chunkIndex, msgType, rpcMessage)
   }
 }
+
+class ClientDeferredReq(var byteBuffer: ByteBuffer, var seq: Int, var blockIndex: Int,
+                        var msgType: Byte, var callback: ReceivedCallback) {}

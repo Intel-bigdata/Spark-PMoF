@@ -1,6 +1,5 @@
 package org.apache.spark.network.pmof
 
-
 import java.nio.ByteBuffer
 import java.util.LinkedList
 
@@ -18,7 +17,7 @@ class RDMAServer(address: String, var port: Int) {
   val cqService = new CqService(eqService, 1, eqService.getNativeHandle)
 
   final val SINGLE_BUFFER_SIZE = RDMATransferService.CHUNKSIZE
-  final val BUFFER_NUM = 512
+  final val BUFFER_NUM = 2048
 
   def init(): Unit = {
     for (i <- 0 until BUFFER_NUM) {
@@ -48,7 +47,7 @@ class RDMAServer(address: String, var port: Int) {
     eqService.setRecvCallback(handler)
     cqService.addExternalEvent(new ExternalHandler {
       override def handle(): Unit = {
-        handler.asInstanceOf[ServerRecvHandler].handleDeferredRequest()
+        handler.asInstanceOf[ServerRecvHandler] handleDeferredReq()
       }
     })
   }
@@ -57,16 +56,16 @@ class RDMAServer(address: String, var port: Int) {
 class ServerRecvHandler(server: RDMAServer, appid: String, serializer: Serializer,
                         blockManager: BlockDataManager) extends Handler {
 
-  private val deferredBufferList = new LinkedList[DeferredBuffer]()
+  private val deferredBufferList = new LinkedList[ServerDeferredReq]()
 
   def sendBuffer(con: Connection, byteBuffer: ByteBuffer, chunkIndex: Int, seq: Int, chunkNums: Int, isDeferred: Boolean): Unit = {
     for (i <- chunkIndex until chunkNums) {
       val sendBuffer = con.getSendBuffer(false)
       if (sendBuffer == null) {
         if (isDeferred) {
-          deferredBufferList.addFirst(new DeferredBuffer(con, byteBuffer, chunkNums - i, seq, chunkNums))
+          deferredBufferList.addFirst(new ServerDeferredReq(con, byteBuffer, 1, chunkNums - i, seq, chunkNums))
         } else {
-          deferredBufferList.addLast(new DeferredBuffer(con, byteBuffer, chunkNums - i, seq, chunkNums))
+          deferredBufferList.addLast(new ServerDeferredReq(con, byteBuffer, 1, chunkNums - i, seq, chunkNums))
         }
         return
       }
@@ -81,14 +80,33 @@ class ServerRecvHandler(server: RDMAServer, appid: String, serializer: Serialize
     }
   }
 
-  def handleDeferredRequest(): Unit = {
-    if (deferredBufferList.size() > 0) {
-      val deferredBuffer = deferredBufferList.pollFirst
-      val con = deferredBuffer.con
-      val chunkNums = deferredBuffer.chunkNums
-      val chunkIndex = chunkNums-deferredBuffer.remainingChunks
-      val seq = deferredBuffer.seq
-      sendBuffer(con, deferredBuffer.byteBuffer, chunkIndex, seq, chunkNums, true)
+  def sendBufferSize(con: Connection, byteBuffer: ByteBuffer, seq: Int, isDeferred: Boolean): Unit = {
+    val sendBuffer = con.getSendBuffer(false)
+    if (sendBuffer == null) {
+      if (isDeferred) {
+        deferredBufferList.addFirst(new ServerDeferredReq(con, byteBuffer, 0, 0, seq, 0))
+      } else {
+        deferredBufferList.addLast(new ServerDeferredReq(con, byteBuffer, 0, 0, seq, 0))
+      }
+      return
+    }
+    sendBuffer.putInt(byteBuffer.capacity(), 0, 0, seq)
+    con.send(sendBuffer.remaining(), sendBuffer.getRdmaBufferId)
+  }
+
+  def handleDeferredReq(): Unit = {
+    if (!deferredBufferList.isEmpty) {
+      val deferredReq = deferredBufferList.pollFirst
+      val con = deferredReq.con
+      val chunkNums = deferredReq.chunkNums
+      val chunkIndex = chunkNums-deferredReq.remainingChunks
+      val seq = deferredReq.seq
+      val msgType = deferredReq.msgType
+      if (msgType == 1.toByte) {
+        sendBuffer(con, deferredReq.byteBuffer, chunkIndex, seq, chunkNums, isDeferred = true)
+      } else {
+        sendBufferSize(con, deferredReq.byteBuffer, seq, isDeferred = true)
+      }
     }
   }
 
@@ -102,19 +120,16 @@ class ServerRecvHandler(server: RDMAServer, appid: String, serializer: Serialize
     val msgType: Byte = buffer.getType
     val byteBuffer: ByteBuffer = blockManager.getBlockData(BlockId.apply(openBlocks.blockIds(0))).nioByteBuffer()
     if (msgType == 0.toByte) {
-      val sendBuffer = con.getSendBuffer(false)
-      sendBuffer.putInt(byteBuffer.capacity(), 0, 0, seq)
-      con.send(sendBuffer.remaining(), sendBuffer.getRdmaBufferId)
+      sendBufferSize(con, byteBuffer, seq, isDeferred = false)
     } else {
       var chunkNums = byteBuffer.capacity()/(RDMATransferService.CHUNKSIZE-9)
       if (byteBuffer.capacity()%(RDMATransferService.CHUNKSIZE-9) != 0) {
         chunkNums += 1
       }
-      sendBuffer(con, byteBuffer, 0, seq, chunkNums, false)
+      sendBuffer(con, byteBuffer, 0, seq, chunkNums, isDeferred = false)
     }
   }
 }
 
-class DeferredBuffer(var con: Connection, var byteBuffer: ByteBuffer, var remainingChunks: Int, var seq: Int, var chunkNums: Int) {
-
-}
+class ServerDeferredReq(var con: Connection, var byteBuffer: ByteBuffer, var msgType: Byte, var remainingChunks: Int,
+                        var seq: Int, var chunkNums: Int) {}

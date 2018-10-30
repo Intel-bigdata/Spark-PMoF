@@ -9,7 +9,7 @@ import scala.collection.concurrent
 class RDMAClientFactory {
   val conPool: concurrent.Map[SocketAddress, RDMAClient] = new ConcurrentHashMap[SocketAddress, RDMAClient]().asScala
 
-  def createClient(address: String, port: Int): RDMAClient = {
+  def createClient(address: String, port: Int): RDMAClient = synchronized {
     val socketAddress: InetSocketAddress = InetSocketAddress.createUnresolved(address, port)
     val client: RDMAClient = conPool.getOrElse(socketAddress, {
       val clientTmp: RDMAClient = new RDMAClient(address, port)
@@ -19,11 +19,6 @@ class RDMAClientFactory {
       clientTmp
     })
     client
-  }
-
-  def getClient(address: String, port: Int): RDMAClient = {
-    val socketAddress: InetSocketAddress = InetSocketAddress.createUnresolved(address, port)
-    conPool.getOrElse(socketAddress, null)
   }
 
   def stop(): Unit = {

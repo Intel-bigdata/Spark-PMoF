@@ -232,7 +232,7 @@ final class RDMAShuffleBlockFetcherIterator(
             // This needs to be released after use.
             if (msgType == 0) {
               val reqBufSize = byteBuffer.getInt()
-              blockBufs(blockIndex) = ByteBuffer.allocate(reqBufSize)
+              blockBufs(blockIndex) = ByteBuffer.allocateDirect(reqBufSize)
               blockBufRemainingSize(blockIndex) = reqBufSize
               shuffleClient.asInstanceOf[RDMATransferService].fetchBlockSize(address.host, address.port, address.executorId,
                 blockIds(blockIndex), blockIndex, 1.toByte, this)
@@ -245,7 +245,6 @@ final class RDMAShuffleBlockFetcherIterator(
                 blockBufs(blockIndex).put(i, byteBuffer.get())
               }
               if (blockBufRemainingSize(blockIndex) == 0) {
-                blockBufs(blockIndex).flip()
                 val resultBuf = new NioManagedBuffer(blockBufs(blockIndex))
                 resultBuf.retain()
                 val blockIdAray = blockIds.toArray
