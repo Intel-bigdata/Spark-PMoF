@@ -19,14 +19,14 @@ package org.apache.spark.shuffle.pmof
 
 import org.apache.spark._
 import org.apache.spark.internal.Logging
-import org.apache.spark.network.pmof.RDMATransferService
+import org.apache.spark.network.pmof.RdmaTransferService
 import org.apache.spark.scheduler.MapStatus
 import org.apache.spark.shuffle.{BaseShuffleHandle, IndexShuffleBlockResolver, ShuffleWriter}
 import org.apache.spark.storage.{BlockManagerId, ShuffleBlockId}
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.ExternalSorter
 
-private[spark] class RDMAShuffleWriter[K, V, C](
+private[spark] class RdmaShuffleWriter[K, V, C](
                                                  shuffleBlockResolver: IndexShuffleBlockResolver,
                                                  handle: BaseShuffleHandle[K, V, C],
                                                  mapId: Int,
@@ -75,7 +75,7 @@ private[spark] class RDMAShuffleWriter[K, V, C](
       val shuffleServerId = blockManager.shuffleServerId
       val blockManagerId: BlockManagerId =
         BlockManagerId(shuffleServerId.executorId, shuffleServerId.host,
-          RDMATransferService.getTransferServiceInstance(blockManager).port, shuffleServerId.topologyInfo)
+          RdmaTransferService.getTransferServiceInstance(blockManager).port, shuffleServerId.topologyInfo)
       mapStatus = MapStatus(blockManagerId, partitionLengths)
 
     } finally {
@@ -109,7 +109,7 @@ private[spark] class RDMAShuffleWriter[K, V, C](
   }
 }
 
-private[spark] object RDMAShuffleWriter {
+private[spark] object RdmaShuffleWriter {
   def shouldBypassMergeSort(conf: SparkConf, dep: ShuffleDependency[_, _, _]): Boolean = {
     // We cannot bypass sorting if we need to do map-side aggregation.
     if (dep.mapSideCombine) {

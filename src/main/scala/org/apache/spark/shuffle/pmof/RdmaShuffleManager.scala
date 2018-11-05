@@ -6,7 +6,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.shuffle._
 import org.apache.spark.{ShuffleDependency, SparkConf, TaskContext}
 
-private[spark] class RDMAShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
+private[spark] class RdmaShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
   if (!conf.getBoolean("spark.shuffle.spill", defaultValue = true)) logWarning("spark.shuffle.spill was set to false")
 
   private[this] val numMapsForShuffle = new ConcurrentHashMap[Int, Int]()
@@ -19,11 +19,11 @@ private[spark] class RDMAShuffleManager(conf: SparkConf) extends ShuffleManager 
   override def getWriter[K, V](handle: ShuffleHandle, mapId: Int, context: TaskContext): ShuffleWriter[K, V] = {
     numMapsForShuffle.putIfAbsent(handle.shuffleId, handle.asInstanceOf[BaseShuffleHandle[_, _, _]].numMaps)
     // TODO: need to handle unsafe writer
-    new RDMAShuffleWriter(shuffleBlockResolver.asInstanceOf[IndexShuffleBlockResolver], handle.asInstanceOf[BaseShuffleHandle[K, V, _]], mapId, context)
+    new RdmaShuffleWriter(shuffleBlockResolver.asInstanceOf[IndexShuffleBlockResolver], handle.asInstanceOf[BaseShuffleHandle[K, V, _]], mapId, context)
   }
 
   override def getReader[K, C](handle: _root_.org.apache.spark.shuffle.ShuffleHandle, startPartition: Int, endPartition: Int, context: _root_.org.apache.spark.TaskContext): _root_.org.apache.spark.shuffle.ShuffleReader[K, C] = {
-    new RDMAShuffleReader(handle.asInstanceOf[BaseShuffleHandle[K, _, C]], startPartition, endPartition, context)
+    new RdmaShuffleReader(handle.asInstanceOf[BaseShuffleHandle[K, _, C]], startPartition, endPartition, context)
   }
 
   override def unregisterShuffle(shuffleId: Int): Boolean = {

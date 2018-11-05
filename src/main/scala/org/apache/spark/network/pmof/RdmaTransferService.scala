@@ -10,11 +10,11 @@ import org.apache.spark.serializer.JavaSerializer
 import org.apache.spark.storage.BlockManager
 import org.apache.spark.{SparkConf, SparkEnv}
 
-class RDMATransferService(conf: SparkConf, val hostname: String, var port: Int) extends TransferService {
+class RdmaTransferService(conf: SparkConf, val hostname: String, var port: Int) extends TransferService {
 
-  private var server: RDMAServer = _
+  private var server: RdmaServer = _
   private var recvHandler: ServerRecvHandler = _
-  private var clientFactory: RDMAClientFactory = _
+  private var clientFactory: RdmaClientFactory = _
   private var appId: String = _
   private var nextReqId: AtomicInteger = _
 
@@ -68,11 +68,11 @@ class RDMATransferService(conf: SparkConf, val hostname: String, var port: Int) 
   }
 
   override def init(blockManager: BlockDataManager): Unit = {
-    this.server = new RDMAServer(hostname, port)
+    this.server = new RdmaServer(hostname, port)
     this.appId = conf.getAppId
     this.recvHandler = new ServerRecvHandler(server, appId, serializer, blockManager)
     this.server.setRecvHandler(recvHandler)
-    this.clientFactory = new RDMAClientFactory()
+    this.clientFactory = new RdmaClientFactory()
     this.server.init()
     this.server.start()
     this.port = server.port
@@ -81,15 +81,15 @@ class RDMATransferService(conf: SparkConf, val hostname: String, var port: Int) 
   }
 }
 
-object RDMATransferService {
+object RdmaTransferService {
   val env: SparkEnv = SparkEnv.get
   val conf: SparkConf = env.conf
-  val CHUNKSIZE: Int = 1024*256
+  val CHUNKSIZE: Int = 1024*1024*2
   private var initialized = 0
-  private var transferService: RDMATransferService = _
-  def getTransferServiceInstance(blockManager: BlockManager): RDMATransferService = synchronized {
+  private var transferService: RdmaTransferService = _
+  def getTransferServiceInstance(blockManager: BlockManager): RdmaTransferService = synchronized {
     if (initialized == 0) {
-      transferService = new RDMATransferService(conf, blockManager.shuffleServerId.host, 0)
+      transferService = new RdmaTransferService(conf, blockManager.shuffleServerId.host, 0)
       transferService.init(blockManager)
       initialized = 1
       transferService

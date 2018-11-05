@@ -5,7 +5,7 @@ import java.util.concurrent.{ConcurrentHashMap, LinkedBlockingDeque}
 
 import com.intel.hpnl.core._
 
-class RDMAClient(address: String, port: Int) {
+class RdmaClient(address: String, port: Int) {
   val eqService = new EqService(address, port.toString, false)
   val cqService = new CqService(eqService, 1, eqService.getNativeHandle)
   val connectHandler = new ClientConnectHandler(this)
@@ -14,7 +14,7 @@ class RDMAClient(address: String, port: Int) {
   val outstandingFetches: ConcurrentHashMap[Int, ReceivedCallback] = new ConcurrentHashMap[Int, ReceivedCallback]()
   val seqToBlockIndex: ConcurrentHashMap[Int, Int] = new ConcurrentHashMap[Int, Int]()
 
-  final val SINGLE_BUFFER_SIZE: Int = RDMATransferService.CHUNKSIZE
+  final val SINGLE_BUFFER_SIZE: Int = RdmaTransferService.CHUNKSIZE
   final val BUFFER_NUM: Int = 16
   private var con: Connection = _
 
@@ -22,10 +22,12 @@ class RDMAClient(address: String, port: Int) {
 
   def init(): Unit = {
     for (i <- 0 until BUFFER_NUM) {
-      val recvBuffer = ByteBuffer.allocateDirect(SINGLE_BUFFER_SIZE)
       val sendBuffer = ByteBuffer.allocateDirect(SINGLE_BUFFER_SIZE)
-      eqService.setRecvBuffer(recvBuffer, SINGLE_BUFFER_SIZE, i)
       eqService.setSendBuffer(sendBuffer, SINGLE_BUFFER_SIZE, i)
+    }
+    for (i <- 0 until BUFFER_NUM*2) {
+      val recvBuffer = ByteBuffer.allocateDirect(SINGLE_BUFFER_SIZE)
+      eqService.setRecvBuffer(recvBuffer, SINGLE_BUFFER_SIZE, i)
     }
     cqService.addExternalEvent(new ExternalHandler {
       override def handle(): Unit = {
@@ -70,12 +72,7 @@ class RDMAClient(address: String, port: Int) {
       val blockIndex = deferredReq.blockIndex
       val msgType = deferredReq.msgType
       val callback = deferredReq.callback
-      val sendBuffer = this.con.getSendBuffer(false)
-      if (sendBuffer == null) {
-        deferredReqList.addFirst(new ClientDeferredReq(byteBuffer, seq, blockIndex, msgType, callback))
-      } else {
-        send(byteBuffer, seq, blockIndex, msgType, callback, isDeferred = true)
-      }
+      send(byteBuffer, seq, blockIndex, msgType, callback, isDeferred = true)
     }
   }
 
@@ -106,13 +103,13 @@ class RDMAClient(address: String, port: Int) {
   }
 }
 
-class ClientConnectHandler(client: RDMAClient) extends Handler {
+class ClientConnectHandler(client: RdmaClient) extends Handler {
   override def handle(connection: Connection, rdmaBufferId: Int, bufferBufferSize: Int): Unit = {
     client.setCon(connection)
   }
 }
 
-class ClientRecvHandler(client: RDMAClient) extends Handler {
+class ClientRecvHandler(client: RdmaClient) extends Handler {
   override def handle(con: Connection, rdmaBufferId: Int, blockBufferSize: Int): Unit = {
     val buffer: Buffer = con.getRecvBuffer(rdmaBufferId)
     val rpcMessage: ByteBuffer = buffer.get(blockBufferSize)
