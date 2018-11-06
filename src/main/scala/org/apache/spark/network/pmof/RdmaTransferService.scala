@@ -9,6 +9,7 @@ import org.apache.spark.network.shuffle.{BlockFetchingListener, TempFileManager}
 import org.apache.spark.serializer.JavaSerializer
 import org.apache.spark.storage.BlockManager
 import org.apache.spark.{SparkConf, SparkEnv}
+import com.intel.hpnl.core.Buffer
 
 class RdmaTransferService(conf: SparkConf, val hostname: String, var port: Int) extends TransferService {
 
@@ -27,33 +28,49 @@ class RdmaTransferService(conf: SparkConf, val hostname: String, var port: Int) 
                            blockFetchingListener: BlockFetchingListener,
                            tempFileManager: TempFileManager): Unit = {}
 
-  def fetchBlocks(reqHost: String,
-                  reqPort: Int,
-                  execId: String,
-                  blockIds: Array[String],
-                  msgType: Byte,
-                  callback: ReceivedCallback): Unit = {
-    val client = clientFactory.createClient(reqHost, reqPort)
-    for (i <- blockIds.indices) {
-      val bss = new Array[String](1)
-      bss(0) = blockIds(i)
-      val openBlocks: OpenBlocks = new OpenBlocks(appId, execId, bss)
-      client.send(openBlocks.toByteBuffer, nextReqId.getAndIncrement(), i, msgType, callback, isDeferred = false)
+  def fetchMetadata(reqHost: String,
+                          reqPort: Int,
+                          execId: String,
+                          blockIds: Array[String],
+                          callback: ReceivedCallback,
+                          client: RdmaClient = null): Unit = {
+    val openBlocks: OpenBlocks = new OpenBlocks(appId, execId, blockIds)
+    if (client == null) {
+      clientFactory.createClient(reqHost, reqPort).send(openBlocks.toByteBuffer, nextReqId.getAndIncrement(), 0, callback, isDeferred = false)
+    } else {
+      client.send(openBlocks.toByteBuffer, nextReqId.getAndIncrement(), 0, callback, isDeferred = false)
     }
   }
 
-  def fetchBlockSize(reqHost: String,
-                     reqPort: Int,
-                     execId: String,
-                     blockId: String,
-                     blockIndex: Int,
-                     msgType: Byte,
-                     callback: ReceivedCallback): Unit = {
-    val client = clientFactory.createClient(reqHost, reqPort)
-    val bss = new Array[String](1)
-    bss(0) = blockId
-    val openBlocks: OpenBlocks = new OpenBlocks(appId, execId, bss)
-    client.send(openBlocks.toByteBuffer, nextReqId.getAndIncrement(), blockIndex, msgType, callback, isDeferred = false)
+  def fetchBlock(reqHost: String,
+                 reqPort: Int,
+                 execId: String,
+                 blockId: String,
+                 blockIndex: Int,
+                 rmaBuffer: Buffer,
+                 reqBufSize: Int,
+                 rmaAddress: Long,
+                 rmaRkey: Long,
+                 callback: ReceivedCallback,
+                 client: RdmaClient = null): Unit = {
+    val seq = nextReqId.getAndIncrement()
+    if (client == null) {
+      clientFactory.createClient(reqHost, reqPort).read(rmaBuffer, blockIndex, seq, reqBufSize, rmaAddress, rmaRkey, callback)
+    } else {
+      client.read(rmaBuffer, blockIndex, seq, reqBufSize, rmaAddress, rmaRkey, callback)
+    }
+  }
+
+  def getRdmaClient(reqHost: String, reqPort: Int): RdmaClient = {
+    clientFactory.createClient(reqHost, reqPort)
+  }
+
+  def getRmaBuffer(reqHost: String, reqPort: Int, bufferSize: Int, client: RdmaClient = null): Buffer = {
+    if (client == null) {
+      clientFactory.createClient(reqHost, reqPort).getRmaBuffer(bufferSize)
+    } else {
+      client.getRmaBuffer(bufferSize)
+    }
   }
 
   override def close(): Unit = {
@@ -84,7 +101,7 @@ class RdmaTransferService(conf: SparkConf, val hostname: String, var port: Int) 
 object RdmaTransferService {
   val env: SparkEnv = SparkEnv.get
   val conf: SparkConf = env.conf
-  val CHUNKSIZE: Int = 1024*1024*2
+  val CHUNKSIZE: Int = 65536
   private var initialized = 0
   private var transferService: RdmaTransferService = _
   def getTransferServiceInstance(blockManager: BlockManager): RdmaTransferService = synchronized {

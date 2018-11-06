@@ -10,6 +10,7 @@ class RdmaClient(address: String, port: Int) {
   val cqService = new CqService(eqService, 1, eqService.getNativeHandle)
   val connectHandler = new ClientConnectHandler(this)
   val recvHandler = new ClientRecvHandler(this)
+  val readHandler = new ClientReadHandler(this)
 
   val outstandingFetches: ConcurrentHashMap[Int, ReceivedCallback] = new ConcurrentHashMap[Int, ReceivedCallback]()
   val seqToBlockIndex: ConcurrentHashMap[Int, Int] = new ConcurrentHashMap[Int, Int]()
@@ -19,19 +20,21 @@ class RdmaClient(address: String, port: Int) {
   private var con: Connection = _
 
   private val deferredReqList = new LinkedBlockingDeque[ClientDeferredReq]()
+  private val deferredReadList = new LinkedBlockingDeque[ClientDeferredRead]()
 
   def init(): Unit = {
     for (i <- 0 until BUFFER_NUM) {
       val sendBuffer = ByteBuffer.allocateDirect(SINGLE_BUFFER_SIZE)
       eqService.setSendBuffer(sendBuffer, SINGLE_BUFFER_SIZE, i)
     }
-    for (i <- 0 until BUFFER_NUM*2) {
+    for (i <- 0 until BUFFER_NUM * 2) {
       val recvBuffer = ByteBuffer.allocateDirect(SINGLE_BUFFER_SIZE)
       eqService.setRecvBuffer(recvBuffer, SINGLE_BUFFER_SIZE, i)
     }
     cqService.addExternalEvent(new ExternalHandler {
       override def handle(): Unit = {
         handleDeferredReq()
+        handleDeferredRead()
       }
     })
   }
@@ -39,6 +42,7 @@ class RdmaClient(address: String, port: Int) {
   def start(): Unit = {
     eqService.setConnectedCallback(connectHandler)
     eqService.setRecvCallback(recvHandler)
+    eqService.setReadCallback(readHandler)
 
     cqService.start()
     eqService.start(1)
@@ -70,36 +74,62 @@ class RdmaClient(address: String, port: Int) {
       val byteBuffer = deferredReq.byteBuffer
       val seq = deferredReq.seq
       val blockIndex = deferredReq.blockIndex
-      val msgType = deferredReq.msgType
       val callback = deferredReq.callback
-      send(byteBuffer, seq, blockIndex, msgType, callback, isDeferred = true)
+      send(byteBuffer, seq, blockIndex, callback, isDeferred = true)
     }
   }
 
-  def send(byteBuffer: ByteBuffer, seq: Int, blockIndex: Int, msgType: Byte,
+  def handleDeferredRead(): Unit = {
+    if (!deferredReadList.isEmpty) {
+      val deferredRead = deferredReadList.pollFirst()
+      read(deferredRead.rmaBuffer, deferredRead.blockIndex, deferredRead.seq, deferredRead.reqBufSize, deferredRead.rmaAddress, deferredRead.rmaRkey, null, true)
+    }
+  }
+
+  def read(rmaBuffer: Buffer, blockIndex: Int,
+           seq: Int, reqBufSize: Int,
+           rmaAddress: Long, rmaRkey: Long,
+           callback: ReceivedCallback, isDeferred: Boolean = false): Unit = {
+    if (!isDeferred) {
+      outstandingFetches.putIfAbsent(seq, callback)
+      rmaBuffer.getRawBuffer.putInt(blockIndex)
+      rmaBuffer.getRawBuffer.putInt(seq)
+      rmaBuffer.getRawBuffer.flip()
+    }
+    val ret = con.read(rmaBuffer.getRdmaBufferId, 8, reqBufSize, rmaAddress, rmaRkey)
+    if (ret == -11) {
+      if (isDeferred)
+        deferredReadList.addFirst(new ClientDeferredRead(rmaBuffer, blockIndex, seq, reqBufSize, rmaAddress, rmaRkey))
+      else
+        deferredReadList.addLast(new ClientDeferredRead(rmaBuffer, blockIndex, seq, reqBufSize, rmaAddress, rmaRkey))
+    }
+  }
+
+  def send(byteBuffer: ByteBuffer, seq: Int, blockIndex: Int,
            callback: ReceivedCallback, isDeferred: Boolean): Unit = {
     assert(con != null)
     outstandingFetches.putIfAbsent(seq, callback)
-    seqToBlockIndex.putIfAbsent(seq, blockIndex)
     val sendBuffer = this.con.getSendBuffer(false)
     if (sendBuffer == null) {
       if (isDeferred) {
-        deferredReqList.addFirst(new ClientDeferredReq(byteBuffer, seq, blockIndex, msgType, callback))
+        deferredReqList.addFirst(new ClientDeferredReq(byteBuffer, seq, blockIndex, callback))
       } else {
-        deferredReqList.addLast(new ClientDeferredReq(byteBuffer, seq, blockIndex, msgType, callback))
+        deferredReqList.addLast(new ClientDeferredReq(byteBuffer, seq, blockIndex, callback))
       }
       return
     }
-    sendBuffer.put(byteBuffer, msgType, 0, seq)
+    sendBuffer.put(byteBuffer, 0, 0, seq)
     con.send(sendBuffer.remaining(), sendBuffer.getRdmaBufferId)
   }
 
-  def getOutStandingFetches(seq: Int): ReceivedCallback = {
-    outstandingFetches.get(seq)
+  def getRmaBuffer(bufferSize: Int): Buffer = {
+    eqService.getRmaBuffer(bufferSize)
   }
 
-  def getSeqToBlockIndex(seq: Int): Int = {
-    seqToBlockIndex.get(seq)
+
+
+  def getOutStandingFetches(seq: Int): ReceivedCallback = {
+    outstandingFetches.get(seq)
   }
 }
 
@@ -114,12 +144,24 @@ class ClientRecvHandler(client: RdmaClient) extends Handler {
     val buffer: Buffer = con.getRecvBuffer(rdmaBufferId)
     val rpcMessage: ByteBuffer = buffer.get(blockBufferSize)
     val seq = buffer.getSeq
-    val msgType = buffer.getType
-    val chunkIndex = buffer.getBlockBufferId
     val callback = client.getOutStandingFetches(seq)
-    callback.onSuccess(client.getSeqToBlockIndex(seq), chunkIndex, msgType, rpcMessage)
+    callback.onSuccess(0, 0, rpcMessage)
+  }
+}
+
+class ClientReadHandler(client: RdmaClient) extends Handler {
+  override def handle(con: Connection, rdmaBufferId: Int, blockBufferSize: Int): Unit = {
+    val byteBuffer = con.getRmaBuffer(rdmaBufferId)
+    val blockIndex = byteBuffer.getInt()
+    val seq = byteBuffer.getInt()
+    val callback = client.getOutStandingFetches(seq)
+    callback.onSuccess(blockIndex, 1, byteBuffer)
   }
 }
 
 class ClientDeferredReq(var byteBuffer: ByteBuffer, var seq: Int, var blockIndex: Int,
-                        var msgType: Byte, var callback: ReceivedCallback) {}
+                        var callback: ReceivedCallback) {}
+
+class ClientDeferredRead(val rmaBuffer: Buffer, val blockIndex: Int, val seq: Int, val reqBufSize: Int,
+                         val rmaAddress: Long, val rmaRkey: Long) {}
+

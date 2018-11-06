@@ -8,7 +8,7 @@ import scala.collection.concurrent
 import scala.util.Random
 
 class RdmaClientFactory {
-  val CON_NUM: Int = 5
+  val CON_NUM: Int = 1
   val conPools: concurrent.Map[SocketAddress, RdmaClientPool] =
     new ConcurrentHashMap[SocketAddress, RdmaClientPool]().asScala
 
