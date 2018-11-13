@@ -1,5 +1,6 @@
 package org.apache.spark.network.pmof
 
+import java.nio.ByteBuffer
 import java.util.Random
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -9,7 +10,6 @@ import org.apache.spark.network.shuffle.{BlockFetchingListener, TempFileManager}
 import org.apache.spark.serializer.JavaSerializer
 import org.apache.spark.storage.BlockManager
 import org.apache.spark.{SparkConf, SparkEnv}
-import com.intel.hpnl.core.Buffer
 
 class RdmaTransferService(conf: SparkConf, val hostname: String, var port: Int) extends TransferService {
 
@@ -47,17 +47,17 @@ class RdmaTransferService(conf: SparkConf, val hostname: String, var port: Int) 
                  execId: String,
                  blockId: String,
                  blockIndex: Int,
-                 rmaBuffer: Buffer,
-                 reqBufSize: Int,
+                 shuffleBuffer: ShuffleBuffer,
+                 reqSize: Int,
                  rmaAddress: Long,
                  rmaRkey: Long,
-                 callback: ReceivedCallback,
+                 callback: ReadCallback,
                  client: RdmaClient = null): Unit = {
     val seq = nextReqId.getAndIncrement()
     if (client == null) {
-      clientFactory.createClient(reqHost, reqPort).read(rmaBuffer, blockIndex, seq, reqBufSize, rmaAddress, rmaRkey, callback)
+      clientFactory.createClient(reqHost, reqPort).read(shuffleBuffer, blockIndex, seq, reqSize, rmaAddress, rmaRkey, callback)
     } else {
-      client.read(rmaBuffer, blockIndex, seq, reqBufSize, rmaAddress, rmaRkey, callback)
+      client.read(shuffleBuffer, blockIndex, seq, reqSize, rmaAddress, rmaRkey, callback)
     }
   }
 
@@ -65,11 +65,9 @@ class RdmaTransferService(conf: SparkConf, val hostname: String, var port: Int) 
     clientFactory.createClient(reqHost, reqPort)
   }
 
-  def getRmaBuffer(reqHost: String, reqPort: Int, bufferSize: Int, client: RdmaClient = null): Buffer = {
+  def regRmaBuffer(byteBuffer: ByteBuffer, bufferSize: Int, client: RdmaClient = null): Unit = {
     if (client == null) {
-      clientFactory.createClient(reqHost, reqPort).getRmaBuffer(bufferSize)
-    } else {
-      client.getRmaBuffer(bufferSize)
+
     }
   }
 
@@ -101,7 +99,7 @@ class RdmaTransferService(conf: SparkConf, val hostname: String, var port: Int) 
 object RdmaTransferService {
   val env: SparkEnv = SparkEnv.get
   val conf: SparkConf = env.conf
-  val CHUNKSIZE: Int = 65536
+  val CHUNKSIZE: Int = 4096
   private var initialized = 0
   private var transferService: RdmaTransferService = _
   def getTransferServiceInstance(blockManager: BlockManager): RdmaTransferService = synchronized {

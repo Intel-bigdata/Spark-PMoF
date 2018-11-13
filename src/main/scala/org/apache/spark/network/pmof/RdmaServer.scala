@@ -56,31 +56,36 @@ class RdmaServer(address: String, var port: Int) {
       }
     })
   }
+
+  def getEqService: EqService = {
+    eqService
+  }
 }
 
 class ServerRecvHandler(server: RdmaServer, appid: String, serializer: Serializer,
                         blockManager: BlockDataManager) extends Handler {
 
   private val deferredBufferList = new LinkedBlockingDeque[ServerDeferredReq]()
-  private val byteBuffersQueue = new LinkedBlockingDeque[Array[ByteBuffer]]()
+  //private val byteBuffersQueue = new LinkedBlockingDeque[Array[ByteBuffer]]()
 
-  def sendMetadata(con: Connection, byteBuffers: Array[ByteBuffer], seq: Int, isDeferred: Boolean): Unit = {
+  def sendMetadata(con: Connection, shuffleBuffers: Array[ShuffleBuffer], seq: Int, isDeferred: Boolean): Unit = {
     val sendBuffer = con.getSendBuffer(false)
     if (sendBuffer == null) {
       if (isDeferred) {
-        deferredBufferList.addFirst(new ServerDeferredReq(con, byteBuffers, seq))
+        deferredBufferList.addFirst(new ServerDeferredReq(con, shuffleBuffers, seq))
       } else {
-        deferredBufferList.addLast(new ServerDeferredReq(con, byteBuffers, seq))
+        deferredBufferList.addLast(new ServerDeferredReq(con, shuffleBuffers, seq))
       }
       return
     }
-    val blocksNum = byteBuffers.length
+    val blocksNum = shuffleBuffers.length
     val byteBufferTmp = ByteBuffer.allocate(20*blocksNum+4)
+
     byteBufferTmp.putInt(blocksNum)
     for (i <- 0 until blocksNum) {
-      byteBufferTmp.putInt(byteBuffers(i).capacity())
-      byteBufferTmp.putLong(server.eqService.getBufferAddress(byteBuffers(i)))
-      byteBufferTmp.putLong(server.eqService.regRmaBuffer(byteBuffers(i), byteBuffers(i).capacity()))
+      byteBufferTmp.putInt(shuffleBuffers(i).size.toInt)
+      byteBufferTmp.putLong(shuffleBuffers(i).getAddress)
+      byteBufferTmp.putLong(shuffleBuffers(i).getRkey)
     }
     byteBufferTmp.flip()
     sendBuffer.put(byteBufferTmp, 0.toByte, 0, seq)
@@ -92,38 +97,42 @@ class ServerRecvHandler(server: RdmaServer, appid: String, serializer: Serialize
     if (deferredReq == null) return
     val con = deferredReq.con
     val seq = deferredReq.seq
-    sendMetadata(con, deferredReq.byteBuffers, seq, isDeferred = true)
+    sendMetadata(con, deferredReq.shuffleBuffers, seq, isDeferred = true)
   }
 
-  def toByteBuffer(file: File, offset: Long, length: Long): ByteBuffer = {
+  def toShuffleBuffer(file: File, offset: Long, length: Long): ShuffleBuffer = {
     val channel: FileChannel = new RandomAccessFile(file, "r").getChannel
     //channel.map(FileChannel.MapMode.READ_WRITE, offset, length)
-    val buf = ByteBuffer.allocateDirect(length.toInt)
+    val shuffleBuffer = new ShuffleBuffer(length.toInt, server.getEqService)
+    val buf = shuffleBuffer.nioByteBuffer()
     channel.position(offset)
     while (buf.remaining != 0) {
       if (channel.read(buf) == -1)
         throw new IOException()
     }
-    buf.flip
-    buf
+    channel.close()
+    val rdmaBuffer = server.getEqService.regRmaBufferByAddress(shuffleBuffer.nioByteBuffer(), shuffleBuffer.getAddress, length.toInt)
+    shuffleBuffer.setRdmaBufferId(rdmaBuffer.getRdmaBufferId)
+    shuffleBuffer.setRkey(rdmaBuffer.getRKey)
+    shuffleBuffer
   }
 
   override def handle(con: Connection, rdmaBufferId: Int, blockBufferSize: Int): Unit = {
-    val buffer: Buffer = con.getRecvBuffer(rdmaBufferId)
+
+    val buffer: RdmaBuffer = con.getRecvBuffer(rdmaBufferId)
     val rpcMessage: ByteBuffer = buffer.get(blockBufferSize)
     val message = BlockTransferMessage.Decoder.fromByteBuffer(rpcMessage)
     val openBlocks = message.asInstanceOf[OpenBlocks]
 
     val blocksNum = openBlocks.blockIds.length
-    val byteBuffers = new Array[ByteBuffer](blocksNum)
+    val shuffleBuffers = new Array[ShuffleBuffer](blocksNum)
     for (i <- (0 until blocksNum).view) {
       val managedBuffer = blockManager.getBlockData(BlockId.apply(openBlocks.blockIds(i))).asInstanceOf[FileSegmentManagedBuffer]
-      byteBuffers(i) = toByteBuffer(managedBuffer.getFile, managedBuffer.getOffset, managedBuffer.getLength)
+      shuffleBuffers(i) = toShuffleBuffer(managedBuffer.getFile, managedBuffer.getOffset, managedBuffer.getLength)
     }
-    byteBuffersQueue.add(byteBuffers)
     val seq = buffer.getSeq
-    sendMetadata(con, byteBuffers, seq, isDeferred = false)
+    sendMetadata(con, shuffleBuffers, seq, isDeferred = false)
   }
 }
 
-class ServerDeferredReq(var con: Connection, var byteBuffers: Array[ByteBuffer], var seq: Int) {}
+class ServerDeferredReq(var con: Connection, var shuffleBuffers: Array[ShuffleBuffer], var seq: Int) {}
