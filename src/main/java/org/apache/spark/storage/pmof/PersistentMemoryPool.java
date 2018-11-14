@@ -149,6 +149,7 @@ public class PersistentMemoryPool {
       MemoryBlock<Transactional> partitionBlock = getPartitionBlock(stageId, shuffleId, partitionId);
 
       partitionBlock.copyFromArray(value, 0, 0, value.length);
+      partitionBlock.flush(0, value.length);
       logger.info("write data to shuffleId: " + shuffleId + ", partitionId: " + partitionId + ", length:" + value.length + ", size is " + partitionBlock.size());
     }
 

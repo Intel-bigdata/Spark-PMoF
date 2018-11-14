@@ -23,6 +23,7 @@ import org.apache.spark.internal.Logging
 import java.nio.ByteBuffer
 import org.apache.spark.network.buffer.{ManagedBuffer, NioManagedBuffer}
 import org.apache.spark.storage.pmof.PersistentMemoryPool
+import org.apache.spark.executor.ShuffleWriteMetrics
 
 
 private[spark] class PersistentMemoryHandler(

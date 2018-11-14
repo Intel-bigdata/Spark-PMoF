@@ -35,7 +35,7 @@ private[spark] class RdmaShuffleManager(conf: SparkConf) extends ShuffleManager 
   override def getWriter[K, V](handle: ShuffleHandle, mapId: Int, context: TaskContext): ShuffleWriter[K, V] = {
     blockTracker = RdmaBlockTracker.getBlockTracker(false, enable_rdma)
     numMapsForShuffle.putIfAbsent(handle.shuffleId, handle.asInstanceOf[BaseShuffleHandle[_, _, _]].numMaps)
-    // TODO: need to handle unsafe writer
+
     new RdmaShuffleWriter(shuffleBlockResolver.asInstanceOf[IndexShuffleBlockResolver],
       handle.asInstanceOf[BaseShuffleHandle[K, V, _]], mapId, context, blockTracker, path, pmPoolSize, maxStages, maxMaps)
   }

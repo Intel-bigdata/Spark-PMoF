@@ -147,6 +147,7 @@ private[spark] class RdmaShuffleWriter[K, V, C](
     }
     for (i <- 0 to (numPartitions - 1)) {
       persistentMemoryWriter.write(stageId, mapId, i,  partitionBufferArray(i).get())
+      writeMetrics.incBytesWritten(partitionBufferArray(i).size)
       partitionLengths(i) = partitionBufferArray(i).size
       partitionBufferArray(i).close()
     }
