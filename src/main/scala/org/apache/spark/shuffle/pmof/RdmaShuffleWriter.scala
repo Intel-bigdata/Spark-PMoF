@@ -27,7 +27,6 @@ import org.apache.spark.serializer.{SerializationStream, SerializerInstance, Ser
 import org.apache.spark.storage._
 
 import org.apache.spark.storage.pmof.PersistentMemoryHandler
-import org.apache.spark.network.pmof.{RdmaBlockTracker, RdmaBlockTrackerExecutor}
 
 import org.apache.spark.util.Utils
 import java.util.UUID
@@ -85,13 +84,12 @@ private[spark] class RdmaShuffleWriter[K, V, C](
                                                  handle: BaseShuffleHandle[K, V, C],
                                                  mapId: Int,
                                                  context: TaskContext,
-                                                 blockTracker: RdmaBlockTracker,
+                                                 enable_rdma: Boolean,
                                                  path_pre: String,
                                                  maxPoolSize: Long,
                                                  maxStages: Int,
                                                  maxMaps: Int
                                                  )
->>>>>>> 1f977c4... [Feature] Enable PMDK(LLPL) support:src/main/scala/org/apache/spark/shuffle/pmof/RDMAShuffleWriter.scala
   extends ShuffleWriter[K, V] with Logging {
   private val dep = handle.dependency
   private val blockManager = SparkEnv.get.blockManager
@@ -149,17 +147,12 @@ private[spark] class RdmaShuffleWriter[K, V, C](
     }
     for (i <- 0 to (numPartitions - 1)) {
       persistentMemoryWriter.write(stageId, mapId, i,  partitionBufferArray(i).get())
+      writeMetrics.incBytesWritten(partitionBufferArray(i).size)
       partitionLengths(i) = partitionBufferArray(i).size
       partitionBufferArray(i).close()
     }
 
-    if (blockTracker.enable_rdma) {
-      val blockManagerId: BlockManagerId =
-          BlockManagerId(blockManager.shuffleServerId.executorId, blockManager.shuffleServerId.host,
-            blockTracker.port, blockManager.shuffleServerId.topologyInfo)
-        mapStatus = MapStatus(blockManagerId, partitionLengths)
-        // TODO: send block status to driver
-        //blockTracker.asInstanceOf[RdmaBlockTrackerExecutor].registerBlockStatus()
+    if (enable_rdma) {
     } else {
       mapStatus = MapStatus(blockManager.shuffleServerId, partitionLengths)
     }
