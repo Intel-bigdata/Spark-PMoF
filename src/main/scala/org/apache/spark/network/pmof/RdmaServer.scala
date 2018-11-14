@@ -101,16 +101,8 @@ class ServerRecvHandler(server: RdmaServer, appid: String, serializer: Serialize
   }
 
   def toShuffleBuffer(file: File, offset: Long, length: Long): ShuffleBuffer = {
-    val channel: FileChannel = new RandomAccessFile(file, "r").getChannel
-    //channel.map(FileChannel.MapMode.READ_WRITE, offset, length)
-    val shuffleBuffer = new ShuffleBuffer(length.toInt, server.getEqService)
-    val buf = shuffleBuffer.nioByteBuffer()
-    channel.position(offset)
-    while (buf.remaining != 0) {
-      if (channel.read(buf) == -1)
-        throw new IOException()
-    }
-    channel.close()
+    val channel: FileChannel = new RandomAccessFile(file, "rw").getChannel
+    val shuffleBuffer = new ShuffleBuffer(offset, length, channel, server.getEqService)
     val rdmaBuffer = server.getEqService.regRmaBufferByAddress(shuffleBuffer.nioByteBuffer(), shuffleBuffer.getAddress, length.toInt)
     shuffleBuffer.setRdmaBufferId(rdmaBuffer.getRdmaBufferId)
     shuffleBuffer.setRkey(rdmaBuffer.getRKey)
