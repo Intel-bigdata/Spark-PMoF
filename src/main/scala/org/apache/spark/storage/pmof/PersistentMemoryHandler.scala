@@ -61,20 +61,32 @@ private[spark] class PersistentMemoryHandler(
 object PersistentMemoryHandler {
   private var persistentMemoryHandler: PersistentMemoryHandler = _
   var path: String = _
+  var stopped = false
   def getPersistentMemoryHandler(path_arg: String, pmPoolSize: Long, maxStages: Int, maxMaps: Int) = synchronized {
-    if (persistentMemoryHandler == null) {
-      path = path_arg
-      persistentMemoryHandler = new PersistentMemoryHandler(path, maxStages, maxMaps, pmPoolSize)
+    if (stopped == false) {
+      if (persistentMemoryHandler == null) {
+        path = path_arg
+        persistentMemoryHandler = new PersistentMemoryHandler(path, maxStages, maxMaps, pmPoolSize)
+      }
+      persistentMemoryHandler.log("Using persistentMemoryHandler for " + path)
     }
-    persistentMemoryHandler.log("Using persistentMemoryHandler for " + path)
     persistentMemoryHandler
   }
 
   def getPersistentMemoryHandler() = synchronized {
-    if (persistentMemoryHandler == null) {
-      throw new NullPointerException("persistentMemoryHandler")
+    if (stopped == false) {
+      if (persistentMemoryHandler == null) {
+        throw new NullPointerException("persistentMemoryHandler")
+      }
+      persistentMemoryHandler.log("Using persistentMemoryHandler for " + path)
     }
-    persistentMemoryHandler.log("Using persistentMemoryHandler for " + path)
     persistentMemoryHandler
+  }
+
+  def stop() = synchronized {
+    if (stopped == false && persistentMemoryHandler != null) {
+      persistentMemoryHandler.close()
+      stopped = true
+    }
   }
 }
