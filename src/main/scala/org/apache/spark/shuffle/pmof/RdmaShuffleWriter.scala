@@ -47,7 +47,7 @@ private[spark] class PersistentMemoryWriterPartition(
   var size: Long = 0
   //var objStream: ObjectOutputStream = _
 
-  def set(key: Any, value: Any) {
+  def set(key: Any, value: Any): Long = {
     if (!initialized) {
       stream = new ByteArrayOutputStream()
       bs = serializerManager.wrapStream(blockId, stream)
@@ -56,13 +56,19 @@ private[spark] class PersistentMemoryWriterPartition(
     }
     objStream.writeObject(key)
     objStream.writeObject(value)
+    /* check size here,
+     * if it exceeds maximun block size,
+     * we will write to PM and continue
+    */
+    stream.size
   }
 
   def get() : Array[Byte] = {
     if (initialized) {
-      objStream.flush()
+      //objStream.flush()
       var data = stream.toByteArray
-      size = data.size
+      size += data.size
+      stream.reset()
       data
     } else {
       Array[Byte]()
@@ -115,6 +121,12 @@ private[spark] class RdmaShuffleWriter[K, V, C](
    */
   private var stopping = false
 
+  def maySpillToPM(size: Long, partitionId: Int, partitionBuffer: PersistentMemoryWriterPartition) {
+    if (size >= 33554432) {
+      persistentMemoryWriter.write(stageId, mapId, partitionId, partitionBuffer.get())
+    }
+  }
+ 
   /** 
   * Call PMDK to write data to persistent memory
   * Original Spark writer will do write and mergesort in this function,
@@ -132,7 +144,8 @@ private[spark] class RdmaShuffleWriter[K, V, C](
           // since we need to write same partition (key, value) togethor, do a partition index here
           val elem = iter.next()
           var partitionId: Int = partitioner.getPartition(elem._1)
-          partitionBufferArray(partitionId).set(elem._1, elem._2)
+          var tmp_size = partitionBufferArray(partitionId).set(elem._1, elem._2)
+          maySpillToPM(tmp_size, partitionId, partitionBufferArray(partitionId));
         }
       } else if (dep.aggregator.isEmpty) {
         throw new IllegalStateException("Aggregator is empty for map-side combine")
@@ -142,7 +155,8 @@ private[spark] class RdmaShuffleWriter[K, V, C](
         // since we need to write same partition (key, value) togethor, do a partition index here
         val elem = records.next()
         var partitionId: Int = partitioner.getPartition(elem._1)
-        partitionBufferArray(partitionId).set(elem._1, elem._2)
+        var tmp_size = partitionBufferArray(partitionId).set(elem._1, elem._2)
+        maySpillToPM(tmp_size, partitionId, partitionBufferArray(partitionId));
       }
     }
     for (i <- 0 to (numPartitions - 1)) {

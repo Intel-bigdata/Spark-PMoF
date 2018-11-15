@@ -38,8 +38,8 @@ private[spark] class PersistentMemoryHandler(
   }
 
   def write(stageId: Int, shuffleId: Int, partitionId: Int, data: Array[Byte]) = synchronized {
-    pmpool.addPartition(stageId, shuffleId, partitionId, data.size);
     if (data.size > 0) {
+      pmpool.addPartition(stageId, shuffleId, partitionId, data.size);
       pmpool.set(stageId, shuffleId, partitionId, data)
     }
   }
