@@ -19,4 +19,9 @@ private[spark] class PersistentMemoryShuffleBlockResolver(
     persistentMemoryHandler.initializeShuffle(blockId.shuffleId, blockId.mapId, -1)
     persistentMemoryHandler.getPartitionBlock(blockId.shuffleId, blockId.mapId, blockId.reduceId)
   }
+
+  override def stop() {
+    PersistentMemoryHandler.stop()
+    super.stop()
+  }
 }
