@@ -19,12 +19,14 @@ public class ShuffleBuffer extends ManagedBuffer {
     private final UnsafeMemoryAllocator unsafeAlloc = new UnsafeMemoryAllocator();
     private final long length;
     private final long address;
-    private long lengthAligned;
-    private long offsetAligned;
+    private final long lengthAligned;
+    private final long offsetAligned;
     private final EqService service;
     private int rdmaBufferId;
     private long rkey;
-    private ByteBuffer byteBuffer;
+    private final ByteBuffer byteBuffer;
+    private final FileChannel channel;
+
     private Method mmap = null;
     private Method unmmap = null;
 
@@ -35,6 +37,9 @@ public class ShuffleBuffer extends ManagedBuffer {
         this.service = service;
         this.byteBuffer = convertToByteBuffer();
         this.byteBuffer.limit((int)length);
+        this.lengthAligned = 0;
+        this.offsetAligned = 0;
+        this.channel = null;
     }
 
     public ShuffleBuffer(long offset, long length, FileChannel channel, EqService service) throws IOException {
@@ -46,6 +51,7 @@ public class ShuffleBuffer extends ManagedBuffer {
         } catch (NoSuchMethodException e) {
             e.printStackTrace();
         }
+        this.channel = channel;
         long distanceFromOffset = offset%4096;
         this.offsetAligned = offset-distanceFromOffset;
         this.lengthAligned = (length+distanceFromOffset + 0xfffL) & ~0xfffL;
@@ -98,12 +104,19 @@ public class ShuffleBuffer extends ManagedBuffer {
     }
 
     public ManagedBuffer release() {
-        if (unmmap != null) {
+        return this;
+    }
+
+    public ManagedBuffer close() {
+        if (this.channel != null) {
             try {
+                channel.close();
                 unmmap.invoke(null, this.offsetAligned, this.lengthAligned);
             } catch (IllegalAccessException e) {
                 e.printStackTrace();
             } catch (InvocationTargetException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         } else {

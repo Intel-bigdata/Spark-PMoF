@@ -13,9 +13,9 @@ import org.apache.spark.{SparkConf, SparkEnv}
 
 class RdmaTransferService(conf: SparkConf, val hostname: String, var port: Int) extends TransferService {
 
-  private var server: RdmaServer = _
-  private var recvHandler: ServerRecvHandler = _
-  private var clientFactory: RdmaClientFactory = _
+  final private var server: RdmaServer = _
+  final private var recvHandler: ServerRecvHandler = _
+  final private var clientFactory: RdmaClientFactory = _
   private var appId: String = _
   private var nextReqId: AtomicInteger = _
 
@@ -83,11 +83,11 @@ class RdmaTransferService(conf: SparkConf, val hostname: String, var port: Int) 
   }
 
   override def init(blockManager: BlockDataManager): Unit = {
-    this.server = new RdmaServer(hostname, port)
+    this.server = new RdmaServer(conf, hostname, port)
     this.appId = conf.getAppId
     this.recvHandler = new ServerRecvHandler(server, appId, serializer, blockManager)
     this.server.setRecvHandler(recvHandler)
-    this.clientFactory = new RdmaClientFactory()
+    this.clientFactory = new RdmaClientFactory(conf)
     this.server.init()
     this.server.start()
     this.port = server.port
@@ -99,7 +99,7 @@ class RdmaTransferService(conf: SparkConf, val hostname: String, var port: Int) 
 object RdmaTransferService {
   val env: SparkEnv = SparkEnv.get
   val conf: SparkConf = env.conf
-  val CHUNKSIZE: Int = 4096
+  val CHUNKSIZE: Int = conf.getInt("spark.shuffle.pmof.chunk_size", 4096*3)
   private var initialized = 0
   private var transferService: RdmaTransferService = _
   def getTransferServiceInstance(blockManager: BlockManager): RdmaTransferService = synchronized {

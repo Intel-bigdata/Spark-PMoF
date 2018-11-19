@@ -6,8 +6,8 @@ import java.nio.ByteBuffer;
 
 public class ShuffleBufferInputStream extends InputStream {
 
-    private ShuffleBuffer shuffleBuffer;
-    private ByteBuffer buf;
+    private final ShuffleBuffer shuffleBuffer;
+    private final ByteBuffer buf;
 
     public ShuffleBufferInputStream(ShuffleBuffer shuffleBuffer) {
         this.shuffleBuffer = shuffleBuffer;
@@ -31,8 +31,8 @@ public class ShuffleBufferInputStream extends InputStream {
         return len;
     }
 
-    public void release() {
-        shuffleBuffer.release();
+    public void close() {
+        shuffleBuffer.close();
     }
 
     public int available() {

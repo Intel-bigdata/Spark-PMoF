@@ -514,7 +514,7 @@ public class SerializedShuffleWriter<K, V> extends ShuffleWriter<K, V> {
             taskContext.taskMetrics().incPeakExecutionMemory(getPeakMemoryUsedBytes());
 
             if (stopping) {
-                return Option.apply(null);
+                return null;
             } else {
                 stopping = true;
                 if (success) {
@@ -523,7 +523,7 @@ public class SerializedShuffleWriter<K, V> extends ShuffleWriter<K, V> {
                     }
                     return Option.apply(mapStatus);
                 } else {
-                    return Option.apply(null);
+                    return null;
                 }
             }
         } finally {
