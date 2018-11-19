@@ -37,14 +37,19 @@ private[spark] class PersistentMemoryHandler(
     pmpool.openShuffleBlock(stageId, shuffleId, numPartitions)
   }
 
-  def write(stageId: Int, shuffleId: Int, partitionId: Int, data: Array[Byte]) = synchronized {
+  def tryAddPartition(stageId: Int, shuffleId: Int, partitionId: Int, size: Long) = synchronized {
+    if (size > 0) {
+      pmpool.addPartition(stageId, shuffleId, partitionId, size);
+    }
+  }
+
+  def write(stageId: Int, shuffleId: Int, partitionId: Int, data: Array[Byte]) = {
     if (data.size > 0) {
-      pmpool.addPartition(stageId, shuffleId, partitionId, data.size);
       pmpool.set(stageId, shuffleId, partitionId, data)
     }
   }
 
-  def getPartitionBlock(stageId: Int, shuffleId: Int, partitionId: Int): ManagedBuffer = synchronized {
+  def getPartitionBlock(stageId: Int, shuffleId: Int, partitionId: Int): ManagedBuffer = {
     var data = pmpool.get(stageId, shuffleId, partitionId)
     new NioManagedBuffer(ByteBuffer.wrap(data))
   }

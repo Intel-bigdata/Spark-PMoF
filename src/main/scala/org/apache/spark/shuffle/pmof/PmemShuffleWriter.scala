@@ -117,7 +117,9 @@ private[spark] class PmemShuffleWriter[K, V, C](
 
   def maySpillToPM(size: Long, partitionId: Int, partitionBuffer: PersistentMemoryWriterPartition) {
     if (size >= 33554432) {
-      persistentMemoryWriter.write(stageId, mapId, partitionId, partitionBuffer.get())
+      val tmp_data = partitionBuffer.get()
+      persistentMemoryWriter.tryAddPartition(stageId, mapId, partitionId, tmp_data.size)
+      persistentMemoryWriter.write(stageId, mapId, partitionId, tmp_data)
     }
   }
  
@@ -154,7 +156,9 @@ private[spark] class PmemShuffleWriter[K, V, C](
       }
     }
     for (i <- 0 until numPartitions) {
-      persistentMemoryWriter.write(stageId, mapId, i,  partitionBufferArray(i).get())
+      val data = partitionBufferArray(i).get()
+      persistentMemoryWriter.tryAddPartition(stageId, mapId, i, data.size)
+      persistentMemoryWriter.write(stageId, mapId, i, data)
       writeMetrics.incBytesWritten(partitionBufferArray(i).size)
       partitionLengths(i) = partitionBufferArray(i).size
       partitionBufferArray(i).close()

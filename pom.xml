@@ -34,18 +34,26 @@
     <build>
         <plugins>
             <plugin>
-                <groupId>org.scala-tools</groupId>
-                <artifactId>maven-scala-plugin</artifactId>
-                <version>2.15.2</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>compile</goal>
-                            <goal>testCompile</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
+		<groupId>net.alchim31.maven</groupId>
+		<artifactId>scala-maven-plugin</artifactId>
+		<executions>
+		    <execution>
+			<id>scala-compile-first</id>
+			<phase>process-resources</phase>
+			<goals>
+			    <goal>add-source</goal>
+			    <goal>compile</goal>
+			</goals>
+		    </execution>
+		    <execution>
+			<id>scala-test-compile</id>
+			<phase>process-test-resources</phase>
+			<goals>
+			    <goal>testCompile</goal>
+			</goals>
+		    </execution>
+		</executions>
+	    </plugin> 
             <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <version>3.0.0</version>
