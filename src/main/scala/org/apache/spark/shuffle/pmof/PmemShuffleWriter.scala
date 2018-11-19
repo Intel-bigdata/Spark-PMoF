@@ -22,26 +22,21 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.network.pmof.RdmaTransferService
 import org.apache.spark.scheduler.MapStatus
 import org.apache.spark.shuffle.{BaseShuffleHandle, IndexShuffleBlockResolver, ShuffleWriter}
-import org.apache.spark.shuffle.IndexShuffleBlockResolver.NOOP_REDUCE_ID
 import org.apache.spark.serializer.{SerializationStream, SerializerInstance, SerializerManager}
 import org.apache.spark.storage._
 
 import org.apache.spark.storage.pmof.PersistentMemoryHandler
 
-import org.apache.spark.util.Utils
 import java.util.UUID
 import java.io.{ByteArrayOutputStream, OutputStream}
-
-//import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.Queue
 
 private[spark] class PersistentMemoryWriterPartition(
     serializerManager: SerializerManager,
     serializerInstance: SerializerInstance,
     val blockId: BlockId
 ) extends Logging {
-  var bs: OutputStream = null
-  var objStream: SerializationStream = null
+  var bs: OutputStream = _
+  var objStream: SerializationStream = _
   var initialized = false
   var stream: ByteArrayOutputStream = _
   var size: Long = 0
@@ -66,8 +61,8 @@ private[spark] class PersistentMemoryWriterPartition(
   def get() : Array[Byte] = {
     if (initialized) {
       //objStream.flush()
-      var data = stream.toByteArray
-      size += data.size
+      val data = stream.toByteArray
+      size += data.length
       stream.reset()
       data
     } else {
@@ -85,7 +80,7 @@ private[spark] class PersistentMemoryWriterPartition(
   }
 }
 
-private[spark] class RdmaShuffleWriter[K, V, C](
+private[spark] class PmemShuffleWriter[K, V, C](
                                                  shuffleBlockResolver: IndexShuffleBlockResolver,
                                                  handle: BaseShuffleHandle[K, V, C],
                                                  mapId: Int,
@@ -105,14 +100,13 @@ private[spark] class RdmaShuffleWriter[K, V, C](
   private val partitioner = dep.partitioner
   private val numPartitions = partitioner.numPartitions
   private val serInstance: SerializerInstance = dep.serializer.newInstance()
-  private val shuffleDataBlockName = ShuffleDataBlockId(stageId, mapId, NOOP_REDUCE_ID).name
 
-  val blockId = new TempShuffleBlockId(UUID.randomUUID())
-  var path = path_pre + "_" + SparkEnv.get.executorId
+  val blockId = TempShuffleBlockId(UUID.randomUUID())
+  var path: String = path_pre + "_" + SparkEnv.get.executorId
   //logInfo("Using spark pmof PersistentMemoryHandler, path is " + path)
-  var persistentMemoryWriter = PersistentMemoryHandler.getPersistentMemoryHandler(path, maxPoolSize, maxStages, maxMaps)
+  val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(path, maxPoolSize, maxStages, maxMaps)
   persistentMemoryWriter.initializeShuffle(stageId, mapId, numPartitions)
-  var partitionLengths = Array.fill[Long](numPartitions)(0)
+  val partitionLengths: Array[Long] = Array.fill[Long](numPartitions)(0)
 
   /**
    * Are we in the process of stopping? Because map tasks can call stop() with success = true
@@ -136,16 +130,16 @@ private[spark] class RdmaShuffleWriter[K, V, C](
     // TODO: keep checking if data need to spill to disk when PM capacity is not enough.
     // TODO: currently, we apply processed records to PM.
 
-    var partitionBufferArray = Array.fill[PersistentMemoryWriterPartition](numPartitions)(new PersistentMemoryWriterPartition(blockManager.serializerManager, serInstance, blockId))
+    val partitionBufferArray = Array.fill[PersistentMemoryWriterPartition](numPartitions)(new PersistentMemoryWriterPartition(blockManager.serializerManager, serInstance, blockId))
     if (dep.mapSideCombine) { // do aggragation
       if (dep.aggregator.isDefined) {
-        var iter = dep.aggregator.get.combineValuesByKey(records, context)
+        val iter = dep.aggregator.get.combineValuesByKey(records, context)
         while (iter.hasNext) {     
           // since we need to write same partition (key, value) togethor, do a partition index here
           val elem = iter.next()
-          var partitionId: Int = partitioner.getPartition(elem._1)
-          var tmp_size = partitionBufferArray(partitionId).set(elem._1, elem._2)
-          maySpillToPM(tmp_size, partitionId, partitionBufferArray(partitionId));
+          val partitionId: Int = partitioner.getPartition(elem._1)
+          val tmp_size = partitionBufferArray(partitionId).set(elem._1, elem._2)
+          maySpillToPM(tmp_size, partitionId, partitionBufferArray(partitionId))
         }
       } else if (dep.aggregator.isEmpty) {
         throw new IllegalStateException("Aggregator is empty for map-side combine")
@@ -154,21 +148,25 @@ private[spark] class RdmaShuffleWriter[K, V, C](
       while (records.hasNext) {     
         // since we need to write same partition (key, value) togethor, do a partition index here
         val elem = records.next()
-        var partitionId: Int = partitioner.getPartition(elem._1)
-        var tmp_size = partitionBufferArray(partitionId).set(elem._1, elem._2)
-        maySpillToPM(tmp_size, partitionId, partitionBufferArray(partitionId));
+        val partitionId: Int = partitioner.getPartition(elem._1)
+        val tmp_size = partitionBufferArray(partitionId).set(elem._1, elem._2)
+        maySpillToPM(tmp_size, partitionId, partitionBufferArray(partitionId))
       }
     }
-    for (i <- 0 to (numPartitions - 1)) {
+    for (i <- 0 until numPartitions) {
       persistentMemoryWriter.write(stageId, mapId, i,  partitionBufferArray(i).get())
       writeMetrics.incBytesWritten(partitionBufferArray(i).size)
       partitionLengths(i) = partitionBufferArray(i).size
       partitionBufferArray(i).close()
     }
-
+    val shuffleServerId = blockManager.shuffleServerId
     if (enable_rdma) {
+      val blockManagerId: BlockManagerId =
+        BlockManagerId(shuffleServerId.executorId, shuffleServerId.host,
+          RdmaTransferService.getTransferServiceInstance(blockManager).port, shuffleServerId.topologyInfo)
+      mapStatus = MapStatus(blockManagerId, partitionLengths)
     } else {
-      mapStatus = MapStatus(blockManager.shuffleServerId, partitionLengths)
+      mapStatus = MapStatus(shuffleServerId, partitionLengths)
     }
   }
 

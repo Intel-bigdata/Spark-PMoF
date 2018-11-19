@@ -4,15 +4,14 @@ import java.util.concurrent.ConcurrentHashMap
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.shuffle._
-import org.apache.spark.{ShuffleDependency, SparkConf, TaskContext}
-import org.apache.spark.serializer.{SerializerInstance, SerializerManager}
-import org.apache.spark.storage.{BlockManagerId, ShuffleBlockId, ShuffleDataBlockId}
-import org.apache.spark.storage.pmof.PersistentMemoryHandler
+import org.apache.spark.shuffle.sort.{SerializedShuffleHandle, SerializedShuffleWriter, SortShuffleManager}
+import org.apache.spark.{ShuffleDependency, SparkConf, SparkEnv, TaskContext}
 
-private[spark] class RdmaShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
+private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
   logInfo("Initialize RdmaShuffleManager")
   if (!conf.getBoolean("spark.shuffle.spill", defaultValue = true)) logWarning("spark.shuffle.spill was set to false")
   val enable_rdma: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_rdma", defaultValue = true)
+  val enable_pmem: Boolean = conf.getBoolean("spark.shuffle.enable_pmem", defaultValue = true)
   val path = "/mnt/mem/spark_shuffle_pmpool"
   val pmPoolSize: Long = conf.getLong("spark.shuffle.pmof.pmpool_size", defaultValue = 1073741824)
   val maxStages: Int = conf.getInt("spark.shuffle.pmof.max_stage_num", defaultValue = 1000)
@@ -24,16 +23,42 @@ private[spark] class RdmaShuffleManager(conf: SparkConf) extends ShuffleManager 
   }
 
   override def registerShuffle[K, V, C](shuffleId: Int, numMaps: Int, dependency: ShuffleDependency[K, V, C]): ShuffleHandle = {
-    // TODO: need to handle other handle
-    new BaseShuffleHandle(shuffleId, numMaps, dependency)
+    if (enable_pmem) {
+      new BaseShuffleHandle(shuffleId, numMaps, dependency)
+    } else if (SortShuffleManager.canUseSerializedShuffle(dependency)) {
+      // Otherwise, try to buffer map outputs in a serialized form, since this is more efficient:
+      new SerializedShuffleHandle[K, V](
+        shuffleId, numMaps, dependency.asInstanceOf[ShuffleDependency[K, V, V]])
+    } else {
+      // Otherwise, buffer map outputs in a deserialized form:
+      new BaseShuffleHandle(shuffleId, numMaps, dependency)
+    }
   }
 
   override def getWriter[K, V](handle: ShuffleHandle, mapId: Int, context: TaskContext): ShuffleWriter[K, V] = {
     logInfo("Using spark pmof RDMAShuffleWriter")
     numMapsForShuffle.putIfAbsent(handle.shuffleId, handle.asInstanceOf[BaseShuffleHandle[_, _, _]].numMaps)
 
-    new RdmaShuffleWriter(shuffleBlockResolver.asInstanceOf[IndexShuffleBlockResolver],
+    val env = SparkEnv.get
+    handle match {
+      case unsafeShuffleHandle: SerializedShuffleHandle[K @unchecked, V @unchecked] =>
+        new SerializedShuffleWriter(
+          env.blockManager,
+          shuffleBlockResolver.asInstanceOf[IndexShuffleBlockResolver],
+          context.taskMemoryManager(),
+          unsafeShuffleHandle,
+          mapId,
+          context,
+          env.conf,
+          enable_rdma)
+      case other: BaseShuffleHandle[K @unchecked, V @unchecked, _] =>
+        if (enable_pmem) {
+          new PmemShuffleWriter(shuffleBlockResolver.asInstanceOf[IndexShuffleBlockResolver],
       handle.asInstanceOf[BaseShuffleHandle[K, V, _]], mapId, context, enable_rdma, path, pmPoolSize, maxStages, maxMaps)
+        } else {
+          new BaseShuffleWriter(shuffleBlockResolver, other, mapId, context, enable_rdma)
+        }
+    }
   }
 
   override def getReader[K, C](handle: _root_.org.apache.spark.shuffle.ShuffleHandle, startPartition: Int, endPartition: Int, context: _root_.org.apache.spark.TaskContext): _root_.org.apache.spark.shuffle.ShuffleReader[K, C] = {
