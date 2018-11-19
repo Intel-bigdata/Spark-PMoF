@@ -1,6 +1,8 @@
 package org.apache.spark.network.pmof;
 
 import com.intel.hpnl.core.EqService;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.PooledByteBufAllocator;
 import org.apache.spark.network.buffer.ManagedBuffer;
 import org.apache.spark.unsafe.memory.MemoryBlock;
 import org.apache.spark.unsafe.memory.UnsafeMemoryAllocator;
@@ -26,16 +28,25 @@ public class ShuffleBuffer extends ManagedBuffer {
     private long rkey;
     private final ByteBuffer byteBuffer;
     private final FileChannel channel;
+    private ByteBuf buf;
+    private boolean supportNettyBuffer;
 
     private Method mmap = null;
     private Method unmmap = null;
 
-    public ShuffleBuffer(long length, EqService service) throws IOException {
+    public ShuffleBuffer(long length, EqService service, boolean supportNettyBuffer) throws IOException {
         this.length = length;
-        memoryBlock = unsafeAlloc.allocate(this.length);
-        this.address = memoryBlock.getBaseOffset();
+        this.supportNettyBuffer = supportNettyBuffer;
+        if (!supportNettyBuffer) {
+            memoryBlock = unsafeAlloc.allocate(this.length);
+            this.address = memoryBlock.getBaseOffset();
+            this.byteBuffer = convertToByteBuffer();
+        } else {
+            this.buf = PooledByteBufAllocator.DEFAULT.directBuffer((int) this.length);
+            this.address = this.buf.memoryAddress();
+            this.byteBuffer = this.buf.nioBuffer();
+        }
         this.service = service;
-        this.byteBuffer = convertToByteBuffer();
         this.byteBuffer.limit((int)length);
         this.lengthAligned = 0;
         this.offsetAligned = 0;
@@ -108,6 +119,7 @@ public class ShuffleBuffer extends ManagedBuffer {
     }
 
     public ManagedBuffer close() {
+        service.unregRmaBuffer(this.rdmaBufferId);
         if (this.channel != null) {
             try {
                 channel.close();
@@ -120,8 +132,11 @@ public class ShuffleBuffer extends ManagedBuffer {
                 e.printStackTrace();
             }
         } else {
-            service.unregRmaBuffer(this.rdmaBufferId);
-            unsafeAlloc.free(memoryBlock);
+            if (this.supportNettyBuffer) {
+                this.buf.release();
+            } else {
+                unsafeAlloc.free(memoryBlock);
+            }
         }
         return this;
     }
@@ -135,7 +150,10 @@ public class ShuffleBuffer extends ManagedBuffer {
     }
 
     public ManagedBuffer retain() {
-        return null;
+        if (this.buf != null) {
+            this.buf.retain();
+        }
+        return this;
     }
 
     private ByteBuffer convertToByteBuffer() throws IOException {

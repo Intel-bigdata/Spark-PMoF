@@ -11,7 +11,7 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
   logInfo("Initialize RdmaShuffleManager")
   if (!conf.getBoolean("spark.shuffle.spill", defaultValue = true)) logWarning("spark.shuffle.spill was set to false")
   val enable_rdma: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_rdma", defaultValue = true)
-  val enable_pmem: Boolean = conf.getBoolean("spark.shuffle.enable_pmem", defaultValue = true)
+  val enable_pmem: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_pmem", defaultValue = true)
   val path = "/mnt/mem/spark_shuffle_pmpool"
   val pmPoolSize: Long = conf.getLong("spark.shuffle.pmof.pmpool_size", defaultValue = 1073741824)
   val maxStages: Int = conf.getInt("spark.shuffle.pmof.max_stage_num", defaultValue = 1000)
@@ -84,5 +84,10 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
     shuffleBlockResolver.stop()
   }
 
-  override val shuffleBlockResolver: PersistentMemoryShuffleBlockResolver = new PersistentMemoryShuffleBlockResolver(conf)
+  override val shuffleBlockResolver = {
+    if (enable_pmem)
+      new PersistentMemoryShuffleBlockResolver(conf)
+    else
+      new IndexShuffleBlockResolver(conf)
+  }
 }

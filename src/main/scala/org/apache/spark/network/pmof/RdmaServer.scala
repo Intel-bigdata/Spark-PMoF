@@ -110,7 +110,7 @@ class ServerRecvHandler(server: RdmaServer, appid: String, serializer: Serialize
     if (false) {
       shuffleBuffer = new ShuffleBuffer(offset, length, channel, server.getEqService)
     } else {
-      shuffleBuffer = new ShuffleBuffer(length, server.getEqService)
+      shuffleBuffer = new ShuffleBuffer(length, server.getEqService, false)
       channel.position(offset)
       while (shuffleBuffer.nioByteBuffer().remaining() != 0) {
         if (channel.read(shuffleBuffer.nioByteBuffer()) == -1) {

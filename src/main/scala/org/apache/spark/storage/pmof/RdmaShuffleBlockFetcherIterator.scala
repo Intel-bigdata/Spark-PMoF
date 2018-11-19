@@ -227,7 +227,7 @@ final class RdmaShuffleBlockFetcherIterator(
       val rdmaTransferService = shuffleClient.asInstanceOf[RdmaTransferService]
       val rdmaClient = rdmaTransferService.getRdmaClient(address.host, address.port)
 
-      val shuffleBuffer = new ShuffleBuffer(reqBufSize, rdmaClient.getEqService)
+      val shuffleBuffer = new ShuffleBuffer(reqBufSize, rdmaClient.getEqService, false)
       val rdmaBuffer = rdmaClient.getEqService.regRmaBufferByAddress(shuffleBuffer.nioByteBuffer(), shuffleBuffer.getAddress, shuffleBuffer.getLength.toInt)
       shuffleBuffer.setRdmaBufferId(rdmaBuffer.getRdmaBufferId)
       shuffleBuffer.setRkey(rdmaBuffer.getRKey)
