@@ -1,13 +1,15 @@
 package org.apache.spark.network.pmof
 
-class RdmaClientPool(poolSize: Int, address: String, port: Int) {
+import org.apache.spark.SparkConf
+
+class RdmaClientPool(conf: SparkConf, poolSize: Int, address: String, port: Int) {
   val RdmaClients = new Array[RdmaClient](poolSize)
 
   init()
 
   def init(): Unit = {
     for (i <- 0 until poolSize) {
-      RdmaClients(i) = new RdmaClient(address, port)
+      RdmaClients(i) = new RdmaClient(conf, address, port)
       RdmaClients(i).init()
       RdmaClients(i).start()
     }
