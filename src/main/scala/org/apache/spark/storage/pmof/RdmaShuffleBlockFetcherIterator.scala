@@ -246,9 +246,9 @@ final class RdmaShuffleBlockFetcherIterator(
             val blockIdAray = blockIds.toArray
             val blockId = blockIdAray(blockIndex)
             remainingBlocks -= blockId
+            logDebug("thread id: " + Thread.currentThread().getId() + ", got remote block, block index: " + blockIndex + ", remaining block size: " + remainingBlocks.size)
             results.put(SuccessFetchResult(BlockId(blockId), address, sizeMap(blockId), shuffleBuffer,
               remainingBlocks.isEmpty))
-            logDebug("remainingBlocks: " + remainingBlocks)
           }
         }
       }
@@ -268,8 +268,10 @@ final class RdmaShuffleBlockFetcherIterator(
             // Increment the ref count because we need to pass this to a different thread.
             // This needs to be released after use.
             val blocksNum = byteBuffer.getInt()
+            logDebug("got block metadata, block number is " + blocksNum)
             for (i <- 0 until blocksNum) {
               val reqBufSize = byteBuffer.getInt()
+              logDebug("wanted block index: " + i + ", wanted block size: " + reqBufSize)
               val rmaAddress = byteBuffer.getLong()
               val rmaRkey = byteBuffer.getLong()
               fetchBlock(i, reqBufSize, rmaAddress, rmaRkey, blockFetchingReadCallback)
@@ -431,6 +433,7 @@ final class RdmaShuffleBlockFetcherIterator(
               shuffleMetrics.incRemoteBytesReadToDisk(buf.size)
             }
             shuffleMetrics.incRemoteBlocksFetched(1)
+            logDebug("take remote block.")
           }
           bytesInFlight -= size
           if (isNetworkReqDone) {
