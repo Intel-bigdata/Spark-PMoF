@@ -2,15 +2,16 @@ package org.apache.spark.network.pmof
 
 import java.net.{InetSocketAddress, SocketAddress}
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.spark.SparkConf
 
 import scala.collection.JavaConverters._
 import scala.collection.concurrent
-import scala.util.Random
 
 class RdmaClientFactory(conf: SparkConf) {
   final val CON_NUM: Int = conf.getInt("spark.shuffle.pmof.client_pool_size", 1)
+  val nextReqId: AtomicInteger = new AtomicInteger(0)
   val conPools: concurrent.Map[SocketAddress, RdmaClientPool] =
     new ConcurrentHashMap[SocketAddress, RdmaClientPool]().asScala
 
@@ -21,7 +22,9 @@ class RdmaClientFactory(conf: SparkConf) {
       conPools.put(socketAddress, conPool)
       conPool
     })
-    conPool.get(new Random().nextInt(CON_NUM))
+    val con = conPool.get(nextReqId.get()%CON_NUM)
+    nextReqId.getAndIncrement()
+    con
   }
 
   def stop(): Unit = {

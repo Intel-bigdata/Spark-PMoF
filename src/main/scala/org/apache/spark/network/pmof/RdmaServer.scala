@@ -11,6 +11,7 @@ import org.apache.spark.serializer.Serializer
 import org.apache.spark.storage.BlockId
 import com.intel.hpnl.core._
 import org.apache.spark.SparkConf
+import org.apache.spark.internal.Logging
 import org.apache.spark.network.buffer.FileSegmentManagedBuffer
 
 class RdmaServer(conf: SparkConf, address: String, var port: Int) {
@@ -67,7 +68,7 @@ class RdmaServer(conf: SparkConf, address: String, var port: Int) {
 }
 
 class ServerRecvHandler(server: RdmaServer, appid: String, serializer: Serializer,
-                        blockManager: BlockDataManager) extends Handler {
+                        blockManager: BlockDataManager) extends Handler with Logging {
 
   private val deferredBufferList = new LinkedBlockingDeque[ServerDeferredReq]()
 
@@ -110,6 +111,7 @@ class ServerRecvHandler(server: RdmaServer, appid: String, serializer: Serialize
     if (false) {
       shuffleBuffer = new ShuffleBuffer(offset, length, channel, server.getEqService)
     } else {
+      val start = System.currentTimeMillis()
       shuffleBuffer = new ShuffleBuffer(length, server.getEqService, false)
       channel.position(offset)
       while (shuffleBuffer.nioByteBuffer().remaining() != 0) {
@@ -118,6 +120,9 @@ class ServerRecvHandler(server: RdmaServer, appid: String, serializer: Serialize
         }
       }
       channel.close()
+      val end = System.currentTimeMillis()
+      val duration = end-start
+      logDebug("allocating direct buffer and read block data consumes " + duration)
     }
     val rdmaBuffer = server.getEqService.regRmaBufferByAddress(shuffleBuffer.nioByteBuffer(), shuffleBuffer.getAddress, length.toInt)
     shuffleBuffer.setRdmaBufferId(rdmaBuffer.getRdmaBufferId)
