@@ -264,7 +264,7 @@ public class SerializedShuffleWriter<K, V> extends ShuffleWriter<K, V> {
                     RdmaTransferService.getTransferServiceInstance(blockManager).port(), shuffleServerId.topologyInfo());
             mapStatus = MapStatus$.MODULE$.apply(blockManagerId, partitionLengths);
         } else {
-            mapStatus = MapStatus$.MODULE$.apply(shuffleServerId, partitionLengths);
+          mapStatus = MapStatus$.MODULE$.apply(shuffleServerId, partitionLengths);
         }
     }
 
