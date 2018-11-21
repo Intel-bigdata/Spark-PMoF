@@ -18,7 +18,7 @@ import java.nio.channels.FileChannel;
 
 public class ShuffleBuffer extends ManagedBuffer {
     private MemoryBlock memoryBlock;
-    private final UnsafeMemoryAllocator unsafeAlloc = new UnsafeMemoryAllocator();
+    private static final UnsafeMemoryAllocator unsafeAlloc = new UnsafeMemoryAllocator();
     private final long length;
     private final long address;
     private final long lengthAligned;
@@ -35,19 +35,20 @@ public class ShuffleBuffer extends ManagedBuffer {
     private Method unmmap = null;
 
     public ShuffleBuffer(long length, EqService service, boolean supportNettyBuffer) throws IOException {
+
         this.length = length;
         this.supportNettyBuffer = supportNettyBuffer;
         if (!supportNettyBuffer) {
             memoryBlock = unsafeAlloc.allocate(this.length);
             this.address = memoryBlock.getBaseOffset();
             this.byteBuffer = convertToByteBuffer();
+            this.byteBuffer.limit((int)length);
         } else {
-            this.buf = PooledByteBufAllocator.DEFAULT.directBuffer((int) this.length);
+            this.buf = PooledByteBufAllocator.DEFAULT.directBuffer((int) this.length, (int)this.length);
             this.address = this.buf.memoryAddress();
-            this.byteBuffer = this.buf.nioBuffer();
+            this.byteBuffer = this.buf.nioBuffer(0, (int)length);
         }
         this.service = service;
-        this.byteBuffer.limit((int)length);
         this.lengthAligned = 0;
         this.offsetAligned = 0;
         this.channel = null;

@@ -22,9 +22,9 @@ import java.io.*;
 import java.nio.channels.FileChannel;
 import java.util.Iterator;
 
-import org.apache.spark.network.pmof.RdmaTransferService;
 import org.apache.spark.storage.BlockManagerId;
 import org.apache.spark.storage.BlockManagerId$;
+import org.apache.spark.network.pmof.RdmaTransferService;
 import scala.Option;
 import scala.Product2;
 import scala.collection.JavaConverters;
