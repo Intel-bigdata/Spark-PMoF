@@ -160,9 +160,9 @@ class ClientRecvHandler(client: RdmaClient) extends Handler {
     val buffer: RdmaBuffer = con.getRecvBuffer(rdmaBufferId)
     val rpcMessage: ByteBuffer = buffer.get(blockBufferSize)
     val seq = buffer.getSeq
+    val blockIndex = buffer.getBlockBufferId
     val callback = client.outstandingReceiveFetches.get(seq)
-    callback.onSuccess(0, rpcMessage)
-    client.outstandingReceiveFetches.remove(seq)
+    callback.onSuccess(blockIndex, rpcMessage)
   }
 }
 

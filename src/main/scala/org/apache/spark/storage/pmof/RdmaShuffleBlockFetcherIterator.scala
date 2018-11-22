@@ -33,6 +33,8 @@ import org.apache.spark.{SparkException, TaskContext}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
   * An iterator that fetches multiple blocks. For local blocks, it fetches from the local block
@@ -227,7 +229,7 @@ final class RdmaShuffleBlockFetcherIterator(
       val rdmaTransferService = shuffleClient.asInstanceOf[RdmaTransferService]
       val rdmaClient = rdmaTransferService.getRdmaClient(address.host, address.port)
 
-      val shuffleBuffer = new ShuffleBuffer(reqBufSize, rdmaClient.getEqService, false)
+      val shuffleBuffer = new ShuffleBuffer(reqBufSize, rdmaClient.getEqService, true)
       val rdmaBuffer = rdmaClient.getEqService.regRmaBufferByAddress(shuffleBuffer.nioByteBuffer(), shuffleBuffer.getAddress, shuffleBuffer.getLength.toInt)
       shuffleBuffer.setRdmaBufferId(rdmaBuffer.getRdmaBufferId)
       shuffleBuffer.setRkey(rdmaBuffer.getRKey)
@@ -241,16 +243,16 @@ final class RdmaShuffleBlockFetcherIterator(
 
     val blockFetchingReadCallback = new ReadCallback {
       override def onSuccess(blockIndex: Int, shuffleBuffer: ShuffleBuffer): Unit = {
-        RdmaShuffleBlockFetcherIterator.this.synchronized {
-          if (!isZombie) {
-            val blockIdAray = blockIds.toArray
-            val blockId = blockIdAray(blockIndex)
-            remainingBlocks -= blockId
-            logDebug("thread id: " + Thread.currentThread().getId() + ", got remote block, block index: " + blockIndex + ", remaining block size: " + remainingBlocks.size)
-            results.put(SuccessFetchResult(BlockId(blockId), address, sizeMap(blockId), shuffleBuffer,
-              remainingBlocks.isEmpty))
+        if (!isZombie) {
+          val blockIdAray = blockIds.toArray
+          val blockId = blockIdAray(blockIndex)
+          RdmaShuffleBlockFetcherIterator.this.synchronized {
+              remainingBlocks -= blockId
+              results.put(SuccessFetchResult(BlockId(blockId), address, sizeMap(blockId), shuffleBuffer,
+                remainingBlocks.isEmpty))
+              logDebug("thread id: " + Thread.currentThread().getId + ", got remote block, block index: " + blockIndex + ", remaining block size: " + remainingBlocks.size)
+            }
           }
-        }
       }
 
       override def onFailure(blockIndex: Int, e: Throwable): Unit = {
@@ -263,20 +265,12 @@ final class RdmaShuffleBlockFetcherIterator(
 
     val blockFetchingReceiveCallback = new ReceivedCallback {
       override def onSuccess(blockIndex: Int, byteBuffer: ByteBuffer): Unit = {
-        RdmaShuffleBlockFetcherIterator.this.synchronized {
-          if (!isZombie) {
-            // Increment the ref count because we need to pass this to a different thread.
-            // This needs to be released after use.
-            val blocksNum = byteBuffer.getInt()
-            logDebug("got block metadata, block number is " + blocksNum)
-            for (i <- 0 until blocksNum) {
-              val reqBufSize = byteBuffer.getInt()
-              logDebug("wanted block index: " + i + ", wanted block size: " + reqBufSize)
-              val rmaAddress = byteBuffer.getLong()
-              val rmaRkey = byteBuffer.getLong()
-              fetchBlock(i, reqBufSize, rmaAddress, rmaRkey, blockFetchingReadCallback)
-            }
-          }
+        if (!isZombie) {
+          val reqBufSize = byteBuffer.getInt()
+          val rmaAddress = byteBuffer.getLong()
+          val rmaRkey = byteBuffer.getLong()
+          logDebug("wanted block size: " + reqBufSize)
+          Future { fetchBlock(blockIndex, reqBufSize, rmaAddress, rmaRkey, blockFetchingReadCallback) }
         }
       }
 
