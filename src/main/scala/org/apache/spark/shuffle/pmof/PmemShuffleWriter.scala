@@ -163,6 +163,13 @@ private[spark] class PmemShuffleWriter[K, V, C](
       partitionLengths(i) = partitionBufferArray(i).size
       partitionBufferArray(i).close()
     }
+
+    var output_str : String = ""
+    for (i <- 0 until numPartitions) {
+      output_str += "\tPartition " + i + ": " + partitionLengths(i) + "\n"
+    }
+    logInfo("shuffle_" + dep.shuffleId + "_" + mapId + ": \n" + output_str);
+
     val shuffleServerId = blockManager.shuffleServerId
     if (enable_rdma) {
       val blockManagerId: BlockManagerId =
