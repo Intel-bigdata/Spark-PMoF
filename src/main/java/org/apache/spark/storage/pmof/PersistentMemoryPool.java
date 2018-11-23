@@ -73,7 +73,7 @@ public class PersistentMemoryPool {
     public void openShuffleBlock(int stageId, int shuffleId, int partitionNum) {
       MemoryBlock<Transactional> shuffleArray = null;
       MemoryBlock<Transactional> shuffleBlock = null;
-      logger.info("Open Shuffle Block: shuffle_" + stageId + "_" + shuffleId);
+      logger.debug("Open Shuffle Block: shuffle_" + stageId + "_" + shuffleId);
       long shuffle_array_addr = this.stageArray.getLong(Long.BYTES * stageId);
       if (shuffle_array_addr == 0 && partitionNum < 0) {
         logger.error("shuffle_" + stageId + "_" + shuffleId + " not exists");
@@ -149,11 +149,11 @@ public class PersistentMemoryPool {
         long partition_size = shuffleBlock.getLong(HEADER_SIZE + Long.BYTES * (partitionId * 2 + 1));
         MemoryBlock<Transactional> partition_block = null;
         if (partition_block_addr == 0) {
-          logger.info("Add first partition block for shuffle_" + stageId + "_" + shuffleId + "_" + partitionId + ", length: " + partitionLength);
+          logger.debug("Add first partition block for shuffle_" + stageId + "_" + shuffleId + "_" + partitionId + ", length: " + partitionLength);
           shuffleBlock.setLong(HEADER_SIZE + Long.BYTES * partitionId * 2, addr.address());
         } else {
           do { 
-            logger.info("Find last partition block for shuffle_" + stageId + "_" + shuffleId + "_" + partitionId + ", length: " + partitionLength);
+            logger.debug("Find last partition block for shuffle_" + stageId + "_" + shuffleId + "_" + partitionId + ", length: " + partitionLength);
             partition_block = this.pmHeap.memoryBlockFromAddress(Transactional.class, partition_block_addr);
             partition_block_addr = partition_block.getLong(0);
           } while (partition_block_addr != 0);
@@ -173,7 +173,7 @@ public class PersistentMemoryPool {
       }
       partitionBlock.copyFromArray(value, 0, Long.BYTES, value.length);
       partitionBlock.flush(0, Long.BYTES + value.length);
-      logger.info("write data to shuffleId: " + shuffleId + ", partitionId: " + partitionId + ", length:" + value.length + ", size is " + partitionBlock.size());
+      logger.debug("write data to shuffleId: " + shuffleId + ", partitionId: " + partitionId + ", length:" + value.length + ", size is " + partitionBlock.size());
     }
 
     public byte[] get(int stageId, int shuffleId, int partitionId) {
@@ -184,7 +184,7 @@ public class PersistentMemoryPool {
 
       // since current partition data is using linked block
       // will need to put them into one byte array here
-      logger.info("Get Shuffle Block: shuffle_" + stageId + "_" + shuffleId + "_" + partitionId + ", size: " + partition_length);
+      logger.debug("Get Shuffle Block: shuffle_" + stageId + "_" + shuffleId + "_" + partitionId + ", size: " + partition_length);
       byte[] bytes = new byte[toIntExact(partition_length)];
       long cur = 0;
       long tmp_length = 0;

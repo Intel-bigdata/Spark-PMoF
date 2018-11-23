@@ -24,27 +24,31 @@ import org.apache.spark.scheduler.MapStatus
 import org.apache.spark.shuffle.{BaseShuffleHandle, IndexShuffleBlockResolver, ShuffleWriter}
 import org.apache.spark.serializer.{SerializationStream, SerializerInstance, SerializerManager}
 import org.apache.spark.storage._
+import org.apache.spark.executor.ShuffleWriteMetrics
 
 import org.apache.spark.storage.pmof.PersistentMemoryHandler
 
 import java.util.UUID
-import java.io.{ByteArrayOutputStream, OutputStream}
+import java.io.{ByteArrayOutputStream, OutputStream, BufferedOutputStream}
 
 private[spark] class PersistentMemoryWriterPartition(
     serializerManager: SerializerManager,
     serializerInstance: SerializerInstance,
-    val blockId: BlockId
+    blockId: BlockId,
+    writeMetrics: ShuffleWriteMetrics 
 ) extends Logging {
   var bs: OutputStream = _
   var objStream: SerializationStream = _
-  var initialized = false
+  //var ts: BufferedOutputStream = _
   var stream: ByteArrayOutputStream = _
   var size: Long = 0
+  var initialized = false
   //var objStream: ObjectOutputStream = _
 
   def set(key: Any, value: Any): Long = {
     if (!initialized) {
       stream = new ByteArrayOutputStream()
+      //ts = new BufferedOutputStream(new TimeTrackingOutputStream(writeMetrics, stream))
       bs = serializerManager.wrapStream(blockId, stream)
       objStream = serializerInstance.serializeStream(bs)
       initialized = true
@@ -60,9 +64,11 @@ private[spark] class PersistentMemoryWriterPartition(
 
   def get() : Array[Byte] = {
     if (initialized) {
-      //objStream.flush()
+      objStream.flush()
+      bs.flush()
+      stream.flush()
       val data = stream.toByteArray
-      size += data.length
+      size += data.size
       stream.reset()
       data
     } else {
@@ -132,7 +138,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
     // TODO: keep checking if data need to spill to disk when PM capacity is not enough.
     // TODO: currently, we apply processed records to PM.
 
-    val partitionBufferArray = Array.fill[PersistentMemoryWriterPartition](numPartitions)(new PersistentMemoryWriterPartition(blockManager.serializerManager, serInstance, blockId))
+    val partitionBufferArray = Array.fill[PersistentMemoryWriterPartition](numPartitions)(new PersistentMemoryWriterPartition(blockManager.serializerManager, serInstance, blockId, writeMetrics))
     if (dep.mapSideCombine) { // do aggragation
       if (dep.aggregator.isDefined) {
         val iter = dep.aggregator.get.combineValuesByKey(records, context)
@@ -163,6 +169,13 @@ private[spark] class PmemShuffleWriter[K, V, C](
       partitionLengths(i) = partitionBufferArray(i).size
       partitionBufferArray(i).close()
     }
+
+    var output_str : String = ""
+    for (i <- 0 until numPartitions) {
+      output_str += "\tPartition " + i + ": " + partitionLengths(i) + "\n"
+    }
+    logInfo("shuffle_" + dep.shuffleId + "_" + mapId + ": \n" + output_str);
+
     val shuffleServerId = blockManager.shuffleServerId
     if (enable_rdma) {
       val blockManagerId: BlockManagerId =
