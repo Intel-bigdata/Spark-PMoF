@@ -200,6 +200,6 @@ public class PersistentMemoryPool {
 
     public void close() {
       logger.info("close: free llpl Heap for " + this.path);
-      this.pmHeap.freeHeap(this.path); 
+      //this.pmHeap.freeHeap(this.path); 
     }
 }
