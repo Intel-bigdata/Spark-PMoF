@@ -39,22 +39,22 @@ private[spark] class PersistentMemoryWriterPartition(
 ) extends Logging {
   var bs: OutputStream = _
   var objStream: SerializationStream = _
-  //var ts: BufferedOutputStream = _
   var stream: ByteArrayOutputStream = _
   var size: Long = 0
+  var records: Long = 0
   var initialized = false
   //var objStream: ObjectOutputStream = _
 
   def set(key: Any, value: Any): Long = {
     if (!initialized) {
       stream = new ByteArrayOutputStream()
-      //ts = new BufferedOutputStream(new TimeTrackingOutputStream(writeMetrics, stream))
       bs = serializerManager.wrapStream(blockId, stream)
       objStream = serializerInstance.serializeStream(bs)
       initialized = true
     }
     objStream.writeObject(key)
     objStream.writeObject(value)
+    records += 1
     /* check size here,
      * if it exceeds maximun block size,
      * we will write to PM and continue
@@ -131,7 +131,10 @@ private[spark] class PmemShuffleWriter[K, V, C](
     if (size >= 33554432) {
       val tmp_data = partitionBuffer.get()
       persistentMemoryWriter.tryAddPartition(stageId, mapId, partitionId, tmp_data.size)
+      val start = System.nanoTime()
       persistentMemoryWriter.write(stageId, mapId, partitionId, tmp_data)
+      writeMetrics.incWriteTime(System.nanoTime() - start)
+      writeMetrics.incBytesWritten(tmp_data.size)
     }
   }
  
@@ -170,8 +173,12 @@ private[spark] class PmemShuffleWriter[K, V, C](
     for (i <- 0 until numPartitions) {
       val data = partitionBufferArray(i).get()
       persistentMemoryWriter.tryAddPartition(stageId, mapId, i, data.size)
+      val start = System.nanoTime()
       persistentMemoryWriter.write(stageId, mapId, i, data)
-      writeMetrics.incBytesWritten(partitionBufferArray(i).size)
+      writeMetrics.incWriteTime(System.nanoTime() - start)
+      writeMetrics.incBytesWritten(data.size)
+      writeMetrics.incRecordsWritten(partitionBufferArray(i).records)
+      //writeMetrics.incBytesWritten(partitionBufferArray(i).size)
       partitionLengths(i) = partitionBufferArray(i).size
       partitionBufferArray(i).close()
     }
