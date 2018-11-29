@@ -10,13 +10,10 @@ import org.apache.spark.{ShuffleDependency, SparkConf, SparkEnv, TaskContext}
 private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager with Logging {
   logInfo("Initialize RdmaShuffleManager")
   if (!conf.getBoolean("spark.shuffle.spill", defaultValue = true)) logWarning("spark.shuffle.spill was set to false")
+
   val enable_rdma: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_rdma", defaultValue = true)
   val enable_pmem: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_pmem", defaultValue = true)
-  val path = "/mnt/mem/spark_shuffle_pmpool"
-  val pmPoolSize: Long = conf.getLong("spark.shuffle.pmof.pmpool_size", defaultValue = 1073741824)
-  val maxStages: Int = conf.getInt("spark.shuffle.pmof.max_stage_num", defaultValue = 1000)
-  val maxMaps: Int = conf.getInt("spark.shuffle.pmof.max_task_num", defaultValue = 1000)
-
+  
   private[this] val numMapsForShuffle = new ConcurrentHashMap[Int, Int]()
   if (enable_rdma) {
     logInfo("spark pmof rdma support enabled")
@@ -54,7 +51,7 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
       case other: BaseShuffleHandle[K @unchecked, V @unchecked, _] =>
         if (enable_pmem) {
           new PmemShuffleWriter(shuffleBlockResolver.asInstanceOf[IndexShuffleBlockResolver],
-      handle.asInstanceOf[BaseShuffleHandle[K, V, _]], mapId, context, enable_rdma, path, pmPoolSize, maxStages, maxMaps)
+      handle.asInstanceOf[BaseShuffleHandle[K, V, _]], mapId, context, env.conf)
         } else {
           new BaseShuffleWriter(shuffleBlockResolver, other, mapId, context, enable_rdma)
         }

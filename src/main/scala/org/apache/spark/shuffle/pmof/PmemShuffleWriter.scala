@@ -91,11 +91,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
                                                  handle: BaseShuffleHandle[K, V, C],
                                                  mapId: Int,
                                                  context: TaskContext,
-                                                 enable_rdma: Boolean,
-                                                 path_pre: String,
-                                                 maxPoolSize: Long,
-                                                 maxStages: Int,
-                                                 maxMaps: Int
+                                                 conf: SparkConf
                                                  )
   extends ShuffleWriter[K, V] with Logging {
   private val dep = handle.dependency
@@ -107,9 +103,19 @@ private[spark] class PmemShuffleWriter[K, V, C](
   private val numPartitions = partitioner.numPartitions
   private val serInstance: SerializerInstance = dep.serializer.newInstance()
 
+  val enable_rdma: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_rdma", defaultValue = true)
+  val enable_pmem: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_pmem", defaultValue = true)
+  val path_list = conf.get("spark.shuffle.pmof.pmem_list").split(",").map(_.trim).distinct
+
+  val maxPoolSize: Long = conf.getLong("spark.shuffle.pmof.pmpool_size", defaultValue = 1073741824)
+  val maxStages: Int = conf.getInt("spark.shuffle.pmof.max_stage_num", defaultValue = 1000)
+  val maxMaps: Int = conf.getInt("spark.shuffle.pmof.max_task_num", defaultValue = 1000)
+
   val blockId = TempShuffleBlockId(UUID.randomUUID())
-  var path: String = path_pre + "_" + SparkEnv.get.executorId
-  //logInfo("Using spark pmof PersistentMemoryHandler, path is " + path)
+  var devId = SparkEnv.get.executorId.toInt - 1
+  //logInfo("devId is " + devId + ", path_list: \n\t" + path_list.mkString("\n\t"))
+  var path: String = path_list(devId)
+
   val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(path, maxPoolSize, maxStages, maxMaps)
   persistentMemoryWriter.initializeShuffle(stageId, mapId, numPartitions)
   val partitionLengths: Array[Long] = Array.fill[Long](numPartitions)(0)
