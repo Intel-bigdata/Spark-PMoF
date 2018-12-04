@@ -34,8 +34,9 @@ import java.io.{ByteArrayOutputStream, OutputStream, BufferedOutputStream}
 private[spark] class PersistentMemoryWriterPartition(
     serializerManager: SerializerManager,
     serializerInstance: SerializerInstance,
-    blockId: BlockId,
-    writeMetrics: ShuffleWriteMetrics 
+    writeMetrics: ShuffleWriteMetrics,
+    stageId: Int,
+    mapId: Int
 ) extends Logging {
   var bs: OutputStream = _
   var objStream: SerializationStream = _
@@ -43,10 +44,12 @@ private[spark] class PersistentMemoryWriterPartition(
   var size: Long = 0
   var records: Long = 0
   var initialized = false
+  var blockId: BlockId = _
   //var objStream: ObjectOutputStream = _
 
-  def set(key: Any, value: Any): Long = {
+  def set(key: Any, value: Any, index: Int): Long = {
     if (!initialized) {
+      blockId = ShuffleBlockId(stageId, mapId, index)
       stream = new ByteArrayOutputStream()
       bs = serializerManager.wrapStream(blockId, stream)
       objStream = serializerInstance.serializeStream(bs)
@@ -67,6 +70,8 @@ private[spark] class PersistentMemoryWriterPartition(
       objStream.flush()
       bs.flush()
       stream.flush()
+
+      logInfo("write - block id: " + blockId + ", OutputStream: " + bs.getClass.getName + " , size: " + stream.size)
       val data = stream.toByteArray
       size += data.size
       stream.reset()
@@ -111,7 +116,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
   val maxStages: Int = conf.getInt("spark.shuffle.pmof.max_stage_num", defaultValue = 1000)
   val maxMaps: Int = conf.getInt("spark.shuffle.pmof.max_task_num", defaultValue = 1000)
 
-  val blockId = TempShuffleBlockId(UUID.randomUUID())
+  //val blockId = TempShuffleBlockId(UUID.randomUUID())
   var devId = SparkEnv.get.executorId.toInt - 1
   //logInfo("devId is " + devId + ", path_list: \n\t" + path_list.mkString("\n\t"))
   var path: String = path_list(devId)
@@ -147,7 +152,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
     // TODO: keep checking if data need to spill to disk when PM capacity is not enough.
     // TODO: currently, we apply processed records to PM.
 
-    val partitionBufferArray = Array.fill[PersistentMemoryWriterPartition](numPartitions)(new PersistentMemoryWriterPartition(blockManager.serializerManager, serInstance, blockId, writeMetrics))
+    val partitionBufferArray = Array.fill[PersistentMemoryWriterPartition](numPartitions)(new PersistentMemoryWriterPartition(blockManager.serializerManager, serInstance, writeMetrics, stageId, mapId))
     if (dep.mapSideCombine) { // do aggragation
       if (dep.aggregator.isDefined) {
         val iter = dep.aggregator.get.combineValuesByKey(records, context)
@@ -155,7 +160,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
           // since we need to write same partition (key, value) togethor, do a partition index here
           val elem = iter.next()
           val partitionId: Int = partitioner.getPartition(elem._1)
-          val tmp_size = partitionBufferArray(partitionId).set(elem._1, elem._2)
+          val tmp_size = partitionBufferArray(partitionId).set(elem._1, elem._2, partitionId)
           maySpillToPM(tmp_size, partitionId, partitionBufferArray(partitionId))
         }
       } else if (dep.aggregator.isEmpty) {
@@ -166,7 +171,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
         // since we need to write same partition (key, value) togethor, do a partition index here
         val elem = records.next()
         val partitionId: Int = partitioner.getPartition(elem._1)
-        val tmp_size = partitionBufferArray(partitionId).set(elem._1, elem._2)
+        val tmp_size = partitionBufferArray(partitionId).set(elem._1, elem._2, partitionId)
         maySpillToPM(tmp_size, partitionId, partitionBufferArray(partitionId))
       }
     }
@@ -185,7 +190,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
 
     var output_str : String = ""
     for (i <- 0 until numPartitions) {
-      output_str += "\tPartition " + i + ": " + partitionLengths(i) + "\n"
+      output_str += "\tPartition " + i + ": " + partitionLengths(i) + ", records: " + partitionBufferArray(i).records + "\n"
     }
     logInfo("shuffle_" + dep.shuffleId + "_" + mapId + ": \n" + output_str);
 
