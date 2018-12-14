@@ -116,13 +116,10 @@ private[spark] class PmemShuffleWriter[K, V, C](
   val maxStages: Int = conf.getInt("spark.shuffle.pmof.max_stage_num", defaultValue = 1000)
   val maxMaps: Int = conf.getInt("spark.shuffle.pmof.max_task_num", defaultValue = 1000)
 
-  //val blockId = TempShuffleBlockId(UUID.randomUUID())
   var devId = SparkEnv.get.executorId.toInt - 1
-  //logInfo("devId is " + devId + ", path_list: \n\t" + path_list.mkString("\n\t"))
   var path: String = path_list(devId)
 
   val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(path, maxPoolSize, maxStages, maxMaps)
-  persistentMemoryWriter.initializeShuffle(stageId, mapId, numPartitions)
   val partitionLengths: Array[Long] = Array.fill[Long](numPartitions)(0)
 
   /**
@@ -133,11 +130,10 @@ private[spark] class PmemShuffleWriter[K, V, C](
   private var stopping = false
 
   def maySpillToPM(size: Long, partitionId: Int, partitionBuffer: PersistentMemoryWriterPartition) {
-    if (size >= 33554432) {
+    if (size >= 2097152) {
       val tmp_data = partitionBuffer.get()
-      persistentMemoryWriter.tryAddPartition(stageId, mapId, partitionId, tmp_data.size)
       val start = System.nanoTime()
-      persistentMemoryWriter.write(stageId, mapId, partitionId, tmp_data)
+      persistentMemoryWriter.setPartition(numPartitions, stageId, mapId, partitionId, tmp_data)
       writeMetrics.incWriteTime(System.nanoTime() - start)
       writeMetrics.incBytesWritten(tmp_data.size)
     }
@@ -177,9 +173,8 @@ private[spark] class PmemShuffleWriter[K, V, C](
     }
     for (i <- 0 until numPartitions) {
       val data = partitionBufferArray(i).get()
-      persistentMemoryWriter.tryAddPartition(stageId, mapId, i, data.size)
       val start = System.nanoTime()
-      persistentMemoryWriter.write(stageId, mapId, i, data)
+      persistentMemoryWriter.setPartition(numPartitions, stageId, mapId, i, data)
       writeMetrics.incWriteTime(System.nanoTime() - start)
       writeMetrics.incBytesWritten(data.size)
       writeMetrics.incRecordsWritten(partitionBufferArray(i).records)

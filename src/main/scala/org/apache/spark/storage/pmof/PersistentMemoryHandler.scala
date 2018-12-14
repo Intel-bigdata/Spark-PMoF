@@ -22,9 +22,8 @@ import org.apache.spark.internal.Logging
 
 import java.nio.ByteBuffer
 import org.apache.spark.network.buffer.{ManagedBuffer, NioManagedBuffer}
-import org.apache.spark.storage.pmof.PersistentMemoryPool
 import org.apache.spark.executor.ShuffleWriteMetrics
-
+import org.apache.spark.storage.pmof.PersistentMemoryPool
 
 private[spark] class PersistentMemoryHandler(
     val pathId: String,
@@ -33,24 +32,14 @@ private[spark] class PersistentMemoryHandler(
     val poolSize: Long = -1) extends Logging {
   val pmpool = new PersistentMemoryPool(pathId, maxStages, maxShuffles, poolSize)
 
-  def initializeShuffle(stageId: Int, shuffleId: Int, numPartitions: Int) = synchronized {
-    pmpool.openShuffleBlock(stageId, shuffleId, numPartitions)
-  }
-
-  def tryAddPartition(stageId: Int, shuffleId: Int, partitionId: Int, size: Long) = synchronized {
-    if (size > 0) {
-      pmpool.addPartition(stageId, shuffleId, partitionId, size);
-    }
-  }
-
-  def write(stageId: Int, shuffleId: Int, partitionId: Int, data: Array[Byte]) = {
+  def setPartition(numPartitions: Int, stageId: Int, shuffleId: Int, partitionId: Int, data: Array[Byte]) = synchronized {
     if (data.size > 0) {
-      pmpool.set(stageId, shuffleId, partitionId, data)
+      pmpool.setPartition(numPartitions, stageId, shuffleId, partitionId, data.size, data)
     }
   }
 
-  def getPartitionBlock(stageId: Int, shuffleId: Int, partitionId: Int): ManagedBuffer = {
-    var data = pmpool.get(stageId, shuffleId, partitionId)
+  def getPartition(stageId: Int, shuffleId: Int, partitionId: Int): ManagedBuffer = {
+    var data = pmpool.getPartition(stageId, shuffleId, partitionId)
     new NioManagedBuffer(ByteBuffer.wrap(data))
   }
 

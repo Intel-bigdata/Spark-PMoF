@@ -16,8 +16,7 @@ private[spark] class PersistentMemoryShuffleBlockResolver(
   override def getBlockData(blockId: ShuffleBlockId): ManagedBuffer = {
     // return BlockId corresponding ManagedBuffer
     val persistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler()
-    persistentMemoryHandler.initializeShuffle(blockId.shuffleId, blockId.mapId, -1)
-    persistentMemoryHandler.getPartitionBlock(blockId.shuffleId, blockId.mapId, blockId.reduceId)
+    persistentMemoryHandler.getPartition(blockId.shuffleId, blockId.mapId, blockId.reduceId)
   }
 
   override def stop() {
