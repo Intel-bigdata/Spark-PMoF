@@ -154,16 +154,14 @@ public:
             long size,
             char* data ) {
         int ret = 0;
-        TOID_ARRAY(struct StageArrayItem) *stageArray = &(D_RW(stageArrayRoot)->stageArray);
+        /*TOID_ARRAY(struct StageArrayItem) *stageArray = &(D_RW(stageArrayRoot)->stageArray);
         assert(!TOID_IS_NULL(D_RO(stageArrayRoot)->stageArray));
 
         TOID(struct StageArrayItem) *stageArrayItem = &(D_RW(*stageArray)[stageId]);
-        tmp = D_RW(*stageArray);
 
         if (TOID_IS_NULL(D_RO(*stageArrayItem)->mapArray)) {
             allocate_array(maxMap, &(D_RW(*stageArrayItem)->mapArray));
         }
-        tmp = D_RW(*stageArray);
 
         TOID_ARRAY(struct MapArrayItem) *mapArray = &(D_RW(*stageArrayItem)->mapArray);
         TOID(struct MapArrayItem) *mapArrayItem = &(D_RW(*mapArray)[mapId]);
@@ -171,8 +169,6 @@ public:
         if (TOID_IS_NULL(D_RO(*mapArrayItem)->partitionArray)) {
             allocate_array(partitionNum, &(D_RW(*mapArrayItem)->partitionArray));
         }
-
-        tmp = D_RW(*stageArray);
 
         TOID_ARRAY(struct PartitionArrayItem) *partitionArray = &(D_RW(*mapArrayItem)->partitionArray);
         TOID(struct PartitionArrayItem) *partitionArrayItem = &(D_RW(*partitionArray)[partitionId]);
@@ -183,13 +179,25 @@ public:
 					  // loop to find the last partitionBlock
             partitionBlock = &(D_RW(*partitionBlock)->next_block);
         }
-        tmp = D_RW(*stageArray);
         POBJ_ALLOC(pmpool, partitionBlock, struct PartitionBlock, sizeof(struct PartitionBlock) + size - 1, initPartitionBlock, &args);
         long updated_size = D_RO(*partitionArrayItem)->partition_size + size;
         //pmemobj_memcpy_persist(pmpool, &(D_RW(*partitionArrayItem)->partition_size), &updated_size, sizeof(long));
         memcpy(&(D_RW(*partitionArrayItem)->partition_size), &updated_size, sizeof(long));
-        tmp = D_RW(*stageArray);
+        */
+        int inflight = 1;
+        std::unique_lock<std::mutex> lck(mtx);
+        TX_BEGIN(pmpool) {
+            char* address = (char*)pmemobj_direct(pmemobj_tx_zalloc(size, 0));
+            pmemobj_tx_add_range_direct((const void *)address, size);
+            memcpy(address, data, size);
     
+            inflight--;
+            cv.notify_all();
+            
+        } TX_ONABORT {
+            exit(1);
+        } TX_END
+        while (inflight > 0) cv.wait(lck);
         return ret;
     }
 
