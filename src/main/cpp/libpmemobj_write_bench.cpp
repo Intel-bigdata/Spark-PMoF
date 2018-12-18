@@ -25,8 +25,6 @@ ArgParser::ArgParser(int ac, char* av[]) {
         ("help,h", "Print help messages")
         ("device,d", boost::program_options::value<string>(), "pmem device path")
         ("runtime,r", boost::program_options::value<string>(), "runtime")
-        ("thread_num,t", boost::program_options::value<string>(), "parallel threads number")
-        ("taskset_start,c", boost::program_options::value<string>(), "taskset start number")
         ("block_size,b", boost::program_options::value<string>(), "block size(KB)");
 	    boost::program_options::store(boost::program_options::parse_command_line(ac, av, options), vm);
     if (vm.count("help")){ 
@@ -84,7 +82,7 @@ void Monitor::run() {
 Writer::Writer(Monitor* mon, const char* dev, int bs, int thread_num, unsigned core):
     mon(mon),
     block_size(bs),
-    pmpool(dev, 100, 100, thread_num, core){
+    pmpool(dev, 100, 100){
     thread_pool.push_back(thread(&Writer::write, this));
 }
 
@@ -130,8 +128,8 @@ std::vector<std::string> split_string_to_vector(const string& s, char delimiter 
 
 int main(int argc, char* argv[]) {
     ArgParser arg_parser(argc, argv);
-    int thread_num = stoi(arg_parser.get("thread_num"));
-    int taskset = stoi(arg_parser.get("taskset_start"));
+    int thread_num = 1;
+    int taskset = 10;
     int runtime = stoi(arg_parser.get("runtime"));
     int bs = stoi(arg_parser.get("block_size"));
     vector<string> device_list = split_string_to_vector(arg_parser.get("device"), ',');
