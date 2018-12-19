@@ -103,6 +103,16 @@ struct MemoryBlock {
     }
 };
 
+static void taskset(int core_start, int core_end) {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    for (int cpu = core_start; cpu < core_end; cpu ++) {
+        CPU_SET(cpu, &cpuset);
+    }
+    pthread_t thId = pthread_self();
+    pthread_setaffinity_np(thId, sizeof(cpu_set_t), &cpuset);
+}
+
 class PMPool {
 private:
     PMEMobjpool *pmpool;
@@ -111,10 +121,14 @@ private:
     int maxMap;
     std::mutex mtx;
     std::condition_variable cv;
+    int core_s;
+    int core_e;
 public:
-    PMPool(const char* dev, int maxStage, int maxMap):
+    PMPool(const char* dev, int maxStage, int maxMap, int core_s, int core_e):
         maxStage(maxStage),
-        maxMap(maxMap) {
+        maxMap(maxMap),
+        core_s(core_s),
+        core_e(core_e) {
         
         const char *pool_layout_name = "pmem_spark_shuffle";
         pmpool = pmemobj_open(dev, pool_layout_name);
@@ -144,7 +158,7 @@ public:
         int inflight = 1;
         std::unique_lock<std::mutex> lck(mtx);
         TX_BEGIN(pmpool) {
-
+            taskset(core_s, core_e); 
             TX_ADD(stageArrayRoot);
             if (TOID_IS_NULL(D_RO(stageArrayRoot)->stageArray)) {
                 D_RW(stageArrayRoot)->stageArray = TX_ZALLOC(struct StageArray, sizeof(struct StageArray) + maxStage * sizeof(struct StageArrayItem));
@@ -152,21 +166,21 @@ public:
             
             TX_ADD_FIELD(stageArrayRoot, stageArray);
             (D_RW(D_RW(stageArrayRoot)->stageArray)->items)[stageId] = TX_ZNEW(struct StageArrayItem);
-            TOID(struct StageArrayItem) stageArrayItem = (D_RO(D_RO(stageArrayRoot)->stageArray)->items)[stageId];
+            TOID(struct StageArrayItem) stageArrayItem = (D_RW(D_RW(stageArrayRoot)->stageArray)->items)[stageId];
             if (TOID_IS_NULL(D_RO(stageArrayItem)->mapArray)) {
                 D_RW(stageArrayItem)->mapArray = TX_ZALLOC(struct MapArray, sizeof(struct MapArray) + maxMap * sizeof(struct MapArrayItem));
             }
     
             TX_ADD_FIELD(stageArrayItem, mapArray);
             (D_RW(D_RW(stageArrayItem)->mapArray)->items)[mapId] = TX_ZNEW(struct MapArrayItem);
-            TOID(struct MapArrayItem) mapArrayItem = D_RO(D_RO(stageArrayItem)->mapArray)->items[mapId];
+            TOID(struct MapArrayItem) mapArrayItem = D_RW(D_RW(stageArrayItem)->mapArray)->items[mapId];
             if (TOID_IS_NULL(D_RO(mapArrayItem)->partitionArray)) {
                 D_RW(mapArrayItem)->partitionArray = TX_ZALLOC(struct PartitionArray, sizeof(struct PartitionArray) +  partitionNum * sizeof(struct PartitionArrayItem));
             }
     
             TX_ADD_FIELD(mapArrayItem, partitionArray);
             (D_RW(D_RW(mapArrayItem)->partitionArray)->items)[partitionId] = TX_ZNEW(struct PartitionArrayItem);
-            TOID(struct PartitionArrayItem) partitionArrayItem = D_RO(D_RO(mapArrayItem)->partitionArray)->items[partitionId];
+            TOID(struct PartitionArrayItem) partitionArrayItem = D_RW(D_RW(mapArrayItem)->partitionArray)->items[partitionId];
             TX_ADD_FIELD(partitionArrayItem, partition_size);
             D_RW(partitionArrayItem)->partition_size += size;
     
@@ -188,7 +202,6 @@ public:
 
             inflight--;
             cv.notify_all();
-            
         } TX_ONABORT {
             exit(-1);
         } TX_END
@@ -202,11 +215,13 @@ public:
             int mapId,
             int partitionId ) {
 
+        taskset(core_s, core_e); 
         assert(!TOID_IS_NULL(D_RO(stageArrayRoot)->stageArray));
 
         TOID(struct StageArrayItem) stageArrayItem = D_RO(D_RO(stageArrayRoot)->stageArray)->items[stageId];
         assert(!TOID_IS_NULL(D_RO(stageArrayItem)->mapArray));
 
+        TOID(struct MapArray) mapArray = D_RO(stageArrayItem)->mapArray;
         TOID(struct MapArrayItem) mapArrayItem = D_RO(D_RO(stageArrayItem)->mapArray)->items[mapId];
         assert(!TOID_IS_NULL(D_RO(mapArrayItem)->partitionArray));
     

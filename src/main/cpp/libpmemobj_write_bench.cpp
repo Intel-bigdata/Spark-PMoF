@@ -82,7 +82,7 @@ void Monitor::run() {
 Writer::Writer(Monitor* mon, const char* dev, int bs, int thread_num, unsigned core):
     mon(mon),
     block_size(bs),
-    pmpool(dev, 100, 100){
+    pmpool(dev, 100, 100, 10, 20){
     thread_pool.push_back(thread(&Writer::write, this));
 }
 

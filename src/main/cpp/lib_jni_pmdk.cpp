@@ -4,7 +4,7 @@
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeOpenDevice
   (JNIEnv *env, jclass obj, jstring path, jint maxStage, jint maxMap) {
     const char *CStr = env->GetStringUTFChars(path, 0);
-    PMPool* pmpool = new PMPool(CStr, maxStage, maxMap);
+    PMPool* pmpool = new PMPool(CStr, maxStage, maxMap, 10, 20);
     env->ReleaseStringUTFChars(path, CStr);
     return (long)pmpool;
 }
