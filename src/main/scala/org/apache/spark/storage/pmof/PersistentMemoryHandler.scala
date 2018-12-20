@@ -35,9 +35,11 @@ private[spark] class PersistentMemoryHandler(
   val pmpool = new PersistentMemoryPool(pathId, maxStages, maxShuffles, poolSize, core_s, core_e)
   log("Open PersistentMemoryPool: " + pathId + " ,binds to core " + core_s + "-" + core_e)
 
-  def setPartition(numPartitions: Int, stageId: Int, shuffleId: Int, partitionId: Int, data: Array[Byte]) = synchronized {
+  def setPartition(numPartitions: Int, stageId: Int, shuffleId: Int, partitionId: Int, data: Array[Byte]): Long = synchronized {
     if (data.size > 0) {
       pmpool.setPartition(numPartitions, stageId, shuffleId, partitionId, data.size, data)
+    } else {
+      -1
     }
   }
 
