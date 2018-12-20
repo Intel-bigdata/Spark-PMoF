@@ -29,8 +29,11 @@ private[spark] class PersistentMemoryHandler(
     val pathId: String,
     val maxStages: Int = 1000,
     val maxShuffles: Int = 1000,
-    val poolSize: Long = -1) extends Logging {
-  val pmpool = new PersistentMemoryPool(pathId, maxStages, maxShuffles, poolSize)
+    val poolSize: Long = -1,
+    val core_s: Int = 0,
+    val core_e: Int = 16) extends Logging {
+  val pmpool = new PersistentMemoryPool(pathId, maxStages, maxShuffles, poolSize, core_s, core_e)
+  log("Open PersistentMemoryPool: " + pathId + " ,binds to core " + core_s + "-" + core_e)
 
   def setPartition(numPartitions: Int, stageId: Int, shuffleId: Int, partitionId: Int, data: Array[Byte]) = synchronized {
     if (data.size > 0) {
@@ -38,7 +41,7 @@ private[spark] class PersistentMemoryHandler(
     }
   }
 
-  def getPartition(stageId: Int, shuffleId: Int, partitionId: Int): ManagedBuffer = {
+  def getPartition(stageId: Int, shuffleId: Int, partitionId: Int): ManagedBuffer = synchronized {
     var data = pmpool.getPartition(stageId, shuffleId, partitionId)
     new NioManagedBuffer(ByteBuffer.wrap(data))
   }
@@ -56,11 +59,11 @@ object PersistentMemoryHandler {
   private var persistentMemoryHandler: PersistentMemoryHandler = _
   var path: String = _
   var stopped = false
-  def getPersistentMemoryHandler(path_arg: String, pmPoolSize: Long, maxStages: Int, maxMaps: Int) = synchronized {
+  def getPersistentMemoryHandler(path_arg: String, pmPoolSize: Long, maxStages: Int, maxMaps: Int, core_s: Int, core_e: Int) = synchronized {
     if (stopped == false) {
       if (persistentMemoryHandler == null) {
         path = path_arg
-        persistentMemoryHandler = new PersistentMemoryHandler(path, maxStages, maxMaps, pmPoolSize)
+        persistentMemoryHandler = new PersistentMemoryHandler(path, maxStages, maxMaps, pmPoolSize, core_s, core_e)
       }
       persistentMemoryHandler.log("Using persistentMemoryHandler for " + path)
     }

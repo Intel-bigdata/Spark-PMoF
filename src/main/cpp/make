@@ -1,5 +1,5 @@
 #!/usr/bin/sh
 g++ lib_jni_pmdk.cpp -o libjnipmdk.so -I/mnt/nvme2/jdk1.8.0_121/include -I/mnt/nvme2/jdk1.8.0_121/include/linux -std=c++11 -lpmemobj -lpthread -fPIC -shared
-g++ -o test test.cpp -std=c++11 -ljnipmdk -lpmemobj -lpthread -g
-g++ -o write_bench libpmemobj_write_bench.cpp -std=c++11 -ljnipmdk -lpmemobj -lpthread -lboost_program_options -g
-g++ -o read_bench libpmemobj_read_bench.cpp -std=c++11 -ljnipmdk -lpmemobj -lpthread -lboost_program_options -g
+#g++ -o test test.cpp -std=c++11 -ljnipmdk -lpmemobj -lpthread -g
+#g++ -o write_bench libpmemobj_write_bench.cpp -std=c++11 -ljnipmdk -lpmemobj -lpthread -lboost_program_options -g
+#g++ -o read_bench libpmemobj_read_bench.cpp -std=c++11 -ljnipmdk -lpmemobj -lpthread -lboost_program_options -g

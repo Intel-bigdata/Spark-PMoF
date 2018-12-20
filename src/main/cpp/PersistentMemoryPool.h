@@ -165,26 +165,35 @@ public:
             }
             
             TX_ADD_FIELD(stageArrayRoot, stageArray);
-            (D_RW(D_RW(stageArrayRoot)->stageArray)->items)[stageId] = TX_ZNEW(struct StageArrayItem);
-            TOID(struct StageArrayItem) stageArrayItem = (D_RW(D_RW(stageArrayRoot)->stageArray)->items)[stageId];
-            if (TOID_IS_NULL(D_RO(stageArrayItem)->mapArray)) {
-                D_RW(stageArrayItem)->mapArray = TX_ZALLOC(struct MapArray, sizeof(struct MapArray) + maxMap * sizeof(struct MapArrayItem));
+            TOID(struct StageArrayItem) *stageArrayItem = &(D_RW(D_RW(stageArrayRoot)->stageArray)->items[stageId]);
+            if (TOID_IS_NULL(*stageArrayItem)) {
+                *stageArrayItem = TX_ZNEW(struct StageArrayItem);
+            }
+            TX_ADD(*stageArrayItem);
+            if (TOID_IS_NULL(D_RO(*stageArrayItem)->mapArray)) {
+                D_RW(*stageArrayItem)->mapArray = TX_ZALLOC(struct MapArray, sizeof(struct MapArray) + maxMap * sizeof(struct MapArrayItem));
             }
     
-            TX_ADD_FIELD(stageArrayItem, mapArray);
-            (D_RW(D_RW(stageArrayItem)->mapArray)->items)[mapId] = TX_ZNEW(struct MapArrayItem);
-            TOID(struct MapArrayItem) mapArrayItem = D_RW(D_RW(stageArrayItem)->mapArray)->items[mapId];
-            if (TOID_IS_NULL(D_RO(mapArrayItem)->partitionArray)) {
-                D_RW(mapArrayItem)->partitionArray = TX_ZALLOC(struct PartitionArray, sizeof(struct PartitionArray) +  partitionNum * sizeof(struct PartitionArrayItem));
+            TX_ADD_FIELD(*stageArrayItem, mapArray);
+            TOID(struct MapArrayItem) *mapArrayItem = &(D_RW(D_RW(*stageArrayItem)->mapArray)->items[mapId]);
+            if (TOID_IS_NULL(*mapArrayItem)) {
+                *mapArrayItem = TX_ZNEW(struct MapArrayItem);
+            }
+            TX_ADD(*mapArrayItem);
+            if (TOID_IS_NULL(D_RO(*mapArrayItem)->partitionArray)) {
+                D_RW(*mapArrayItem)->partitionArray = TX_ZALLOC(struct PartitionArray, sizeof(struct PartitionArray) +  partitionNum * sizeof(struct PartitionArrayItem));
             }
     
-            TX_ADD_FIELD(mapArrayItem, partitionArray);
-            (D_RW(D_RW(mapArrayItem)->partitionArray)->items)[partitionId] = TX_ZNEW(struct PartitionArrayItem);
-            TOID(struct PartitionArrayItem) partitionArrayItem = D_RW(D_RW(mapArrayItem)->partitionArray)->items[partitionId];
-            TX_ADD_FIELD(partitionArrayItem, partition_size);
-            D_RW(partitionArrayItem)->partition_size += size;
+            TX_ADD_FIELD(*mapArrayItem, partitionArray);
+            TOID(struct PartitionArrayItem) *partitionArrayItem = &(D_RW(D_RW(*mapArrayItem)->partitionArray)->items[partitionId]);
+            if (TOID_IS_NULL(*partitionArrayItem)) {
+                *partitionArrayItem = TX_ZNEW(struct PartitionArrayItem);
+            }
+            TX_ADD(*partitionArrayItem);
+            TX_ADD_FIELD(*partitionArrayItem, partition_size);
+            D_RW(*partitionArrayItem)->partition_size += size;
     
-            TOID(struct PartitionBlock) *partitionBlock = &(D_RW(partitionArrayItem)->first_block);
+            TOID(struct PartitionBlock) *partitionBlock = &(D_RW(*partitionArrayItem)->first_block);
             while(!TOID_IS_NULL(*partitionBlock)) {
                 *partitionBlock = D_RW(*partitionBlock)->next_block;
             }
@@ -197,12 +206,15 @@ public:
             D_RW(*partitionBlock)->next_block = TOID_NULL(struct PartitionBlock);
 
             char* data_addr = (char*)pmemobj_direct(D_RW(*partitionBlock)->data);
+            //printf("setPartition data_addr: %p\n", data_addr);
             pmemobj_tx_add_range_direct((const void *)data_addr, size);
             memcpy(data_addr, data, size);
-
+        } TX_ONCOMMIT {
             inflight--;
             cv.notify_all();
         } TX_ONABORT {
+            fprintf(stderr, "set Partition of shuffle_%d_%d_%d failed. Error: %s\n", stageId, mapId, partitionId, pmemobj_errormsg());
+            ret = -1;
             exit(-1);
         } TX_END
         while (inflight > 0) cv.wait(lck);
@@ -216,25 +228,41 @@ public:
             int partitionId ) {
 
         taskset(core_s, core_e); 
-        assert(!TOID_IS_NULL(D_RO(stageArrayRoot)->stageArray));
+        if(TOID_IS_NULL(D_RO(stageArrayRoot)->stageArray)){
+            fprintf(stderr, "get Partition of shuffle_%d_%d_%d failed: stageArray none Exists.\n", stageId, mapId, partitionId);
+            return -1;
+        }
 
         TOID(struct StageArrayItem) stageArrayItem = D_RO(D_RO(stageArrayRoot)->stageArray)->items[stageId];
-        assert(!TOID_IS_NULL(D_RO(stageArrayItem)->mapArray));
+        if(TOID_IS_NULL(stageArrayItem) || TOID_IS_NULL(D_RO(stageArrayItem)->mapArray)) {
+            fprintf(stderr, "get Partition of shuffle_%d_%d_%d failed: stageArrayItem OR mapArray none Exists.\n", stageId, mapId, partitionId);
+            return -1;
+        }
 
         TOID(struct MapArray) mapArray = D_RO(stageArrayItem)->mapArray;
         TOID(struct MapArrayItem) mapArrayItem = D_RO(D_RO(stageArrayItem)->mapArray)->items[mapId];
-        assert(!TOID_IS_NULL(D_RO(mapArrayItem)->partitionArray));
+        if(TOID_IS_NULL(mapArrayItem) || TOID_IS_NULL(D_RO(mapArrayItem)->partitionArray)){
+            fprintf(stderr, "get Partition of shuffle_%d_%d_%d failed: mapArrayItem OR partitionArray none Exists.\n", stageId, mapId, partitionId);
+            return -1;
+        }
     
         TOID(struct PartitionArrayItem) partitionArrayItem = D_RO(D_RO(mapArrayItem)->partitionArray)->items[partitionId];
-        assert(!TOID_IS_NULL(D_RO(partitionArrayItem)->first_block));
+        if(TOID_IS_NULL(partitionArrayItem) || TOID_IS_NULL(D_RO(partitionArrayItem)->first_block)) {
+            fprintf(stderr, "get Partition of shuffle_%d_%d_%d failed: partitionArrayItem OR partitionBlock none Exists.\n", stageId, mapId, partitionId);
+            return -1;
+        }
 
         long data_length = D_RO(partitionArrayItem)->partition_size;
         mb->buf = new char[data_length]();
         long off = 0;
         TOID(struct PartitionBlock) partitionBlock = D_RO(partitionArrayItem)->first_block;
 
+        char* data_addr;
         while(!TOID_IS_NULL(partitionBlock)) {
-            memcpy(mb->buf + off, pmemobj_direct(D_RO(partitionBlock)->data), D_RO(partitionBlock)->data_size);
+            data_addr = (char*)pmemobj_direct(D_RO(partitionBlock)->data);
+            //printf("getPartition data_addr: %p\n", data_addr);
+
+            memcpy(mb->buf + off, data_addr, D_RO(partitionBlock)->data_size);
             off += D_RO(partitionBlock)->data_size;
             partitionBlock = D_RO(partitionBlock)->next_block;
         }
