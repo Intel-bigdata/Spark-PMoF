@@ -30,6 +30,7 @@ import org.apache.spark.storage.pmof.PersistentMemoryHandler
 
 import java.util.UUID
 import java.io.{ByteArrayOutputStream, OutputStream, BufferedOutputStream}
+import scala.collection.mutable.LinkedHashMap
 
 private[spark] class PersistentMemoryWriterPartition(
     serializerManager: SerializerManager,
@@ -119,8 +120,9 @@ private[spark] class PmemShuffleWriter[K, V, C](
 
   var devId = SparkEnv.get.executorId.toInt - 1
   var path: String = path_list(devId)
-  var core_s = 0;
-  var core_e = 0;
+  var core_s = 0
+  var core_e = 0
+  val data_addr_map = new LinkedHashMap[Long, Long]()
   for (i <- core_set_map) {
     if (path.indexOf(i(0)) > -1) {
       var core_set = i(1).split("-")
@@ -143,7 +145,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
     if (size >= 2097152) {
       val tmp_data = partitionBuffer.get()
       val start = System.nanoTime()
-      persistentMemoryWriter.setPartition(numPartitions, stageId, mapId, partitionId, tmp_data)
+      data_addr_map.update(persistentMemoryWriter.setPartition(numPartitions, stageId, mapId, partitionId, tmp_data), tmp_data.size)
       writeMetrics.incWriteTime(System.nanoTime() - start)
       writeMetrics.incBytesWritten(tmp_data.size)
     }
@@ -184,7 +186,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
     for (i <- 0 until numPartitions) {
       val data = partitionBufferArray(i).get()
       val start = System.nanoTime()
-      persistentMemoryWriter.setPartition(numPartitions, stageId, mapId, i, data)
+      data_addr_map.update(persistentMemoryWriter.setPartition(numPartitions, stageId, mapId, i, data), data.size)
       writeMetrics.incWriteTime(System.nanoTime() - start)
       writeMetrics.incBytesWritten(data.size)
       writeMetrics.incRecordsWritten(partitionBufferArray(i).records)
@@ -197,7 +199,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
     for (i <- 0 until numPartitions) {
       output_str += "\tPartition " + i + ": " + partitionLengths(i) + ", records: " + partitionBufferArray(i).records + "\n"
     }
-    logInfo("shuffle_" + dep.shuffleId + "_" + mapId + ": \n" + output_str);
+    logDebug("shuffle_" + dep.shuffleId + "_" + mapId + ": \n" + output_str);
 
     val shuffleServerId = blockManager.shuffleServerId
     if (enable_rdma) {

@@ -36,8 +36,8 @@ public class PersistentMemoryPool {
       this.deviceHandler = nativeOpenDevice(path, max_stages_num, max_shuffles_num, core_s, core_e);
     }
 
-    public void setPartition(int partitionNum, int stageId, int shuffleId, int partitionId, long partitionLength, byte[] data) {
-      nativeSetPartition(this.deviceHandler, partitionNum, stageId, shuffleId, partitionId, partitionLength, data);
+    public long setPartition(int partitionNum, int stageId, int shuffleId, int partitionId, long partitionLength, byte[] data) {
+      return nativeSetPartition(this.deviceHandler, partitionNum, stageId, shuffleId, partitionId, partitionLength, data);
     }
 
     public byte[] getPartition(int stageId, int shuffleId, int partitionId) {

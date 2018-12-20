@@ -147,7 +147,7 @@ public:
         pmemobj_close(pmpool);
     }
 
-    int setPartition(
+    long setPartition(
             int partitionNum,
             int stageId, 
             int mapId, 
@@ -156,6 +156,7 @@ public:
             char* data ) {
         int ret = 0;
         int inflight = 1;
+        char* data_addr = nullptr;
         std::unique_lock<std::mutex> lck(mtx);
         TX_BEGIN(pmpool) {
             taskset(core_s, core_e); 
@@ -205,7 +206,7 @@ public:
             D_RW(*partitionBlock)->data_size = size;
             D_RW(*partitionBlock)->next_block = TOID_NULL(struct PartitionBlock);
 
-            char* data_addr = (char*)pmemobj_direct(D_RW(*partitionBlock)->data);
+            data_addr = (char*)pmemobj_direct(D_RW(*partitionBlock)->data);
             //printf("setPartition data_addr: %p\n", data_addr);
             pmemobj_tx_add_range_direct((const void *)data_addr, size);
             memcpy(data_addr, data, size);
@@ -218,7 +219,9 @@ public:
             exit(-1);
         } TX_END
         while (inflight > 0) cv.wait(lck);
-        return ret;
+        if (data_addr == nullptr)
+          return -1;
+        return (long)data_addr;
     }
 
     long getPartition(
