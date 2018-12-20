@@ -22,6 +22,7 @@ import java.io.*;
 import java.nio.channels.FileChannel;
 import java.util.Iterator;
 
+import org.apache.spark.shuffle.pmof.MetadataResolver;
 import org.apache.spark.storage.BlockManagerId;
 import org.apache.spark.storage.BlockManagerId$;
 import org.apache.spark.network.pmof.RdmaTransferService;
@@ -85,6 +86,7 @@ public class SerializedShuffleWriter<K, V> extends ShuffleWriter<K, V> {
     private final int initialSortBufferSize;
     private final int inputBufferSizeInBytes;
     private final int outputBufferSizeInBytes;
+    private final MetadataResolver metadataResolver;
     private final boolean enable_rdma;
 
     @Nullable private MapStatus mapStatus;
@@ -122,6 +124,7 @@ public class SerializedShuffleWriter<K, V> extends ShuffleWriter<K, V> {
     public SerializedShuffleWriter(
             BlockManager blockManager,
             IndexShuffleBlockResolver shuffleBlockResolver,
+            MetadataResolver metadataResolver,
             TaskMemoryManager memoryManager,
             SerializedShuffleHandle<K, V> handle,
             int mapId,
@@ -147,6 +150,7 @@ public class SerializedShuffleWriter<K, V> extends ShuffleWriter<K, V> {
         this.taskContext = taskContext;
         this.sparkConf = sparkConf;
         this.enable_rdma = enable_rdma;
+        this.metadataResolver = metadataResolver;
         this.transferToEnabled = sparkConf.getBoolean("spark.file.transferTo", true);
         this.initialSortBufferSize = sparkConf.getInt("spark.shuffle.sort.initialBufferSize",
                 DEFAULT_INITIAL_SORT_BUFFER_SIZE);
@@ -253,6 +257,8 @@ public class SerializedShuffleWriter<K, V> extends ShuffleWriter<K, V> {
                 }
             }
             shuffleBlockResolver.writeIndexFileAndCommit(shuffleId, mapId, partitionLengths, tmp);
+
+            metadataResolver.commitBlockInfo(shuffleId, mapId, partitionLengths);
         } finally {
             if (tmp.exists() && !tmp.delete()) {
                 logger.error("Error while deleting temp file {}", tmp.getAbsolutePath());
@@ -261,7 +267,7 @@ public class SerializedShuffleWriter<K, V> extends ShuffleWriter<K, V> {
         BlockManagerId shuffleServerId = blockManager.shuffleServerId();
         if (enable_rdma) {
             BlockManagerId blockManagerId = BlockManagerId$.MODULE$.apply(shuffleServerId.executorId(), shuffleServerId.host(),
-                    RdmaTransferService.getTransferServiceInstance(blockManager).port(), shuffleServerId.topologyInfo());
+                    RdmaTransferService.getTransferServiceInstance(blockManager, null, false).port(), shuffleServerId.topologyInfo());
             mapStatus = MapStatus$.MODULE$.apply(blockManagerId, partitionLengths);
         } else {
           mapStatus = MapStatus$.MODULE$.apply(shuffleServerId, partitionLengths);

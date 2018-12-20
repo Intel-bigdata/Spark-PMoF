@@ -94,6 +94,7 @@ private[spark] class PersistentMemoryWriterPartition(
 
 private[spark] class PmemShuffleWriter[K, V, C](
                                                  shuffleBlockResolver: IndexShuffleBlockResolver,
+                                                 metadataResolver: MetadataResolver,
                                                  handle: BaseShuffleHandle[K, V, C],
                                                  mapId: Int,
                                                  context: TaskContext,
@@ -122,7 +123,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
   var path: String = path_list(devId)
   var core_s = 0
   var core_e = 0
-  var data_addr_map = Array.fill(numPartitions)(new LinkedHashMap[Long, Long])
+  var data_addr_map = Array.fill(numPartitions)(new LinkedHashMap[Long, Int])
   for (i <- core_set_map) {
     if (path.indexOf(i(0)) > -1) {
       var core_set = i(1).split("-")
@@ -146,7 +147,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
       val tmp_data = partitionBuffer.get()
       val start = System.nanoTime()
       var addr_len_t = (persistentMemoryWriter.setPartition(numPartitions, stageId, mapId, partitionId, tmp_data), tmp_data.size)
-      data_addr_map(i)+=addr_len_t
+      data_addr_map(partitionId)+=addr_len_t
       writeMetrics.incWriteTime(System.nanoTime() - start)
       writeMetrics.incBytesWritten(tmp_data.size)
     }
@@ -202,6 +203,8 @@ private[spark] class PmemShuffleWriter[K, V, C](
       output_str += "\tPartition " + i + ": " + partitionLengths(i) + ", records: " + partitionBufferArray(i).records + "\n"
     }
     logDebug("shuffle_" + dep.shuffleId + "_" + mapId + ": \n" + output_str);
+
+    metadataResolver.commitPmemBlockInfo(stageId, mapId, data_addr_map)
 
     val shuffleServerId = blockManager.shuffleServerId
     if (enable_rdma) {

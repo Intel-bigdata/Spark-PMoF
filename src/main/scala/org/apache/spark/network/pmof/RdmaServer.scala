@@ -1,41 +1,42 @@
 package org.apache.spark.network.pmof
 
-import java.io.{File, RandomAccessFile}
 import java.nio.ByteBuffer
-import java.nio.channels.FileChannel
-import java.util.concurrent.{ConcurrentHashMap, LinkedBlockingDeque}
+import java.util
+import java.util.concurrent.LinkedBlockingDeque
 
-import org.apache.spark.network.BlockDataManager
-import org.apache.spark.network.shuffle.protocol.{BlockTransferMessage, OpenBlocks}
 import org.apache.spark.serializer.Serializer
-import org.apache.spark.storage.BlockId
 import com.intel.hpnl.core._
 import org.apache.spark.SparkConf
 import org.apache.spark.internal.Logging
-import org.apache.spark.network.buffer.FileSegmentManagedBuffer
+import org.apache.spark.shuffle.pmof.PmofShuffleManager
 
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class RdmaServer(conf: SparkConf, address: String, var port: Int) {
+class RdmaServer(conf: SparkConf, val shuffleManager: PmofShuffleManager, address: String, var port: Int, supportRma: Boolean) {
   if (port == 0) {
     port = Utils.getPort
   }
+  var SINGLE_BUFFER_SIZE: Int = _
+  var BUFFER_NUM: Int = _
+
+  if (supportRma) {
+    SINGLE_BUFFER_SIZE = 0
+    BUFFER_NUM = 0
+  } else {
+    SINGLE_BUFFER_SIZE = RdmaTransferService.CHUNKSIZE
+    BUFFER_NUM = conf.getInt("spark.shuffle.pmof.server_buffer_nums", 256)
+  }
   final val workers = conf.getInt("spark.shuffle.pmof.server_pool_size", 1)
-  final val eqService = new EqService(address, port.toString, true)
+  final val sparkExecutorNums = conf.getInt("spark.shuffle.pmof.executor_num", 3)
+  final val eqService = new EqService(address, port.toString, BUFFER_NUM, true)
   final val cqService = new CqService(eqService, workers, eqService.getNativeHandle)
 
-  final val SINGLE_BUFFER_SIZE = RdmaTransferService.CHUNKSIZE
-  final val BUFFER_NUM = conf.getInt("spark.shuffle.pmof.server_buffer_nums", 1024)
-
-  val shuffleBufferMap: ConcurrentHashMap[Long, ShuffleBuffer] = new ConcurrentHashMap[Long, ShuffleBuffer]()
+  val conList = new util.ArrayList[Connection]()
 
   def init(): Unit = {
-    for (i <- 0 until BUFFER_NUM) {
+    for (i <- 0 until BUFFER_NUM*20) {
       val sendBuffer = ByteBuffer.allocateDirect(SINGLE_BUFFER_SIZE)
       eqService.setSendBuffer(sendBuffer, SINGLE_BUFFER_SIZE, i)
     }
-    for (i <- 0 until BUFFER_NUM*2) {
+    for (i <- 0 until BUFFER_NUM*2*20) {
       val recvBuffer = ByteBuffer.allocateDirect(SINGLE_BUFFER_SIZE)
       eqService.setRecvBuffer(recvBuffer, SINGLE_BUFFER_SIZE, i)
     }
@@ -65,35 +66,39 @@ class RdmaServer(conf: SparkConf, address: String, var port: Int) {
     })
   }
 
+  def setConnectHandler(handler: Handler): Unit = {
+    eqService.setConnectedCallback(handler)
+  }
+
   def getEqService: EqService = {
     eqService
   }
+
+  def addCon(con: Connection): Unit = synchronized {
+    conList.add(con)
+  }
+
+  def getConSize: Int = synchronized {
+    conList.size()
+  }
 }
 
-class ServerRecvHandler(server: RdmaServer, appid: String, serializer: Serializer,
-                        blockManager: BlockDataManager) extends Handler with Logging {
+class ServerRecvHandler(server: RdmaServer, appid: String, serializer: Serializer) extends Handler with Logging {
 
-  private val deferredBufferList = new LinkedBlockingDeque[ServerDeferredReq]()
+  private final val deferredBufferList = new LinkedBlockingDeque[ServerDeferredReq]()
+  private final val byteBufferTmp = ByteBuffer.allocate(4)
 
-  def sendMetadata(con: Connection, shuffleBuffer: ShuffleBuffer, index: Int, seq: Int, isDeferred: Boolean): Unit = {
+  def sendMetadata(con: Connection, byteBuffer: ByteBuffer, msgType: Byte, seq: Int, isDeferred: Boolean): Unit = {
     val sendBuffer = con.getSendBuffer(false)
     if (sendBuffer == null) {
       if (isDeferred) {
-        deferredBufferList.addFirst(new ServerDeferredReq(con, shuffleBuffer, index, seq))
+        deferredBufferList.addFirst(new ServerDeferredReq(con, byteBuffer, msgType, seq))
       } else {
-        deferredBufferList.addLast(new ServerDeferredReq(con, shuffleBuffer, index, seq))
+        deferredBufferList.addLast(new ServerDeferredReq(con, byteBuffer, msgType, seq))
       }
       return
     }
-    val byteBufferTmp = ByteBuffer.allocate(20)
-
-    byteBufferTmp.putInt(shuffleBuffer.size.toInt)
-    byteBufferTmp.putLong(shuffleBuffer.getAddress)
-    byteBufferTmp.putLong(shuffleBuffer.getRkey)
-    server.shuffleBufferMap.put(shuffleBuffer.getAddress, shuffleBuffer)
-
-    byteBufferTmp.flip()
-    sendBuffer.put(byteBufferTmp, 0.toByte, index, seq)
+    sendBuffer.put(byteBuffer, msgType, 0, seq)
     con.send(sendBuffer.remaining(), sendBuffer.getRdmaBufferId)
   }
 
@@ -101,63 +106,32 @@ class ServerRecvHandler(server: RdmaServer, appid: String, serializer: Serialize
     val deferredReq = deferredBufferList.pollFirst
     if (deferredReq == null) return
     val con = deferredReq.con
-    val index = deferredReq.index
+    val byteBuffer = deferredReq.byteBuffer
+    val msgType = deferredReq.msgType
     val seq = deferredReq.seq
-    sendMetadata(con, deferredReq.shuffleBuffer, index, seq, isDeferred = true)
+    sendMetadata(con, byteBuffer, msgType, seq, isDeferred = true)
   }
 
-  def convertToShuffleBuffer(file: File, offset: Long, length: Long): ShuffleBuffer = {
-    var shuffleBuffer: ShuffleBuffer = null
-    val channel: FileChannel = new RandomAccessFile(file, "rw").getChannel
-    if (false) {
-      shuffleBuffer = new ShuffleBuffer(offset, length, channel, server.getEqService)
-    } else {
-      val start = System.currentTimeMillis()
-      shuffleBuffer = new ShuffleBuffer(length, server.getEqService, true)
-      channel.position(offset)
-      while (shuffleBuffer.nioByteBuffer().remaining() != 0) {
-        if (channel.read(shuffleBuffer.nioByteBuffer()) == -1) {
-          shuffleBuffer.nioByteBuffer().flip()
-        }
-      }
-      channel.close()
-      val end = System.currentTimeMillis()
-      val duration = end-start
-      logDebug("allocating direct buffer and read block data consumes " + duration)
-    }
-    val rdmaBuffer = server.getEqService.regRmaBufferByAddress(shuffleBuffer.nioByteBuffer(), shuffleBuffer.getAddress, length.toInt)
-    shuffleBuffer.setRdmaBufferId(rdmaBuffer.getRdmaBufferId)
-    shuffleBuffer.setRkey(rdmaBuffer.getRKey)
-    shuffleBuffer
-  }
-
-  def handleMessage(con: Connection, blockId: String, index: Int, seq: Int): Unit = {
-    val managedBuffer = blockManager.getBlockData(BlockId.apply(blockId)).asInstanceOf[FileSegmentManagedBuffer]
-    val shuffleBuffer = convertToShuffleBuffer(managedBuffer.getFile, managedBuffer.getOffset, managedBuffer.getLength)
-    sendMetadata(con, shuffleBuffer, index, seq, isDeferred = false)
-  }
-
-  override def handle(con: Connection, rdmaBufferId: Int, blockBufferSize: Int): Unit = {
+  override def handle(con: Connection, rdmaBufferId: Int, blockBufferSize: Int): Unit = synchronized {
     val buffer: RdmaBuffer = con.getRecvBuffer(rdmaBufferId)
-    val serializedMessage: ByteBuffer = buffer.get(blockBufferSize)
+    val message: ByteBuffer = buffer.get(blockBufferSize)
     val seq = buffer.getSeq
     val msgType = buffer.getType
+    val metadataResolver = server.shuffleManager.metadataResolver
     if (msgType == 0.toByte) {
-      val message = BlockTransferMessage.Decoder.fromByteBuffer(serializedMessage)
-      val openBlocks = message.asInstanceOf[OpenBlocks]
-      val blocksNum = openBlocks.blockIds.length
-      for (i <- (0 until blocksNum).view) {
-        Future { handleMessage(con, openBlocks.blockIds(i), i, seq) }
-      }
+      metadataResolver.addShuffleBlockInfo(message)
+      sendMetadata(con, byteBufferTmp, 0.toByte, seq, isDeferred = false)
     } else {
-      val rmaAddress = serializedMessage.getLong()
-      val shuffleBuffer = server.shuffleBufferMap.get(rmaAddress)
-      if (shuffleBuffer != null) {
-        shuffleBuffer.close
-        server.shuffleBufferMap.remove(rmaAddress)
-      }
+      val outputBuffer = metadataResolver.serializeShuffleBlockInfo(message)
+      sendMetadata(con, outputBuffer, 1.toByte, seq, isDeferred = false)
     }
   }
 }
 
-class ServerDeferredReq(val con: Connection, val shuffleBuffer: ShuffleBuffer, val index: Int, val seq: Int) {}
+class ServerConnectHandler(server: RdmaServer) extends Handler {
+  override def handle(con: Connection, rdmaBufferId: Int, bufferBufferSize: Int): Unit = {
+    server.addCon(con)
+  }
+}
+
+class ServerDeferredReq(val con: Connection, val byteBuffer: ByteBuffer, val msgType: Byte, val seq: Int) {}

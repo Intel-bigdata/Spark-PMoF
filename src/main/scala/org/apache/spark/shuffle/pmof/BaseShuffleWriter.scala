@@ -28,6 +28,7 @@ import org.apache.spark.util.collection.ExternalSorter
 
 private[spark] class BaseShuffleWriter[K, V, C](
                                                  shuffleBlockResolver: IndexShuffleBlockResolver,
+                                                 metadataResolver: MetadataResolver,
                                                  handle: BaseShuffleHandle[K, V, C],
                                                  mapId: Int,
                                                  context: TaskContext,
@@ -73,6 +74,9 @@ private[spark] class BaseShuffleWriter[K, V, C](
       val blockId = ShuffleBlockId(dep.shuffleId, mapId, IndexShuffleBlockResolver.NOOP_REDUCE_ID)
       val partitionLengths = sorter.writePartitionedFile(blockId, tmp)
       shuffleBlockResolver.writeIndexFileAndCommit(dep.shuffleId, mapId, partitionLengths, tmp)
+
+      metadataResolver.commitBlockInfo(dep.shuffleId, mapId, partitionLengths)
+
       val shuffleServerId = blockManager.shuffleServerId
       if (enable_rdma) {
         val blockManagerId: BlockManagerId =
