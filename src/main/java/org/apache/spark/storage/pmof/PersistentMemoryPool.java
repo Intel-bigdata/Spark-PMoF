@@ -8,7 +8,7 @@ public class PersistentMemoryPool {
     static {
         System.loadLibrary("jnipmdk");
     }
-    private static native long nativeOpenDevice(String path, int maxStage, int maxMap);
+    private static native long nativeOpenDevice(String path, int maxStage, int maxMap, int core_s, int core_e);
     private static native int nativeSetPartition(long deviceHandler, int numPartitions, int stageId, int mapId, int partutionId, long size, byte[] data);
     private static native byte[] nativeGetPartition(long deviceHandler, int stageId, int mapId, int partutionId);
     private static native int nativeCloseDevice(long deviceHandler);
@@ -25,17 +25,19 @@ public class PersistentMemoryPool {
         String path,
         int max_stages_num,
         int max_shuffles_num,
-        long pool_size) {
+        long pool_size,
+        int core_s,
+        int core_e) {
       this.max_stages_num = max_stages_num;
       this.max_shuffles_num = max_shuffles_num;
 
       //logger.info("Open pmdk_handler [" + path + "]");
       pool_size = pool_size == -1 ? DEFAULT_PMPOOL_SIZE : pool_size;
-      this.deviceHandler = nativeOpenDevice(path, max_stages_num, max_shuffles_num);
+      this.deviceHandler = nativeOpenDevice(path, max_stages_num, max_shuffles_num, core_s, core_e);
     }
 
-    public void setPartition(int partitionNum, int stageId, int shuffleId, int partitionId, long partitionLength, byte[] data) {
-      nativeSetPartition(this.deviceHandler, partitionNum, stageId, shuffleId, partitionId, partitionLength, data);
+    public long setPartition(int partitionNum, int stageId, int shuffleId, int partitionId, long partitionLength, byte[] data) {
+      return nativeSetPartition(this.deviceHandler, partitionNum, stageId, shuffleId, partitionId, partitionLength, data);
     }
 
     public byte[] getPartition(int stageId, int shuffleId, int partitionId) {

@@ -45,27 +45,41 @@ using namespace std;
 #define TOID_ARRAY(x) TOID_ARRAY_TYPE(TOID(x))
 
 POBJ_LAYOUT_BEGIN(PersistentMemoryStruct);
-//POBJ_LAYOUT_ROOT(PersistentMemoryStruct, struct StageArrayRoot);
 POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct StageArrayRoot);
+POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct StageArray);
 POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct StageArrayItem);
-POBJ_LAYOUT_TOID(PersistentMemoryStruct, TOID(struct StageArrayItem));
+POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct MapArray);
 POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct MapArrayItem);
-POBJ_LAYOUT_TOID(PersistentMemoryStruct, TOID(struct MapArrayItem));
+POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct PartitionArray);
 POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct PartitionArrayItem);
-POBJ_LAYOUT_TOID(PersistentMemoryStruct, TOID(struct PartitionArrayItem));
 POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct PartitionBlock);
 POBJ_LAYOUT_END(PersistentMemoryStruct);
 
 struct StageArrayRoot {
-    TOID_ARRAY(struct StageArrayItem) stageArray;
+    TOID(struct StageArray) stageArray;
+};
+
+struct StageArray {
+    int size;
+    TOID(struct StageArrayItem) items[];
 };
 
 struct StageArrayItem {
-    TOID_ARRAY(struct MapArrayItem) mapArray;
+    TOID(struct MapArray) mapArray;
+};
+
+struct MapArray {
+    int size;
+    TOID(struct MapArrayItem) items[];
 };
 
 struct MapArrayItem {
-    TOID_ARRAY(struct PartitionArrayItem) partitionArray;
+    TOID(struct PartitionArray) partitionArray;
+};
+
+struct PartitionArray {
+    int size;
+    TOID(struct PartitionArrayItem) items[];
 };
 
 struct PartitionArrayItem {
@@ -76,7 +90,7 @@ struct PartitionArrayItem {
 struct PartitionBlock {
     TOID(struct PartitionBlock) next_block;
     long data_size;
-    char data[];
+    PMEMoid data;
 };
 
 struct MemoryBlock {
@@ -89,42 +103,32 @@ struct MemoryBlock {
     }
 };
 
-struct PartitionBlockArg {
-    long size;
-    char* data;
-    PartitionBlockArg(long size, char* data): size(size), data(data){}
-};
-
-static int initPartitionBlock(pmemobjpool *pmpool, void *ptr, void *args) {
-    struct PartitionBlock *partitionBlock = (struct PartitionBlock*)ptr;
-    partitionBlock->data_size = ((struct PartitionBlockArg*)args)->size;
-    //pmemobj_persist(pmpool, &(partitionBlock->data_size), sizeof(long));
-
-    memcpy(partitionBlock->data, ((struct PartitionBlockArg*)args)->data, ((struct PartitionBlockArg*)args)->size);
-    partitionBlock->next_block = TOID_NULL(struct PartitionBlock);
-    return 0;
-}
-
-static int initStageArrayItem(pmemobjpool *pmpool, void *ptr, void *arg) {
-    //pmemobj_persist(pmpool, ptr, *((int*)arg));
-    return 0;
-}
-
-static int initMapArrayItem(pmemobjpool *pmpool, void *ptr, void *arg) {
-    //pmemobj_persist(pmpool, ptr, *((int*)arg));
-    return 0;
-}
-
-static int initPartitionArrayItem(pmemobjpool *pmpool, void *ptr, void *arg) {
-    //pmemobj_persist(pmpool, ptr, *((int*)arg));
-    return 0;
+static void taskset(int core_start, int core_end) {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    for (int cpu = core_start; cpu < core_end; cpu ++) {
+        CPU_SET(cpu, &cpuset);
+    }
+    pthread_t thId = pthread_self();
+    pthread_setaffinity_np(thId, sizeof(cpu_set_t), &cpuset);
 }
 
 class PMPool {
+private:
+    PMEMobjpool *pmpool;
+    TOID(struct StageArrayRoot) stageArrayRoot;
+    int maxStage;
+    int maxMap;
+    std::mutex mtx;
+    std::condition_variable cv;
+    int core_s;
+    int core_e;
 public:
-    PMPool(const char* dev, int maxStage, int maxMap):
+    PMPool(const char* dev, int maxStage, int maxMap, int core_s, int core_e):
         maxStage(maxStage),
-        maxMap(maxMap) {
+        maxMap(maxMap),
+        core_s(core_s),
+        core_e(core_e) {
         
         const char *pool_layout_name = "pmem_spark_shuffle";
         pmpool = pmemobj_open(dev, pool_layout_name);
@@ -137,16 +141,13 @@ public:
         }
 
         stageArrayRoot = POBJ_ROOT(pmpool, struct StageArrayRoot);
-        if (TOID_IS_NULL(D_RO(stageArrayRoot)->stageArray)) {
-            allocate_array(maxStage, &(D_RW(stageArrayRoot)->stageArray));
-        }
     }
 
     ~PMPool() {
         pmemobj_close(pmpool);
     }
 
-    int setPartition(
+    long setPartition(
             int partitionNum,
             int stageId, 
             int mapId, 
@@ -154,43 +155,73 @@ public:
             long size,
             char* data ) {
         int ret = 0;
-        TOID_ARRAY(struct StageArrayItem) *stageArray = &(D_RW(stageArrayRoot)->stageArray);
-        assert(!TOID_IS_NULL(D_RO(stageArrayRoot)->stageArray));
-
-        TOID(struct StageArrayItem) *stageArrayItem = &(D_RW(*stageArray)[stageId]);
-        tmp = D_RW(*stageArray);
-
-        if (TOID_IS_NULL(D_RO(*stageArrayItem)->mapArray)) {
-            allocate_array(maxMap, &(D_RW(*stageArrayItem)->mapArray));
-        }
-        tmp = D_RW(*stageArray);
-
-        TOID_ARRAY(struct MapArrayItem) *mapArray = &(D_RW(*stageArrayItem)->mapArray);
-        TOID(struct MapArrayItem) *mapArrayItem = &(D_RW(*mapArray)[mapId]);
+        int inflight = 1;
+        char* data_addr = nullptr;
+        std::unique_lock<std::mutex> lck(mtx);
+        TX_BEGIN(pmpool) {
+            taskset(core_s, core_e); 
+            TX_ADD(stageArrayRoot);
+            if (TOID_IS_NULL(D_RO(stageArrayRoot)->stageArray)) {
+                D_RW(stageArrayRoot)->stageArray = TX_ZALLOC(struct StageArray, sizeof(struct StageArray) + maxStage * sizeof(struct StageArrayItem));
+            }
+            
+            TX_ADD_FIELD(stageArrayRoot, stageArray);
+            TOID(struct StageArrayItem) *stageArrayItem = &(D_RW(D_RW(stageArrayRoot)->stageArray)->items[stageId]);
+            if (TOID_IS_NULL(*stageArrayItem)) {
+                *stageArrayItem = TX_ZNEW(struct StageArrayItem);
+            }
+            TX_ADD(*stageArrayItem);
+            if (TOID_IS_NULL(D_RO(*stageArrayItem)->mapArray)) {
+                D_RW(*stageArrayItem)->mapArray = TX_ZALLOC(struct MapArray, sizeof(struct MapArray) + maxMap * sizeof(struct MapArrayItem));
+            }
     
-        if (TOID_IS_NULL(D_RO(*mapArrayItem)->partitionArray)) {
-            allocate_array(partitionNum, &(D_RW(*mapArrayItem)->partitionArray));
-        }
-
-        tmp = D_RW(*stageArray);
-
-        TOID_ARRAY(struct PartitionArrayItem) *partitionArray = &(D_RW(*mapArrayItem)->partitionArray);
-        TOID(struct PartitionArrayItem) *partitionArrayItem = &(D_RW(*partitionArray)[partitionId]);
-
-        struct PartitionBlockArg args(size, data);
-        TOID(struct PartitionBlock) *partitionBlock = &(D_RW(*partitionArrayItem)->first_block);
-        while(!TOID_IS_NULL(*partitionBlock)) {
-					  // loop to find the last partitionBlock
-            partitionBlock = &(D_RW(*partitionBlock)->next_block);
-        }
-        tmp = D_RW(*stageArray);
-        POBJ_ALLOC(pmpool, partitionBlock, struct PartitionBlock, sizeof(struct PartitionBlock) + size - 1, initPartitionBlock, &args);
-        long updated_size = D_RO(*partitionArrayItem)->partition_size + size;
-        //pmemobj_memcpy_persist(pmpool, &(D_RW(*partitionArrayItem)->partition_size), &updated_size, sizeof(long));
-        memcpy(&(D_RW(*partitionArrayItem)->partition_size), &updated_size, sizeof(long));
-        tmp = D_RW(*stageArray);
+            TX_ADD_FIELD(*stageArrayItem, mapArray);
+            TOID(struct MapArrayItem) *mapArrayItem = &(D_RW(D_RW(*stageArrayItem)->mapArray)->items[mapId]);
+            if (TOID_IS_NULL(*mapArrayItem)) {
+                *mapArrayItem = TX_ZNEW(struct MapArrayItem);
+            }
+            TX_ADD(*mapArrayItem);
+            if (TOID_IS_NULL(D_RO(*mapArrayItem)->partitionArray)) {
+                D_RW(*mapArrayItem)->partitionArray = TX_ZALLOC(struct PartitionArray, sizeof(struct PartitionArray) +  partitionNum * sizeof(struct PartitionArrayItem));
+            }
     
-        return ret;
+            TX_ADD_FIELD(*mapArrayItem, partitionArray);
+            TOID(struct PartitionArrayItem) *partitionArrayItem = &(D_RW(D_RW(*mapArrayItem)->partitionArray)->items[partitionId]);
+            if (TOID_IS_NULL(*partitionArrayItem)) {
+                *partitionArrayItem = TX_ZNEW(struct PartitionArrayItem);
+            }
+            TX_ADD(*partitionArrayItem);
+            TX_ADD_FIELD(*partitionArrayItem, partition_size);
+            D_RW(*partitionArrayItem)->partition_size += size;
+    
+            TOID(struct PartitionBlock) *partitionBlock = &(D_RW(*partitionArrayItem)->first_block);
+            while(!TOID_IS_NULL(*partitionBlock)) {
+                *partitionBlock = D_RW(*partitionBlock)->next_block;
+            }
+
+            TX_ADD_DIRECT(partitionBlock);
+            *partitionBlock = TX_ZALLOC(struct PartitionBlock, 1);
+            D_RW(*partitionBlock)->data = pmemobj_tx_zalloc(size, 0);
+            
+            D_RW(*partitionBlock)->data_size = size;
+            D_RW(*partitionBlock)->next_block = TOID_NULL(struct PartitionBlock);
+
+            data_addr = (char*)pmemobj_direct(D_RW(*partitionBlock)->data);
+            //printf("setPartition data_addr: %p\n", data_addr);
+            pmemobj_tx_add_range_direct((const void *)data_addr, size);
+            memcpy(data_addr, data, size);
+        } TX_ONCOMMIT {
+            inflight--;
+            cv.notify_all();
+        } TX_ONABORT {
+            fprintf(stderr, "set Partition of shuffle_%d_%d_%d failed. Error: %s\n", stageId, mapId, partitionId, pmemobj_errormsg());
+            ret = -1;
+            exit(-1);
+        } TX_END
+        while (inflight > 0) cv.wait(lck);
+        if (data_addr == nullptr)
+          return -1;
+        return (long)data_addr;
     }
 
     long getPartition(
@@ -199,26 +230,42 @@ public:
             int mapId,
             int partitionId ) {
 
-        stageArrayRoot = POBJ_ROOT(pmpool, struct StageArrayRoot);
-        //TOID(struct StageArrayRoot) stageArrayRoot = POBJ_ROOT(pmpool, struct StageArrayRoot);
-        assert(!TOID_IS_NULL(D_RO(stageArrayRoot)->stageArray));
+        taskset(core_s, core_e); 
+        if(TOID_IS_NULL(D_RO(stageArrayRoot)->stageArray)){
+            fprintf(stderr, "get Partition of shuffle_%d_%d_%d failed: stageArray none Exists.\n", stageId, mapId, partitionId);
+            return -1;
+        }
 
-        TOID(struct StageArrayItem) stageArrayItem = D_RO(D_RO(stageArrayRoot)->stageArray)[stageId];
-        assert(!TOID_IS_NULL(D_RO(stageArrayItem)->mapArray));
+        TOID(struct StageArrayItem) stageArrayItem = D_RO(D_RO(stageArrayRoot)->stageArray)->items[stageId];
+        if(TOID_IS_NULL(stageArrayItem) || TOID_IS_NULL(D_RO(stageArrayItem)->mapArray)) {
+            fprintf(stderr, "get Partition of shuffle_%d_%d_%d failed: stageArrayItem OR mapArray none Exists.\n", stageId, mapId, partitionId);
+            return -1;
+        }
 
-        TOID(struct MapArrayItem) mapArrayItem = D_RO(D_RO(stageArrayItem)->mapArray)[mapId];
-        assert(!TOID_IS_NULL(D_RO(mapArrayItem)->partitionArray));
+        TOID(struct MapArray) mapArray = D_RO(stageArrayItem)->mapArray;
+        TOID(struct MapArrayItem) mapArrayItem = D_RO(D_RO(stageArrayItem)->mapArray)->items[mapId];
+        if(TOID_IS_NULL(mapArrayItem) || TOID_IS_NULL(D_RO(mapArrayItem)->partitionArray)){
+            fprintf(stderr, "get Partition of shuffle_%d_%d_%d failed: mapArrayItem OR partitionArray none Exists.\n", stageId, mapId, partitionId);
+            return -1;
+        }
     
-        TOID(struct PartitionArrayItem) partitionArrayItem = D_RO(D_RO(mapArrayItem)->partitionArray)[partitionId];
-        assert(!TOID_IS_NULL(D_RO(partitionArrayItem)->first_block));
+        TOID(struct PartitionArrayItem) partitionArrayItem = D_RO(D_RO(mapArrayItem)->partitionArray)->items[partitionId];
+        if(TOID_IS_NULL(partitionArrayItem) || TOID_IS_NULL(D_RO(partitionArrayItem)->first_block)) {
+            fprintf(stderr, "get Partition of shuffle_%d_%d_%d failed: partitionArrayItem OR partitionBlock none Exists.\n", stageId, mapId, partitionId);
+            return -1;
+        }
 
         long data_length = D_RO(partitionArrayItem)->partition_size;
         mb->buf = new char[data_length]();
         long off = 0;
         TOID(struct PartitionBlock) partitionBlock = D_RO(partitionArrayItem)->first_block;
 
+        char* data_addr;
         while(!TOID_IS_NULL(partitionBlock)) {
-            memcpy(mb->buf + off, D_RO(partitionBlock)->data, D_RO(partitionBlock)->data_size);
+            data_addr = (char*)pmemobj_direct(D_RO(partitionBlock)->data);
+            //printf("getPartition data_addr: %p\n", data_addr);
+
+            memcpy(mb->buf + off, data_addr, D_RO(partitionBlock)->data_size);
             off += D_RO(partitionBlock)->data_size;
             partitionBlock = D_RO(partitionBlock)->next_block;
         }
@@ -226,58 +273,4 @@ public:
         return data_length;
     }
 
-private:
-    PMEMobjpool *pmpool;
-    TOID(struct StageArrayRoot) stageArrayRoot;
-    TOID(struct StageArrayItem) *tmp;
-    int maxStage;
-    int maxMap;
-    uint64_t poolId;
-    int inflight = 0;
-    std::mutex mtx;
-    std::condition_variable cv;
-
-    void allocate_array(int size, TOID_ARRAY(struct StageArrayItem) *array) {
-        int arg_size = sizeof(TOID(struct StageArrayItem)) * size;
-        POBJ_ZALLOC(pmpool, array, TOID(struct StageArrayItem), arg_size);
-
-	      if (TOID_IS_NULL(*array)) {
-		        fprintf(stderr, "Unable to allocate Stage array, size is %d\n", arg_size);
-            exit(-1);
-	      }
-
-	      for (int i = 0; i < size; i++) {
-		        POBJ_ZNEW(pmpool, &D_RW(*array)[i], struct StageArrayItem);
-	      }
-    }
-
-    void allocate_array(int size, TOID_ARRAY(struct MapArrayItem) *array) {
-        int arg_size = sizeof(TOID(struct MapArrayItem)) * size;
-        POBJ_ZALLOC(pmpool, array, TOID(struct MapArrayItem), arg_size);
-
-	      if (TOID_IS_NULL(*array)) {
-		        fprintf(stderr, "Unable to allocate Map array, size is %d\n", arg_size);
-            exit(-1);
-	      }
-
-	      for (int i = 0; i < size; i++) {
-		        POBJ_ZNEW(pmpool, &D_RW(*array)[i], struct MapArrayItem);
-	      }
-    }
-
-    void allocate_array(int size, TOID_ARRAY(struct PartitionArrayItem) *array) {
-        int arg_size = sizeof(TOID(struct PartitionArrayItem)) * size;
-        POBJ_ZALLOC(pmpool, array, TOID(struct PartitionArrayItem), arg_size);
-
-	      if (TOID_IS_NULL(*array)) {
-		        fprintf(stderr, "Unable to allocate Shuffle array, size is %d\n", arg_size);
-            exit(-1);
-	      }
-
-	      for (int i = 0; i < size; i++) {
-		        POBJ_ZNEW(pmpool, &D_RW(*array)[i], struct PartitionArrayItem);
-	      }
-    }
 };
-
-
