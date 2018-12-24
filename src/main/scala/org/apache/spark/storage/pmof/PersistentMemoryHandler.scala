@@ -17,13 +17,10 @@
 
 package org.apache.spark.storage.pmof
 
-import org.apache.spark._
 import org.apache.spark.internal.Logging
-
 import java.nio.ByteBuffer
+
 import org.apache.spark.network.buffer.{ManagedBuffer, NioManagedBuffer}
-import org.apache.spark.executor.ShuffleWriteMetrics
-import org.apache.spark.storage.pmof.PersistentMemoryPool
 
 private[spark] class PersistentMemoryHandler(
     val pathId: String,
@@ -36,33 +33,33 @@ private[spark] class PersistentMemoryHandler(
   log("Open PersistentMemoryPool: " + pathId + " ,binds to core " + core_s + "-" + core_e)
 
   def setPartition(numPartitions: Int, stageId: Int, shuffleId: Int, partitionId: Int, data: Array[Byte]): Long = synchronized {
-    if (data.size > 0) {
-      pmpool.setPartition(numPartitions, stageId, shuffleId, partitionId, data.size, data)
+    if (data.length > 0) {
+      pmpool.setPartition(numPartitions, stageId, shuffleId, partitionId, data.length, data)
     } else {
       -1
     }
   }
 
   def getPartition(stageId: Int, shuffleId: Int, partitionId: Int): ManagedBuffer = synchronized {
-    var data = pmpool.getPartition(stageId, shuffleId, partitionId)
+    val data = pmpool.getPartition(stageId, shuffleId, partitionId)
     new NioManagedBuffer(ByteBuffer.wrap(data))
   }
 
-  def close() = synchronized {
+  def close(): Unit = synchronized {
     pmpool.close() 
   } 
 
   def log(printout: String) {
-    logInfo(printout)
+    logDebug(printout)
   }
 }
 
 object PersistentMemoryHandler {
   private var persistentMemoryHandler: PersistentMemoryHandler = _
   var path: String = _
-  var stopped = false
-  def getPersistentMemoryHandler(path_arg: String, pmPoolSize: Long, maxStages: Int, maxMaps: Int, core_s: Int, core_e: Int) = synchronized {
-    if (stopped == false) {
+  var stopped: Boolean = false
+  def getPersistentMemoryHandler(path_arg: String, pmPoolSize: Long, maxStages: Int, maxMaps: Int, core_s: Int, core_e: Int): PersistentMemoryHandler = synchronized {
+    if (!stopped) {
       if (persistentMemoryHandler == null) {
         path = path_arg
         persistentMemoryHandler = new PersistentMemoryHandler(path, maxStages, maxMaps, pmPoolSize, core_s, core_e)
@@ -72,8 +69,8 @@ object PersistentMemoryHandler {
     persistentMemoryHandler
   }
 
-  def getPersistentMemoryHandler() = synchronized {
-    if (stopped == false) {
+  def getPersistentMemoryHandler: PersistentMemoryHandler = synchronized {
+    if (!stopped) {
       if (persistentMemoryHandler == null) {
         throw new NullPointerException("persistentMemoryHandler")
       }
@@ -82,8 +79,8 @@ object PersistentMemoryHandler {
     persistentMemoryHandler
   }
 
-  def stop() = synchronized {
-    if (stopped == false && persistentMemoryHandler != null) {
+  def stop(): Unit = synchronized {
+    if (!stopped && persistentMemoryHandler != null) {
       persistentMemoryHandler.close()
       stopped = true
     }
