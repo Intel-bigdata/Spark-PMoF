@@ -18,17 +18,15 @@ package org.apache.spark.storage.pmof
  */
 
 import java.io.{File, IOException, InputStream}
-import java.nio.ByteBuffer
 import java.util.concurrent.LinkedBlockingQueue
 
 import javax.annotation.concurrent.GuardedBy
 import org.apache.spark.internal.Logging
 import org.apache.spark.network.buffer.{FileSegmentManagedBuffer, ManagedBuffer}
 import org.apache.spark.network.shuffle.{ShuffleClient, TempFileManager}
-import org.apache.spark.network.pmof.{RdmaTransferService, ReadCallback, ReceivedCallback, ShuffleBuffer}
+import org.apache.spark.network.pmof._
 import org.apache.spark.shuffle.FetchFailedException
 import org.apache.spark.storage._
-import org.apache.spark.util.Utils
 import org.apache.spark.{SparkException, TaskContext}
 
 import scala.collection.mutable
@@ -90,13 +88,8 @@ final class RdmaShuffleBlockFetcherIterator(
     */
   private[this] var numBlocksProcessed = 0
 
-  private[this] val startTime = System.currentTimeMillis
-
   /** Local blocks to fetch, excluding zero-sized blocks. */
   private[this] val localBlocks = new ArrayBuffer[BlockId]()
-
-  /** Remote blocks to fetch, excluding zero-sized blocks. */
-  private[this] val remoteBlocks = new mutable.HashSet[BlockId]()
 
   /**
     * A queue to hold our results. This turns the asynchronous model provided by
@@ -110,18 +103,6 @@ final class RdmaShuffleBlockFetcherIterator(
     */
   @volatile private[this] var currentResult: SuccessFetchResult = _
 
-  /**
-    * Queue of fetch requests to issue; we'll pull requests off this gradually to make sure that
-    * the number of bytes in flight is limited to maxBytesInFlight.
-    */
-  private[this] val fetchRequests = new mutable.Queue[FetchRequest]
-
-  /**
-    * Queue of fetch requests which could not be issued the first time they were dequeued. These
-    * requests are tried again when the fetch constraints are satisfied.
-    */
-  private[this] val deferredFetchRequests = new mutable.HashMap[BlockManagerId, mutable.Queue[FetchRequest]]()
-
   /** Current bytes in flight from our requests */
   private[this] var bytesInFlight = 0L
 
@@ -130,12 +111,6 @@ final class RdmaShuffleBlockFetcherIterator(
 
   /** Current number of blocks in flight per host:port */
   private[this] val numBlocksInFlightPerAddress = new mutable.HashMap[BlockManagerId, Int]()
-
-  /**
-    * The blocks that can't be decompressed successfully, it is used to guarantee that we retry
-    * at most once for those corrupted blocks.
-    */
-  private[this] val corruptedBlocks = mutable.HashSet[BlockId]()
 
   private[this] val shuffleMetrics = context.taskMetrics().createTempShuffleReadMetrics()
 
@@ -153,7 +128,123 @@ final class RdmaShuffleBlockFetcherIterator(
   @GuardedBy("this")
   private[this] val shuffleFilesSet = mutable.HashSet[File]()
 
+  private[this] val remoteRdmaRequestQueue = new LinkedBlockingQueue[RdmaRequest]()
+
   initialize()
+
+  def startFetchMetadata(blockManagerId: BlockManagerId, blockIds: Array[BlockId]): Unit = {
+    val receivedCallback = new ReceivedCallback {
+      override def onSuccess(blockInfoArray: ArrayBuffer[ShuffleBlockInfo]): Unit = {
+        val num = blockInfoArray.size
+        assert(num >= 1)
+        var last: ShuffleBlockInfo = blockInfoArray(0)
+        var startIndex = 0
+        var reqSize = 0
+        for (i <- 0 until num) {
+          val current = blockInfoArray(i)
+          if (current.getShuffleBlockId != last.getShuffleBlockId) {
+            remoteRdmaRequestQueue.put(new RdmaRequest(blockManagerId, last.getShuffleBlockId, blockInfoArray.slice(startIndex, i), reqSize))
+            startIndex = i
+            reqSize = 0
+            Future { fetchRemoteBlocks() }
+          }
+          last = current
+          reqSize += current.getLength
+        }
+        remoteRdmaRequestQueue.put(new RdmaRequest(blockManagerId, last.getShuffleBlockId, blockInfoArray.slice(startIndex, num), reqSize))
+        Future { fetchRemoteBlocks() }
+      }
+
+      override def onFailure(e: Throwable): Unit = {
+
+      }
+    }
+
+    numBlocksToFetch += blockIds.length
+
+    val rdmaTransferService = shuffleClient.asInstanceOf[RdmaTransferService]
+    rdmaTransferService.fetchBlockInfo(blockIds, receivedCallback)
+  }
+
+  def sendRequest(rdmaRequest: RdmaRequest): Unit = {
+    val shuffleBlockInfos = rdmaRequest.shuffleBlockInfos
+    var partitionNums = shuffleBlockInfos.size
+    bytesInFlight += rdmaRequest.reqSize
+    reqsInFlight += 1
+    val blockManagerId = rdmaRequest.blockManagerId
+    val shuffleBlockIdName = rdmaRequest.shuffleBlockIdName
+
+    numBlocksInFlightPerAddress(blockManagerId) =
+        numBlocksInFlightPerAddress.getOrElse(blockManagerId, 0) + 1
+
+    val rdmaTransferService = shuffleClient.asInstanceOf[RdmaTransferService]
+
+    val blockFetchingReadCallback = new ReadCallback {
+      def onSuccess(blockIndex: Int, shuffleBuffer: ShuffleBuffer, f: Int => Unit): Unit = {
+        if (!isZombie) {
+          RdmaShuffleBlockFetcherIterator.this.synchronized {
+            partitionNums -= 1
+            if (partitionNums == 0) {
+              results.put(SuccessFetchResult(BlockId(shuffleBlockIdName), blockManagerId, rdmaRequest.reqSize, shuffleBuffer, isNetworkReqDone = true))
+              f(shuffleBuffer.getRdmaBufferId)
+            }
+          }
+        }
+      }
+
+      override def onFailure(blockIndex: Int, e: Throwable): Unit = {
+        results.put(FailureFetchResult(BlockId(shuffleBlockIdName), blockManagerId, e))
+      }
+    }
+
+    val rdmaClient = rdmaTransferService.getClient(blockManagerId.host, blockManagerId.port)
+    val shuffleBuffer = new ShuffleBuffer(rdmaRequest.reqSize, rdmaClient.getEqService, true)
+    val rdmaBuffer = rdmaClient.getEqService.regRmaBufferByAddress(shuffleBuffer.nioByteBuffer(), shuffleBuffer.getAddress, shuffleBuffer.getLength.toInt)
+    shuffleBuffer.setRdmaBufferId(rdmaBuffer.getRdmaBufferId)
+
+    var offset = 0
+    for (i <- 0 until partitionNums) {
+      rdmaTransferService.fetchBlock(blockManagerId.host, blockManagerId.port, shuffleBlockInfos(i).getAddress, shuffleBlockInfos(i).getLength, shuffleBlockInfos(i).getRkey, offset, shuffleBuffer, rdmaClient, blockFetchingReadCallback)
+      offset += shuffleBlockInfos(i).getLength
+    }
+  }
+
+  def isRemoteBlockFetchable(rdmaRequest: RdmaRequest): Boolean = {
+    reqsInFlight + 1 <= maxReqsInFlight && bytesInFlight + rdmaRequest.reqSize <= maxBytesInFlight
+  }
+
+  def fetchRemoteBlocks(): Unit = {
+    val rdmaRequest = remoteRdmaRequestQueue.poll()
+    if (rdmaRequest == null) {
+      return
+    }
+    if (!isRemoteBlockFetchable(rdmaRequest)) {
+      remoteRdmaRequestQueue.put(rdmaRequest)
+    } else {
+      sendRequest(rdmaRequest)
+    }
+  }
+
+  def startFetch(remoteBlocksByAddress: Seq[(BlockManagerId, Seq[(BlockId, Long)])]): Unit = {
+    for ((blockManagerId, blockInfos) <- remoteBlocksByAddress) {
+      startFetchMetadata(blockManagerId, blockInfos.map(_._1).toArray)
+    }
+    fetchLocalBlocks()
+  }
+
+  def initialize(): Unit = {
+    context.addTaskCompletionListener(_ => cleanup())
+
+    val remoteBlocksByAddress = blocksByAddress.filter(_._1.executorId != blockManager.blockManagerId.executorId)
+    for ((address, blockInfos) <- blocksByAddress) {
+      if (address.executorId == blockManager.blockManagerId.executorId) {
+        localBlocks ++= blockInfos.filter(_._2 != 0).map(_._1)
+        numBlocksToFetch += localBlocks.size
+      }
+    }
+
+    startFetch(remoteBlocksByAddress)
+  }
 
   // Decrements the buffer reference count.
   // The currentResult is set to null to prevent releasing the buffer again on cleanup()
@@ -210,137 +301,6 @@ final class RdmaShuffleBlockFetcherIterator(
     }
   }
 
-  private[this] def sendRequest(req: FetchRequest) {
-    logDebug("Sending request for %d blocks (%s) from %s".format(
-      req.blocks.size, Utils.bytesToString(req.size), req.address.hostPort))
-    bytesInFlight += req.size
-    reqsInFlight += 1
-
-    // so we can look up the size of each blockID
-    val sizeMap = req.blocks.map { case (blockId, size) => (blockId.toString, size) }.toMap
-    val remainingBlocks = new mutable.HashSet[String]() ++= sizeMap.keys
-    val blockIds = req.blocks.map(_._1.toString)
-    val address = req.address
-
-    val blockBufs = new Array[ByteBuffer](blockIds.size)
-    val blockBufRemainingSize = new Array[Long](blockIds.size)
-
-    def fetchBlock(blockIndex: Int, reqBufSize: Int, rmaAddress: Long, rmaRkey: Long, callback: ReadCallback): Unit = {
-      val rdmaTransferService = shuffleClient.asInstanceOf[RdmaTransferService]
-      val rdmaClient = rdmaTransferService.getRdmaClient(address.host, address.port)
-
-      val shuffleBuffer = new ShuffleBuffer(reqBufSize, rdmaClient.getEqService, true)
-      val rdmaBuffer = rdmaClient.getEqService.regRmaBufferByAddress(shuffleBuffer.nioByteBuffer(), shuffleBuffer.getAddress, shuffleBuffer.getLength.toInt)
-      shuffleBuffer.setRdmaBufferId(rdmaBuffer.getRdmaBufferId)
-      shuffleBuffer.setRkey(rdmaBuffer.getRKey)
-
-      blockBufs(blockIndex) = shuffleBuffer.nioByteBuffer()
-      blockBufRemainingSize(blockIndex) = reqBufSize
-
-      rdmaTransferService.fetchBlock(address.host, address.port, address.executorId,
-        blockIds(blockIndex), blockIndex, shuffleBuffer, reqBufSize, rmaAddress, rmaRkey, callback, rdmaClient)
-    }
-
-    val blockFetchingReadCallback = new ReadCallback {
-      override def onSuccess(blockIndex: Int, shuffleBuffer: ShuffleBuffer): Unit = {
-        if (!isZombie) {
-          val blockIdAray = blockIds.toArray
-          val blockId = blockIdAray(blockIndex)
-          RdmaShuffleBlockFetcherIterator.this.synchronized {
-              remainingBlocks -= blockId
-              results.put(SuccessFetchResult(BlockId(blockId), address, sizeMap(blockId), shuffleBuffer,
-                remainingBlocks.isEmpty))
-              logDebug("thread id: " + Thread.currentThread().getId + ", got remote block, block index: " + blockIndex + ", remaining block size: " + remainingBlocks.size)
-            }
-          }
-      }
-
-      override def onFailure(blockIndex: Int, e: Throwable): Unit = {
-        logError(s"Failed to get block(s) from ${req.address.host}:${req.address.port}", e)
-        val blockIdAray = blockIds.toArray
-        val blockId = blockIdAray(blockIndex)
-        results.put(FailureFetchResult(BlockId(blockId), address, e))
-      }
-    }
-
-    val blockFetchingReceiveCallback = new ReceivedCallback {
-      override def onSuccess(blockIndex: Int, byteBuffer: ByteBuffer): Unit = {
-        if (!isZombie) {
-          val reqBufSize = byteBuffer.getInt()
-          val rmaAddress = byteBuffer.getLong()
-          val rmaRkey = byteBuffer.getLong()
-          logDebug("wanted block size: " + reqBufSize)
-          Future { fetchBlock(blockIndex, reqBufSize, rmaAddress, rmaRkey, blockFetchingReadCallback) }
-        }
-      }
-
-      override def onFailure(blockIndex: Int, e: Throwable): Unit = {
-
-      }
-    }
-
-    // Fetch remote shuffle blocks to disk when the request is too large. Since the shuffle data is
-    // already encrypted and compressed over the wire(w.r.t. the related configs), we can just fetch
-    // the data and write it to file directly.
-    shuffleClient.asInstanceOf[RdmaTransferService].fetchMetadata(address.host, address.port, address.executorId,
-      blockIds.toArray, blockFetchingReceiveCallback)
-  }
-
-  private[this] def splitLocalRemoteBlocks(): ArrayBuffer[FetchRequest] = {
-    // Make remote requests at most maxBytesInFlight / 5 in length; the reason to keep them
-    // smaller than maxBytesInFlight is to allow multiple, parallel fetches from up to 5
-    // nodes, rather than blocking on reading output from one node.
-    val targetRequestSize = math.max(maxBytesInFlight / 5, 1L)
-    logDebug("maxBytesInFlight: " + maxBytesInFlight + ", targetRequestSize: " + targetRequestSize
-      + ", maxBlocksInFlightPerAddress: " + maxBlocksInFlightPerAddress)
-
-    // Split local and remote blocks. Remote blocks are further split into FetchRequests of size
-    // at most maxBytesInFlight in order to limit the amount of data in flight.
-    val remoteRequests = new ArrayBuffer[FetchRequest]
-
-    // Tracks total number of blocks (including zero sized blocks)
-    var totalBlocks = 0
-    for ((address, blockInfos) <- blocksByAddress) {
-      totalBlocks += blockInfos.size
-      if (address.executorId == blockManager.blockManagerId.executorId) {
-        // Filter out zero-sized blocks
-        localBlocks ++= blockInfos.filter(_._2 != 0).map(_._1)
-        numBlocksToFetch += localBlocks.size
-      } else {
-        val iterator = blockInfos.iterator
-        var curRequestSize = 0L
-        var curBlocks = new ArrayBuffer[(BlockId, Long)]
-        while (iterator.hasNext) {
-          val (blockId, size: Long) = iterator.next()
-          // Skip empty blocks
-          if (size > 0) {
-            curBlocks += ((blockId, size))
-            remoteBlocks += blockId
-            numBlocksToFetch += 1
-            curRequestSize += size
-          } else if (size < 0) {
-            throw BlockException(blockId, "Negative block size " + size)
-          }
-          if (curRequestSize >= targetRequestSize ||
-            curBlocks.size >= maxBlocksInFlightPerAddress) {
-            // Add this FetchRequest
-            remoteRequests += FetchRequest(address, curBlocks)
-            logDebug(s"Creating fetch request of $curRequestSize at $address "
-              + s"with ${curBlocks.size} blocks")
-            curBlocks = new ArrayBuffer[(BlockId, Long)]
-            curRequestSize = 0
-          }
-        }
-        // Add in the final request
-        if (curBlocks.nonEmpty) {
-          remoteRequests += FetchRequest(address, curBlocks)
-        }
-      }
-    }
-    logInfo(s"Getting $numBlocksToFetch non-empty blocks out of $totalBlocks blocks")
-    remoteRequests
-  }
-
   /**
     * Fetch the local blocks while we are fetching remote blocks. This is ok because
     * `ManagedBuffer`'s memory is allocated lazily when we create the input stream, so all we
@@ -364,29 +324,6 @@ final class RdmaShuffleBlockFetcherIterator(
           return
       }
     }
-  }
-
-  private[this] def initialize(): Unit = {
-    // Add a task completion callback (called in both success case and failure case) to cleanup.
-    context.addTaskCompletionListener(_ => cleanup())
-
-    // Split local and remote blocks.
-    val remoteRequests = splitLocalRemoteBlocks()
-    // Add the remote requests into our queue in a random order
-    fetchRequests ++= Utils.randomize(remoteRequests)
-    assert ((0 == reqsInFlight) == (0 == bytesInFlight),
-      "expected reqsInFlight = 0 but found reqsInFlight = " + reqsInFlight +
-        ", expected bytesInFlight = 0 but found bytesInFlight = " + bytesInFlight)
-
-    // Send out initial requests for blocks, up to our maxBytesInFlight
-    fetchUpToMaxBytes()
-
-    val numFetches = remoteRequests.size - fetchRequests.size
-    logInfo("Started " + numFetches + " remote fetches in" + Utils.getUsedTimeMs(startTime))
-
-    // Get Local Blocks
-    fetchLocalBlocks()
-    logDebug("Got local blocks in " + Utils.getUsedTimeMs(startTime))
   }
 
   override def hasNext: Boolean = numBlocksProcessed < numBlocksToFetch
@@ -432,7 +369,6 @@ final class RdmaShuffleBlockFetcherIterator(
           bytesInFlight -= size
           if (isNetworkReqDone) {
             reqsInFlight -= 1
-            logDebug("Number of requests in flight " + reqsInFlight)
           }
 
           val in = try {
@@ -454,66 +390,16 @@ final class RdmaShuffleBlockFetcherIterator(
       }
 
       // Send fetch requests up to maxBytesInFlight
-      fetchUpToMaxBytes()
+      Future { fetchRemoteBlocks() }
     }
 
     currentResult = result.asInstanceOf[SuccessFetchResult]
     (currentResult.blockId, new RDMABufferReleasingInputStream(input, this))
   }
 
-  private def fetchUpToMaxBytes(): Unit = {
-    // Send fetch requests up to maxBytesInFlight. If you cannot fetch from a remote host
-    // immediately, defer the request until the next time it can be processed.
-
-    // Process any outstanding deferred fetch requests if possible.
-    if (deferredFetchRequests.nonEmpty) {
-      for ((remoteAddress, defReqQueue) <- deferredFetchRequests) {
-        while (isRemoteBlockFetchable(defReqQueue) &&
-          !isRemoteAddressMaxedOut(remoteAddress, defReqQueue.front)) {
-          val request = defReqQueue.dequeue()
-          logDebug(s"Processing deferred fetch request for $remoteAddress with "
-            + s"${request.blocks.length} blocks")
-          send(remoteAddress, request)
-          if (defReqQueue.isEmpty) {
-            deferredFetchRequests -= remoteAddress
-          }
-        }
-      }
-    }
-
-    // Process any regular fetch requests if possible.
-    while (isRemoteBlockFetchable(fetchRequests)) {
-      val request = fetchRequests.dequeue()
-      val remoteAddress = request.address
-      if (isRemoteAddressMaxedOut(remoteAddress, request)) {
-        logDebug(s"Deferring fetch request for $remoteAddress with ${request.blocks.size} blocks")
-        val defReqQueue = deferredFetchRequests.getOrElse(remoteAddress, new mutable.Queue[FetchRequest]())
-        defReqQueue.enqueue(request)
-        deferredFetchRequests(remoteAddress) = defReqQueue
-      } else {
-        send(remoteAddress, request)
-      }
-    }
-
-    def send(remoteAddress: BlockManagerId, request: FetchRequest): Unit = {
-      sendRequest(request)
-      numBlocksInFlightPerAddress(remoteAddress) =
-        numBlocksInFlightPerAddress.getOrElse(remoteAddress, 0) + request.blocks.size
-    }
-
-    def isRemoteBlockFetchable(fetchReqQueue: mutable.Queue[FetchRequest]): Boolean = {
-      fetchReqQueue.nonEmpty &&
-        (bytesInFlight == 0 ||
-          (reqsInFlight + 1 <= maxReqsInFlight &&
-            bytesInFlight + fetchReqQueue.front.size <= maxBytesInFlight))
-    }
-
-    // Checks if sending a new fetch request will exceed the max no. of blocks being fetched from a
-    // given remote address.
-    def isRemoteAddressMaxedOut(remoteAddress: BlockManagerId, request: FetchRequest): Boolean = {
-      numBlocksInFlightPerAddress.getOrElse(remoteAddress, 0) + request.blocks.size >
-        maxBlocksInFlightPerAddress
-    }
+  def isRemoteAddressMaxedOut(remoteAddress: BlockManagerId, request: FetchRequest): Boolean = {
+    numBlocksInFlightPerAddress.getOrElse(remoteAddress, 0) + request.blocks.size >
+      maxBlocksInFlightPerAddress
   }
 
   private def throwFetchFailedException(blockId: BlockId, address: BlockManagerId, e: Throwable) = {
@@ -526,6 +412,8 @@ final class RdmaShuffleBlockFetcherIterator(
     }
   }
 }
+
+private class RdmaRequest(val blockManagerId: BlockManagerId, val shuffleBlockIdName: String, val shuffleBlockInfos: ArrayBuffer[ShuffleBlockInfo], val reqSize: Int) {}
 
 /**
   * Helper class that ensures a ManagedBuffer is released upon InputStream.close()
@@ -613,4 +501,3 @@ object RdmaShuffleBlockFetcherIterator {
                                                   e: Throwable)
     extends FetchResult
 }
-

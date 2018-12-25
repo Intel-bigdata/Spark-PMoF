@@ -31,11 +31,21 @@ public class ShuffleBuffer extends ManagedBuffer {
     private ByteBuf buf;
     private boolean supportNettyBuffer;
 
-    private Method mmap = null;
-    private Method unmmap = null;
+    private static Method mmap;
+    private static Method unmmap;
+
+    static {
+        try {
+            mmap = FileChannelImpl.class.getDeclaredMethod("map0", int.class, long.class, long.class);
+            mmap.setAccessible(true);
+            unmmap = FileChannelImpl.class.getDeclaredMethod("unmap0", long.class, long.class);
+            unmmap.setAccessible(true);
+        } catch (NoSuchMethodException e) {
+            e.printStackTrace();
+        }
+    }
 
     public ShuffleBuffer(long length, EqService service, boolean supportNettyBuffer) throws IOException {
-
         this.length = length;
         this.supportNettyBuffer = supportNettyBuffer;
         if (!supportNettyBuffer) {
@@ -54,7 +64,7 @@ public class ShuffleBuffer extends ManagedBuffer {
         this.channel = null;
     }
 
-    public ShuffleBuffer(long offset, long length, FileChannel channel, EqService service) throws IOException {
+    public ShuffleBuffer(long offset, long length, FileChannel channel, EqService service) {
         try {
             mmap = FileChannelImpl.class.getDeclaredMethod("map0", int.class, long.class, long.class);
             mmap.setAccessible(true);
@@ -71,16 +81,13 @@ public class ShuffleBuffer extends ManagedBuffer {
         try {
             assert mmap != null;
             addressTmp = (Long)mmap.invoke(channel, 1, this.offsetAligned, this.lengthAligned);
-        } catch (IllegalAccessException e) {
-            e.printStackTrace();
-        } catch (InvocationTargetException e) {
+        } catch (IllegalAccessException | InvocationTargetException e) {
             e.printStackTrace();
         }
         this.length = length;
         this.address = addressTmp+distanceFromOffset;
         this.service = service;
-        this.byteBuffer = convertToByteBuffer();
-        this.byteBuffer.limit((int)length);
+        this.byteBuffer = null;
     }
 
     public long getLength() {
@@ -111,10 +118,6 @@ public class ShuffleBuffer extends ManagedBuffer {
         this.rkey = rkey;
     }
 
-    public long getRkey() {
-        return this.rkey;
-    }
-
     public ManagedBuffer release() {
         return this;
     }
@@ -125,9 +128,7 @@ public class ShuffleBuffer extends ManagedBuffer {
             try {
                 channel.close();
                 unmmap.invoke(null, this.offsetAligned, this.lengthAligned);
-            } catch (IllegalAccessException e) {
-                e.printStackTrace();
-            } catch (InvocationTargetException e) {
+            } catch (IllegalAccessException | InvocationTargetException e) {
                 e.printStackTrace();
             } catch (IOException e) {
                 e.printStackTrace();

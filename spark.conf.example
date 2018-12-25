@@ -1,14 +1,26 @@
-spark.driver.extraClassPath /root/chendi/SSO/target/sso-0.1-jar-with-dependencies.jar
-spark.driver.extraJavaOptions -Djava.library.path=/root/chendi/llpl/target/cppbuild/
-spark.executor.extraClassPath /root/chendi/SSO/target/sso-0.1-jar-with-dependencies.jar:/root/chendi/llpl/target/classes/llpl.jar
-spark.executor.extraJavaOptions -XX:+UseParallelGC -XX:+UseParallelOldGC -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCTimeStamps
-spark.executor.extraJavaOptions -Djava.library.path=/root/chendi/llpl/target/cppbuild/
+spark.driver.extraClassPath   /root/haodong/SSO/target/sso-0.1-jar-with-dependencies.jar
+spark.driver.extraJavaOptions -Djava.library.path=/root/haodong/SSO/src/main/cpp
+spark.executor.extraClassPath /root/haodong/SSO/target/sso-0.1-jar-with-dependencies.jar
+spark.executor.extraJavaOptions -Djava.library.path=/root/haodong/SSO/src/main/cpp
+
 spark.shuffle.manager org.apache.spark.shuffle.pmof.PmofShuffleManager
-spark.shuffle.pmof.pmpool_size 96636764160
 
-spark.shuffle.pmof.enable_rdma false
+spark.shuffle.pmof.enable_rdma true
 spark.shuffle.pmof.enable_pmem true
-spark.shuffle.pmof.max_stage_num 1
-spark.shuffle.pmof.max_task_num 5000
 
-spark.shuffle.pmof.pmem_list /dev/dax0.0,/dev/dax0.1,/dev/dax0.2,/dev/dax0.3,/dev/dax0.5,/dev/dax1.0,/dev/dax1.1,/dev/dax1.2,/dev/dax1.3,/dev/dax1.5
+# for persistent memory
+spark.shuffle.pmof.max_stage_num 1
+spark.shuffle.pmof.max_task_num 50000
+spark.shuffle.pmof.pmem_list /dev/dax0.0,/dev/dax1.0
+spark.shuffle.pmof.dev_core_set dax0:0-87,dax1:0-87
+
+# for rdma
+spark.shuffle.pmof.server_buffer_nums 32
+spark.shuffle.pmof.client_buffer_nums 32
+spark.shuffle.pmof.map_serializer_buffer_size 262144
+spark.shuffle.pmof.reduce_serializer_buffer_size 262144
+spark.shuffle.pmof.chunk_size 262144
+spark.shuffle.pmof.server_pool_size 2
+spark.shuffle.pmof.client_pool_size 2
+#spark.shuffle.pmof.metadata_compress true
+spark.shuffle.pmof.shuffle_block_size 2097152

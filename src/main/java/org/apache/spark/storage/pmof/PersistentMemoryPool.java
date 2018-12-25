@@ -2,25 +2,22 @@ package org.apache.spark.storage.pmof;
 
 //import org.slf4j.Logger;
 //import org.slf4j.LoggerFactory;
-import java.io.IOException;
 
 public class PersistentMemoryPool {
     static {
-        System.loadLibrary("jnipmdk");
+        System.load("/usr/local/lib/libjnipmdk.so");
     }
     private static native long nativeOpenDevice(String path, int maxStage, int maxMap, int core_s, int core_e);
-    private static native int nativeSetPartition(long deviceHandler, int numPartitions, int stageId, int mapId, int partutionId, long size, byte[] data);
+    private static native long nativeSetPartition(long deviceHandler, int numPartitions, int stageId, int mapId, int partutionId, long size, byte[] data);
     private static native byte[] nativeGetPartition(long deviceHandler, int stageId, int mapId, int partutionId);
     private static native int nativeCloseDevice(long deviceHandler);
   
     //private static final Logger logger = LoggerFactory.getLogger(PersistentMemoryPool.class);
-    static final int HEADER_SIZE = 8;
-    static final long DEFAULT_PMPOOL_SIZE = 26843545600L;
-    int max_stages_num;
-    int max_shuffles_num;
+    //static final int HEADER_SIZE = 8;
+    private static final long DEFAULT_PMPOOL_SIZE = 26843545600L;
 
     private long deviceHandler;
-    
+
     PersistentMemoryPool(
         String path,
         int max_stages_num,
@@ -28,10 +25,7 @@ public class PersistentMemoryPool {
         long pool_size,
         int core_s,
         int core_e) {
-      this.max_stages_num = max_stages_num;
-      this.max_shuffles_num = max_shuffles_num;
 
-      //logger.info("Open pmdk_handler [" + path + "]");
       pool_size = pool_size == -1 ? DEFAULT_PMPOOL_SIZE : pool_size;
       this.deviceHandler = nativeOpenDevice(path, max_stages_num, max_shuffles_num, core_s, core_e);
     }
