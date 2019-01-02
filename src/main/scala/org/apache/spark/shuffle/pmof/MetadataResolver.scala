@@ -50,8 +50,7 @@ class MetadataResolver(conf: SparkConf) {
 
   val shuffleBlockMap = new ConcurrentHashMap[String, ArrayBuffer[ShuffleBlockInfo]]()
 
-  def commitPmemBlockInfo(shuffleId: Int, mapId: Int, dataAddressMap: Array[mutable.LinkedHashMap[Long, Int]]): Unit = {
-    val eqService = RdmaTransferService.getTransferServiceInstance(blockManager).server.getEqService
+  def commitPmemBlockInfo(shuffleId: Int, mapId: Int, dataAddressMap: Array[mutable.LinkedHashMap[Long, Int]], rkey: Long): Unit = {
     val byteBuffer = ByteBuffer.allocate(map_serializer_buffer_size.toInt)
     val bos = new ByteBufferOutputStream(byteBuffer)
     var output: Output = null
@@ -65,9 +64,8 @@ class MetadataResolver(conf: SparkConf) {
     MetadataResolver.this.synchronized {
       for (i <- 0 until partitionNums) {
         for ((address, length) <- dataAddressMap(i)) {
-          val rdmaBuffer = eqService.regRmaBufferByAddress(null, address, length.toInt)
           val shuffleBlockId = ShuffleBlockId(shuffleId, mapId, i).name
-          kryo.writeObject(output, new ShuffleBlockInfo(shuffleBlockId, address, length.toInt, rdmaBuffer.getRKey))
+          kryo.writeObject(output, new ShuffleBlockInfo(shuffleBlockId, address, length.toInt, rkey))
         }
       }
     }

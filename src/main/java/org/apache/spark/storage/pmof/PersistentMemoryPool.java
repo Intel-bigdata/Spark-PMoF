@@ -10,6 +10,7 @@ public class PersistentMemoryPool {
     private static native long nativeOpenDevice(String path, int maxStage, int maxMap, int core_s, int core_e);
     private static native long nativeSetPartition(long deviceHandler, int numPartitions, int stageId, int mapId, int partutionId, long size, byte[] data);
     private static native byte[] nativeGetPartition(long deviceHandler, int stageId, int mapId, int partutionId);
+    private static native long nativeGetRoot(long deviceHandler);
     private static native int nativeCloseDevice(long deviceHandler);
   
     //private static final Logger logger = LoggerFactory.getLogger(PersistentMemoryPool.class);
@@ -36,7 +37,10 @@ public class PersistentMemoryPool {
 
     public byte[] getPartition(int stageId, int shuffleId, int partitionId) {
       return nativeGetPartition(this.deviceHandler, stageId, shuffleId, partitionId);
-      //nativeGetPartition(this.deviceHandler, stageId, shuffleId, partitionId);
+    }
+
+    public long getRootAddr() {
+      return nativeGetRoot(this.deviceHandler);
     }
 
     public void close() {

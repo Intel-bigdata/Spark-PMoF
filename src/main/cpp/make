@@ -1,2 +1,2 @@
 #!/usr/bin/sh
-g++ lib_jni_pmdk.cpp -o libjnipmdk.so -I/usr/lib/jvm/jdk1.8.0_181/ -I/usr/lib/jvm/jdk1.8.0_181/include/linux -I/usr/lib/jvm/jdk1.8.0_181/include -std=c++11 -lpmemobj -lpthread -fPIC -shared
+g++ lib_jni_pmdk.cpp -o libjnipmdk.so -I/usr/lib/jvm/jdk1.8.0_181/ -I/opt/jdk1.8.0_192/include/linux -I/opt/jdk1.8.0_192/include -std=c++11 -lpmemobj -lpthread -fPIC -shared

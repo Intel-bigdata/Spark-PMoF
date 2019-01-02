@@ -141,7 +141,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
   private var stopping = false
 
   def maySpillToPM(size: Long, partitionId: Int, partitionBuffer: PersistentMemoryWriterPartition) {
-    if (size >= 2097152) {
+    if (size >= 4194304) {
       val tmp_data = partitionBuffer.get()
       val start = System.nanoTime()
       var addr_len_t = (persistentMemoryWriter.setPartition(numPartitions, stageId, mapId, partitionId, tmp_data), tmp_data.length)
@@ -204,7 +204,8 @@ private[spark] class PmemShuffleWriter[K, V, C](
 
     val shuffleServerId = blockManager.shuffleServerId
     if (enable_rdma) {
-      metadataResolver.commitPmemBlockInfo(stageId, mapId, data_addr_map)
+      val rkey = persistentMemoryWriter.rkey
+      metadataResolver.commitPmemBlockInfo(stageId, mapId, data_addr_map, rkey)
       val blockManagerId: BlockManagerId =
         BlockManagerId(shuffleServerId.executorId, shuffleServerId.host,
           RdmaTransferService.getTransferServiceInstance(blockManager).port, shuffleServerId.topologyInfo)
