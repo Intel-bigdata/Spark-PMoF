@@ -39,6 +39,10 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemory
 JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeCloseDevice
   (JNIEnv *, jclass, jlong);
 
+
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetRoot
+  (JNIEnv *, jclass, jlong);
+
 #ifdef __cplusplus
 }
 #endif

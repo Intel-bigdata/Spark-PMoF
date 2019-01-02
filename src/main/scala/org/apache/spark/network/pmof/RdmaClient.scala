@@ -111,10 +111,11 @@ class RdmaClient(conf: SparkConf, val shuffleManager: PmofShuffleManager, addres
     }
     val ret = con.read(shuffleBuffer.getRdmaBufferId, localAddress, reqSize, rmaAddress, rmaRkey)
     if (ret == -11) {
-      if (isDeferred)
+      if (isDeferred) {
         deferredReadList.addFirst(new ClientDeferredRead(shuffleBuffer, blockIndex, reqSize, rmaAddress, rmaRkey, localAddress))
-      else
+      } else {
         deferredReadList.addLast(new ClientDeferredRead(shuffleBuffer, blockIndex, reqSize, rmaAddress, rmaRkey, localAddress))
+      }
     }
   }
 

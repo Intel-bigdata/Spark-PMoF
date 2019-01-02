@@ -31,3 +31,8 @@ JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_n
   (JNIEnv *env, jclass obj, jlong pmpool) {
     delete (PMPool*)pmpool;
 }
+
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetRoot
+  (JNIEnv *env, jclass obj, jlong pmpool) {
+  return ((PMPool*)pmpool)->getRootAddr();
+}

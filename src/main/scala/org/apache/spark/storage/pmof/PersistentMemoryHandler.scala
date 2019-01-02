@@ -21,6 +21,8 @@ import org.apache.spark.internal.Logging
 import java.nio.ByteBuffer
 
 import org.apache.spark.network.buffer.{ManagedBuffer, NioManagedBuffer}
+import org.apache.spark.network.pmof.RdmaTransferService
+import org.apache.spark.SparkEnv
 
 private[spark] class PersistentMemoryHandler(
     val pathId: String,
@@ -30,6 +32,7 @@ private[spark] class PersistentMemoryHandler(
     val core_s: Int = 0,
     val core_e: Int = 16) extends Logging {
   val pmpool = new PersistentMemoryPool(pathId, maxStages, maxShuffles, poolSize, core_s, core_e)
+  var rkey: Long = 0
   log("Open PersistentMemoryPool: " + pathId + " ,binds to core " + core_s + "-" + core_e)
 
   def setPartition(numPartitions: Int, stageId: Int, shuffleId: Int, partitionId: Int, data: Array[Byte]): Long = synchronized {
@@ -47,7 +50,11 @@ private[spark] class PersistentMemoryHandler(
 
   def close(): Unit = synchronized {
     pmpool.close() 
-  } 
+  }
+
+  def getRootAddr(): Long = {
+    pmpool.getRootAddr();
+  }
 
   def log(printout: String) {
     logDebug(printout)
@@ -63,6 +70,12 @@ object PersistentMemoryHandler {
       if (persistentMemoryHandler == null) {
         path = path_arg
         persistentMemoryHandler = new PersistentMemoryHandler(path, maxStages, maxMaps, pmPoolSize, core_s, core_e)
+        val blockManager = SparkEnv.get.blockManager
+        val eqService = RdmaTransferService.getTransferServiceInstance(blockManager).server.getEqService
+        val size: Long = 264239054848L
+        val offset: Long = persistentMemoryHandler.getRootAddr
+        val rdmaBuffer = eqService.regRmaBufferByAddress(null, offset, size)
+        persistentMemoryHandler.rkey = rdmaBuffer.getRKey()
       }
       persistentMemoryHandler.log("Using persistentMemoryHandler for " + path)
     }

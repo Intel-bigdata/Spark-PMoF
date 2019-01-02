@@ -147,6 +147,10 @@ public:
         pmemobj_close(pmpool);
     }
 
+    long getRootAddr() {
+        return (long)pmpool;
+    }
+
     long setPartition(
             int partitionNum,
             int stageId, 
@@ -207,7 +211,6 @@ public:
             D_RW(*partitionBlock)->next_block = TOID_NULL(struct PartitionBlock);
 
             data_addr = (char*)pmemobj_direct(D_RW(*partitionBlock)->data);
-            //printf("setPartition data_addr: %p\n", data_addr);
             pmemobj_tx_add_range_direct((const void *)data_addr, size);
             memcpy(data_addr, data, size);
         } TX_ONCOMMIT {
