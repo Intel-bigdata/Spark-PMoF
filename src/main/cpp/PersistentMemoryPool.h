@@ -129,11 +129,43 @@ public:
         maxMap(maxMap),
         core_s(core_s),
         core_e(core_e) {
-        
+
         const char *pool_layout_name = "pmem_spark_shuffle";
-        pmpool = pmemobj_open(dev, pool_layout_name);
+	std::string prefix = "/dev/dax";
+	std::string lock_file = "/tmp/spark_dax.lock";
+	int fd = open(lock_file.c_str(), O_RDWR|O_CREAT);
+	assert(fd != -1);
+	lockf(fd, F_LOCK, 0);
+	char* buf = new char[10];
+        std::string next_dax;
+        std::string dax = "0.0";
+        int ret = pread(fd, buf, 2, 0);
+        if (ret == 0) {
+          buf = (char*)("0");
+        }
+        int idx = std::stoi(buf);
+        if (idx == 0) {
+          dax = "0.0";
+          next_dax = std::to_string(idx+1);
+        } else if (idx == 1) {
+          dax = "0.1";
+          next_dax = std::to_string(idx+1);
+        } else if (idx == 2) {
+          dax = "1.0";
+          next_dax = std::to_string(idx+1);
+        } else {
+          dax = "1.1";
+          next_dax = std::to_string(0);
+        }
+        ret = pwrite(fd, next_dax.c_str(), next_dax.length(), 0);
+	std::string device = prefix + dax;
+        lockf(fd, F_ULOCK, 0);
+	free(buf);
+        close(fd);
+
+        pmpool = pmemobj_open(device.c_str(), pool_layout_name);
         if (pmpool == NULL) {
-            pmpool = pmemobj_create(dev, pool_layout_name, 0, S_IRUSR | S_IWUSR);
+            pmpool = pmemobj_create(device.c_str(), pool_layout_name, 0, S_IRUSR | S_IWUSR);
         }
         if (pmpool == NULL) {
             cerr << "Failed to open pool " << pmemobj_errormsg() << endl; 
