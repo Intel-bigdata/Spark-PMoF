@@ -11,6 +11,8 @@ import org.apache.spark.shuffle.pmof.{MetadataResolver, PmofShuffleManager}
 import org.apache.spark.storage.{BlockId, BlockManager, ShuffleBlockId}
 import org.apache.spark.{SparkConf, SparkEnv}
 
+import scala.collection.mutable
+
 class RdmaTransferService(conf: SparkConf, val shuffleManager: PmofShuffleManager, val hostname: String, var port: Int, val supportRma: Boolean) extends TransferService {
   final var server: RdmaServer = _
   final private var recvHandler: ServerRecvHandler = _
@@ -79,8 +81,13 @@ object RdmaTransferService {
   final val env: SparkEnv = SparkEnv.get
   final val conf: SparkConf = env.conf
   final val CHUNKSIZE: Int = conf.getInt("spark.shuffle.pmof.chunk_size", 4096*3)
-  final val driverHost: String = conf.get("spark.driver.host")
-  final val driverPort: Int = conf.getInt("spark.driver.port", defaultValue = 61000)
+  final val driverHost: String = conf.get("spark.driver.rhost", defaultValue = "172.168.0.43")
+  final val driverPort: Int = conf.getInt("spark.driver.rport", defaultValue = 61000)
+  val shuffleNodes: Array[Array[String]] = conf.get("spark.shuffle.pmof.node", defaultValue = "").split(",").map(_.split("-"))
+  val shuffleNodesMap: mutable.Map[String, String] = new mutable.HashMap[String, String]()
+  for (array <- shuffleNodes) {
+    shuffleNodesMap.put(array(0), array(1))
+  }
   private val initialized = new AtomicBoolean(false)
   private var transferService: RdmaTransferService = _
   def getTransferServiceInstance(blockManager: BlockManager, shuffleManager: PmofShuffleManager = null, isDriver: Boolean = false): RdmaTransferService = {
@@ -90,7 +97,7 @@ object RdmaTransferService {
         if (isDriver) {
           transferService = new RdmaTransferService(conf, shuffleManager, driverHost, driverPort, false)
         } else {
-          transferService = new RdmaTransferService(conf, shuffleManager, blockManager.shuffleServerId.host, 0, false)
+          transferService = new RdmaTransferService(conf, shuffleManager, shuffleNodesMap(blockManager.shuffleServerId.host), 0, false)
         }
         transferService.init()
         initialized.set(true)

@@ -207,7 +207,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
       val rkey = persistentMemoryWriter.rkey
       metadataResolver.commitPmemBlockInfo(stageId, mapId, data_addr_map, rkey)
       val blockManagerId: BlockManagerId =
-        BlockManagerId(shuffleServerId.executorId, shuffleServerId.host,
+        BlockManagerId(shuffleServerId.executorId, RdmaTransferService.shuffleNodesMap(shuffleServerId.host),
           RdmaTransferService.getTransferServiceInstance(blockManager).port, shuffleServerId.topologyInfo)
       mapStatus = MapStatus(blockManagerId, partitionLengths)
     } else {

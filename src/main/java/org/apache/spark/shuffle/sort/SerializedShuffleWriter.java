@@ -266,7 +266,7 @@ public class SerializedShuffleWriter<K, V> extends ShuffleWriter<K, V> {
         }
         BlockManagerId shuffleServerId = blockManager.shuffleServerId();
         if (enable_rdma) {
-            BlockManagerId blockManagerId = BlockManagerId$.MODULE$.apply(shuffleServerId.executorId(), shuffleServerId.host(),
+            BlockManagerId blockManagerId = BlockManagerId$.MODULE$.apply(shuffleServerId.executorId(), RdmaTransferService.shuffleNodesMap().get(shuffleServerId.host()).get(),
                     RdmaTransferService.getTransferServiceInstance(blockManager, null, false).port(), shuffleServerId.topologyInfo());
             mapStatus = MapStatus$.MODULE$.apply(blockManagerId, partitionLengths);
         } else {
