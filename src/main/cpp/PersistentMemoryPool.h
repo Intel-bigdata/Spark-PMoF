@@ -136,12 +136,12 @@ public:
 	int fd = open(lock_file.c_str(), O_RDWR|O_CREAT);
 	assert(fd != -1);
 	lockf(fd, F_LOCK, 0);
-	char* buf = new char[10];
+        char buf[10] = "";
         std::string next_dax;
         std::string dax = "0.0";
         int ret = pread(fd, buf, 2, 0);
         if (ret == 0) {
-          buf = (char*)("0");
+          buf[0] = '0';
         }
         int idx = std::stoi(buf);
         if (idx == 0) {
@@ -160,7 +160,6 @@ public:
         ret = pwrite(fd, next_dax.c_str(), next_dax.length(), 0);
 	std::string device = prefix + dax;
         lockf(fd, F_ULOCK, 0);
-	free(buf);
         close(fd);
 
         pmpool = pmemobj_open(device.c_str(), pool_layout_name);
