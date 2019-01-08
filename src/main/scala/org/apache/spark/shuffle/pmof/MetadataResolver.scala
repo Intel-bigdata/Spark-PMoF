@@ -21,8 +21,8 @@ import scala.collection.mutable.ArrayBuffer
 class MetadataResolver(conf: SparkConf) {
   private lazy val blockManager = SparkEnv.get.blockManager
   private lazy val blockMap: ConcurrentHashMap[String, ShuffleBuffer] = new ConcurrentHashMap[String, ShuffleBuffer]()
-  val driverHost: String = conf.get("spark.driver.host")
-  val driverPort: Int = conf.getInt("spark.driver.port", defaultValue = 61000)
+  val driverHost: String = conf.get("spark.driver.rhost", defaultValue = "172.168.0.43")
+  val driverPort: Int = conf.getInt("spark.driver.rport", defaultValue = 61000)
 
   var map_serializer_buffer_size = 0L
   if (conf == null) {

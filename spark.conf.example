@@ -24,3 +24,4 @@ spark.shuffle.pmof.server_pool_size 2
 spark.shuffle.pmof.client_pool_size 2
 #spark.shuffle.pmof.metadata_compress true
 spark.shuffle.pmof.shuffle_block_size 2097152
+spark.shuffle.pmof.node sr140-172.168.0.40,sr141-172.168.0.41,sr142-172.168.0.42,sr143-172.168.0.43

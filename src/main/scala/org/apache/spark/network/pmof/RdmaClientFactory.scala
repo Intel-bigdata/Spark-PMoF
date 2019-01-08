@@ -5,7 +5,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.spark.SparkConf
-import org.apache.spark.shuffle.ShuffleManager
 import org.apache.spark.shuffle.pmof.PmofShuffleManager
 
 import scala.collection.JavaConverters._

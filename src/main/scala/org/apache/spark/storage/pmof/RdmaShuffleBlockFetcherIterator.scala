@@ -358,7 +358,8 @@ final class RdmaShuffleBlockFetcherIterator(
       result match {
         case SuccessFetchResult(blockId, address, size, buf, isNetworkReqDone) =>
           if (address != blockManager.blockManagerId) {
-            numBlocksInFlightPerAddress(address) = numBlocksInFlightPerAddress(address) - 1
+            if (numBlocksInFlightPerAddress.contains(address))
+              numBlocksInFlightPerAddress(address) = numBlocksInFlightPerAddress(address) - 1
             shuffleMetrics.incRemoteBytesRead(buf.size)
             if (buf.isInstanceOf[FileSegmentManagedBuffer]) {
               shuffleMetrics.incRemoteBytesReadToDisk(buf.size)

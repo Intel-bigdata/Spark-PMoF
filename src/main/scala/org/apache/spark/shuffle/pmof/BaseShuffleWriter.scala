@@ -80,7 +80,7 @@ private[spark] class BaseShuffleWriter[K, V, C](
       val shuffleServerId = blockManager.shuffleServerId
       if (enable_rdma) {
         val blockManagerId: BlockManagerId =
-        BlockManagerId(shuffleServerId.executorId, shuffleServerId.host,
+        BlockManagerId(shuffleServerId.executorId, RdmaTransferService.shuffleNodesMap(shuffleServerId.host),
           RdmaTransferService.getTransferServiceInstance(blockManager).port, shuffleServerId.topologyInfo)
         mapStatus = MapStatus(blockManagerId, partitionLengths)
       } else {
