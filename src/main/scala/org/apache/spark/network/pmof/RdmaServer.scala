@@ -22,7 +22,7 @@ class RdmaServer(conf: SparkConf, address: String, var port: Int) {
     port = Utils.getPort
   }
   final val workers = conf.getInt("spark.shuffle.pmof.server_pool_size", 1)
-  final val eqService = new EqService(address, port.toString, true)
+  final val eqService = new EqService(address, port.toString, 0, true)
   final val cqService = new CqService(eqService, workers, eqService.getNativeHandle)
 
   final val SINGLE_BUFFER_SIZE = RdmaTransferService.CHUNKSIZE

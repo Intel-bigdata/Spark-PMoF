@@ -144,7 +144,9 @@ public:
           buf = (char*)("0");
         }
         int idx = std::stoi(buf);
-        if (idx == 0) {
+        dax = std::to_string(idx)+".0";
+        next_dax = std::to_string(idx+1);
+        /*if (idx == 0) {
           dax = "0.0";
           next_dax = std::to_string(idx+1);
         } else if (idx == 1) {
@@ -156,7 +158,7 @@ public:
         } else {
           dax = "1.1";
           next_dax = std::to_string(0);
-        }
+        }*/
         ret = pwrite(fd, next_dax.c_str(), next_dax.length(), 0);
 	std::string device = prefix + dax;
         lockf(fd, F_ULOCK, 0);

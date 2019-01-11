@@ -7,7 +7,7 @@ import com.intel.hpnl.core._
 import org.apache.spark.SparkConf
 
 class RdmaClient(conf: SparkConf, address: String, port: Int) {
-  final val eqService = new EqService(address, port.toString, false)
+  final val eqService = new EqService(address, port.toString, 0, false)
   final val cqService = new CqService(eqService, 1, eqService.getNativeHandle)
   final val connectHandler = new ClientConnectHandler(this)
   final val recvHandler = new ClientRecvHandler(this)

@@ -111,27 +111,27 @@ private[spark] class PmemShuffleWriter[K, V, C](
 
   val enable_rdma: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_rdma", defaultValue = true)
   val enable_pmem: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_pmem", defaultValue = true)
-  val path_list = conf.get("spark.shuffle.pmof.pmem_list").split(",").map(_.trim).distinct
-  val core_set_map = conf.get("spark.shuffle.pmof.dev_core_set").split(",").map(_.trim.split(":"))
+  //val path_list = conf.get("spark.shuffle.pmof.pmem_list").split(",").map(_.trim).distinct
+  //val core_set_map = conf.get("spark.shuffle.pmof.dev_core_set").split(",").map(_.trim.split(":"))
 
   val maxPoolSize: Long = conf.getLong("spark.shuffle.pmof.pmpool_size", defaultValue = 1073741824)
   val maxStages: Int = conf.getInt("spark.shuffle.pmof.max_stage_num", defaultValue = 1000)
   val maxMaps: Int = conf.getInt("spark.shuffle.pmof.max_task_num", defaultValue = 1000)
 
   var devId = SparkEnv.get.executorId.toInt - 1
-  var path: String = path_list(devId)
+  //var path: String = path_list(devId)
   var core_s = 0
   var core_e = 0
   val data_addr_map = new LinkedHashMap[Long, Long]()
-  for (i <- core_set_map) {
+  /*for (i <- core_set_map) {
     if (path.indexOf(i(0)) > -1) {
       var core_set = i(1).split("-")
       core_s = core_set(0).toInt
       core_e = core_set(1).toInt
     }
-  }
+  }*/
 
-  val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(path, maxPoolSize, maxStages, maxMaps, core_s, core_e)
+  val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler("/dev/dax0.0", maxPoolSize, maxStages, maxMaps, 0, 71)
   val partitionLengths: Array[Long] = Array.fill[Long](numPartitions)(0)
 
   /**
