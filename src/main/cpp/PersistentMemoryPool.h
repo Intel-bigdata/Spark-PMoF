@@ -165,6 +165,7 @@ public:
 	free(buf);
         close(fd);
 
+        cout << "PMPOOL is " << device << endl;
         pmpool = pmemobj_open(device.c_str(), pool_layout_name);
         if (pmpool == NULL) {
             pmpool = pmemobj_create(device.c_str(), pool_layout_name, 0, S_IRUSR | S_IWUSR);

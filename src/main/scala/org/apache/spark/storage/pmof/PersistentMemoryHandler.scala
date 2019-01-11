@@ -67,7 +67,7 @@ object PersistentMemoryHandler {
         path = path_arg
         persistentMemoryHandler = new PersistentMemoryHandler(path, maxStages, maxMaps, pmPoolSize, core_s, core_e)
       }
-      persistentMemoryHandler.log("Using persistentMemoryHandler for " + path)
+      //persistentMemoryHandler.log("Using persistentMemoryHandler for " + path)
     }
     persistentMemoryHandler
   }
@@ -77,7 +77,7 @@ object PersistentMemoryHandler {
       if (persistentMemoryHandler == null) {
         throw new NullPointerException("persistentMemoryHandler")
       }
-      persistentMemoryHandler.log("Using persistentMemoryHandler for " + path)
+      //persistentMemoryHandler.log("Using persistentMemoryHandler for " + path)
     }
     persistentMemoryHandler
   }
