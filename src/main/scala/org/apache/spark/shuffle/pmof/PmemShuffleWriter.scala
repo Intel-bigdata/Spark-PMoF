@@ -130,7 +130,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
     }
   }
 
-  val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(path, maxPoolSize, maxStages, maxMaps, core_s, core_e)
+  val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(path, maxPoolSize, maxStages, maxMaps, core_s, core_e, enable_rdma)
   val partitionLengths: Array[Long] = Array.fill[Long](numPartitions)(0)
 
   /**

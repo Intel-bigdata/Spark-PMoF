@@ -65,17 +65,19 @@ object PersistentMemoryHandler {
   private var persistentMemoryHandler: PersistentMemoryHandler = _
   var path: String = _
   var stopped: Boolean = false
-  def getPersistentMemoryHandler(path_arg: String, pmPoolSize: Long, maxStages: Int, maxMaps: Int, core_s: Int, core_e: Int): PersistentMemoryHandler = synchronized {
+  def getPersistentMemoryHandler(path_arg: String, pmPoolSize: Long, maxStages: Int, maxMaps: Int, core_s: Int, core_e: Int, enable_rdma: Boolean): PersistentMemoryHandler = synchronized {
     if (!stopped) {
       if (persistentMemoryHandler == null) {
         path = path_arg
         persistentMemoryHandler = new PersistentMemoryHandler(path, maxStages, maxMaps, pmPoolSize, core_s, core_e)
-        val blockManager = SparkEnv.get.blockManager
-        val eqService = RdmaTransferService.getTransferServiceInstance(blockManager).server.getEqService
-        val size: Long = 264239054848L
-        val offset: Long = persistentMemoryHandler.getRootAddr
-        val rdmaBuffer = eqService.regRmaBufferByAddress(null, offset, size)
-        persistentMemoryHandler.rkey = rdmaBuffer.getRKey()
+        if (enable_rdma) {
+          val blockManager = SparkEnv.get.blockManager
+          val eqService = RdmaTransferService.getTransferServiceInstance(blockManager).server.getEqService
+          val size: Long = 264239054848L
+          val offset: Long = persistentMemoryHandler.getRootAddr
+          val rdmaBuffer = eqService.regRmaBufferByAddress(null, offset, size)
+          persistentMemoryHandler.rkey = rdmaBuffer.getRKey()
+        }
       }
       persistentMemoryHandler.log("Using persistentMemoryHandler for " + path)
     }
