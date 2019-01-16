@@ -25,18 +25,18 @@ class RdmaServer(conf: SparkConf, val shuffleManager: PmofShuffleManager, addres
     BUFFER_NUM = conf.getInt("spark.shuffle.pmof.server_buffer_nums", 256)
   }
   final val workers = conf.getInt("spark.shuffle.pmof.server_pool_size", 1)
-  final val sparkExecutorNums = conf.getInt("spark.shuffle.pmof.executor_num", 3)
+  final val maxConnections = conf.getInt("spark.shuffle.pmof.max_connection_nums", defaultValue = 20)
   final val eqService = new EqService(address, port.toString, BUFFER_NUM, true)
   final val cqService = new CqService(eqService, workers, eqService.getNativeHandle)
 
   val conList = new util.ArrayList[Connection]()
 
   def init(): Unit = {
-    for (i <- 0 until BUFFER_NUM*20) {
+    for (i <- 0 until BUFFER_NUM*maxConnections) {
       val sendBuffer = ByteBuffer.allocateDirect(SINGLE_BUFFER_SIZE)
       eqService.setSendBuffer(sendBuffer, SINGLE_BUFFER_SIZE, i)
     }
-    for (i <- 0 until BUFFER_NUM*2*20) {
+    for (i <- 0 until BUFFER_NUM*maxConnections*2) {
       val recvBuffer = ByteBuffer.allocateDirect(SINGLE_BUFFER_SIZE)
       eqService.setRecvBuffer(recvBuffer, SINGLE_BUFFER_SIZE, i)
     }
