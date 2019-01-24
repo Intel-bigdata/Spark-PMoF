@@ -119,10 +119,11 @@ private:
     TOID(struct StageArrayRoot) stageArrayRoot;
     int maxStage;
     int maxMap;
-    std::mutex mtx;
-    std::condition_variable cv;
+    std::mutex pmem_index_lock;
     int core_s;
     int core_e;
+    std::mutex mtx;
+    std::condition_variable cv;
 public:
     PMPool(const char* dev, int maxStage, int maxMap, int core_s, int core_e):
         maxStage(maxStage),
@@ -144,19 +145,8 @@ public:
           buf[0] = '0';
         }
         int idx = std::stoi(buf);
-        if (idx == 0) {
-          dax = "0.0";
-          next_dax = std::to_string(idx+1);
-        } else if (idx == 1) {
-          dax = "0.1";
-          next_dax = std::to_string(idx+1);
-        } else if (idx == 2) {
-          dax = "1.0";
-          next_dax = std::to_string(idx+1);
-        } else {
-          dax = "1.1";
-          next_dax = std::to_string(0);
-        }
+        dax = std::to_string(idx)+".0";
+        next_dax = std::to_string(idx+1);
         ret = pwrite(fd, next_dax.c_str(), next_dax.length(), 0);
 	std::string device = prefix + dax;
         lockf(fd, F_ULOCK, 0);
@@ -192,37 +182,64 @@ public:
         int ret = 0;
         int inflight = 1;
         char* data_addr = nullptr;
+        bool should_lock = false;
         std::unique_lock<std::mutex> lck(mtx);
         TX_BEGIN(pmpool) {
             taskset(core_s, core_e); 
             TX_ADD(stageArrayRoot);
+            // add a lock flag
+
             if (TOID_IS_NULL(D_RO(stageArrayRoot)->stageArray)) {
+                if (!should_lock) {
+                    pmem_index_lock.lock();
+                    should_lock = true;
+                }
                 D_RW(stageArrayRoot)->stageArray = TX_ZALLOC(struct StageArray, sizeof(struct StageArray) + maxStage * sizeof(struct StageArrayItem));
             }
             
             TX_ADD_FIELD(stageArrayRoot, stageArray);
             TOID(struct StageArrayItem) *stageArrayItem = &(D_RW(D_RW(stageArrayRoot)->stageArray)->items[stageId]);
             if (TOID_IS_NULL(*stageArrayItem)) {
+                if (!should_lock) {
+                    pmem_index_lock.lock();
+                    should_lock = true;
+                }
                 *stageArrayItem = TX_ZNEW(struct StageArrayItem);
             }
             TX_ADD(*stageArrayItem);
             if (TOID_IS_NULL(D_RO(*stageArrayItem)->mapArray)) {
+                if (!should_lock) {
+                    pmem_index_lock.lock();
+                    should_lock = true;
+                }
                 D_RW(*stageArrayItem)->mapArray = TX_ZALLOC(struct MapArray, sizeof(struct MapArray) + maxMap * sizeof(struct MapArrayItem));
             }
     
             TX_ADD_FIELD(*stageArrayItem, mapArray);
             TOID(struct MapArrayItem) *mapArrayItem = &(D_RW(D_RW(*stageArrayItem)->mapArray)->items[mapId]);
             if (TOID_IS_NULL(*mapArrayItem)) {
+                if (!should_lock) {
+                    pmem_index_lock.lock();
+                    should_lock = true;
+                }
                 *mapArrayItem = TX_ZNEW(struct MapArrayItem);
             }
             TX_ADD(*mapArrayItem);
             if (TOID_IS_NULL(D_RO(*mapArrayItem)->partitionArray)) {
+                if (!should_lock) {
+                    pmem_index_lock.lock();
+                    should_lock = true;
+                }
                 D_RW(*mapArrayItem)->partitionArray = TX_ZALLOC(struct PartitionArray, sizeof(struct PartitionArray) +  partitionNum * sizeof(struct PartitionArrayItem));
             }
     
             TX_ADD_FIELD(*mapArrayItem, partitionArray);
             TOID(struct PartitionArrayItem) *partitionArrayItem = &(D_RW(D_RW(*mapArrayItem)->partitionArray)->items[partitionId]);
             if (TOID_IS_NULL(*partitionArrayItem)) {
+                if (!should_lock) {
+                    pmem_index_lock.lock();
+                    should_lock = true;
+                }
                 *partitionArrayItem = TX_ZNEW(struct PartitionArrayItem);
             }
             TX_ADD(*partitionArrayItem);
@@ -235,6 +252,10 @@ public:
             }
 
             TX_ADD_DIRECT(partitionBlock);
+            if (!should_lock) {
+                pmem_index_lock.lock();
+                should_lock = true;
+            }
             *partitionBlock = TX_ZALLOC(struct PartitionBlock, 1);
             D_RW(*partitionBlock)->data = pmemobj_tx_zalloc(size, 0);
             
@@ -243,6 +264,11 @@ public:
 
             data_addr = (char*)pmemobj_direct(D_RW(*partitionBlock)->data);
             pmemobj_tx_add_range_direct((const void *)data_addr, size);
+
+            if (should_lock) {
+                pmem_index_lock.unlock();
+                should_lock =false;
+            }
             memcpy(data_addr, data, size);
         } TX_ONCOMMIT {
             inflight--;
@@ -250,9 +276,15 @@ public:
         } TX_ONABORT {
             fprintf(stderr, "set Partition of shuffle_%d_%d_%d failed. Error: %s\n", stageId, mapId, partitionId, pmemobj_errormsg());
             ret = -1;
+            if (should_lock) {
+                pmem_index_lock.unlock();
+                should_lock =false;
+            }
             exit(-1);
         } TX_END
-        while (inflight > 0) cv.wait(lck);
+        while (inflight > 0){
+            cv.wait(lck);
+        }
         if (data_addr == nullptr)
           return -1;
         return (long)data_addr;
