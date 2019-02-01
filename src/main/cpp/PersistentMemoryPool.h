@@ -145,6 +145,7 @@ public:
     long size;
     char *data;
     int inflight;
+    char* data_addr;
     PMPool* pmpool_ptr;
 
     Request(PMPool* pmpool_ptr,
@@ -158,6 +159,7 @@ public:
             char* data);
     ~Request();
     long setPartition();
+    long getResult();
 };
 
 
@@ -180,7 +182,7 @@ PMPool::PMPool(const char* dev, int maxStage, int maxMap, int core_s, int core_e
     stop(false),
     worker(&PMPool::process, this) {
 
-    const char *pool_layout_name = "pmem_spark_shuffle";
+  const char *pool_layout_name = "pmem_spark_shuffle";
 	std::string prefix = "/dev/dax";
 	std::string lock_file = "/tmp/spark_dax.lock";
 	int fd = open(lock_file.c_str(), O_RDWR|O_CREAT);
@@ -246,6 +248,7 @@ long PMPool::setPartition(
     //fprintf(stderr, "%s request queue size is %d\n", device.c_str(), request_queue.size());
     Request write_request(this, maxStage, maxMap, partitionNum, stageId, mapId, partitionId, size, data);
     request_queue.enqueue((void*)&write_request);
+    return write_request.getResult();
 }
 
 long PMPool::getPartition(
@@ -315,22 +318,26 @@ Request::Request(PMPool* pmpool_ptr,
     partitionId(partitionId),
     size(size),
     data(data),
+    data_addr(nullptr),
     lck(mtx), block_lck(block_mtx) {    
     inflight = 1;
 }
 
 Request::~Request() {
-    //cout << this << " inflight is " << inflight << endl;
+}
+
+long Request::getResult() {
     if (inflight > 0){
         cv.wait(lck);
     }
+    if (data_addr == nullptr)
+      return -1;
+    return (long)data_addr;
 }
     
 long Request::setPartition() {
     int ret = 0;
-    char* data_addr = nullptr;
     bool should_lock = true;
-    
     
     TX_BEGIN(pmpool_ptr->pmpool) {
         //taskset(core_s, core_e); 

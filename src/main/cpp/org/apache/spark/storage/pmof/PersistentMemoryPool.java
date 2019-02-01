@@ -14,7 +14,7 @@ class ArgParser {
 
     CommandLine cmd;
     Options options = new Options();
-    CommandLineParser parser = new GnuParser();
+    CommandLineParser parser = new DefaultParser();
     HelpFormatter formatter = new HelpFormatter();
 
     ArgParser (String[] args) {
@@ -90,15 +90,16 @@ class Monitor {
 
     void stop() {
         this.alive = false;
-        while(this.submittedJobs > 0) {
+        /*while(this.submittedJobs > 0) {
             System.out.println("still remain inflight io: " + this.submittedJobs);
-	    try {
-	        Thread.sleep(1000);
+  	    try {
+	          Thread.sleep(1000);
             } catch (InterruptedException e) {
                 System.exit(1);
-	    }
+	          }
         }
         System.out.println("inflight io: " + this.submittedJobs);
+        */
         this.monitor_thread.shutdown();
     }
 
@@ -130,7 +131,7 @@ public class PersistentMemoryPool{
     private void write() {
         int i = 0, j = 0;
         //System.out.println("Enter write thread");
-	while (monitor.alive() == true) {
+	      while (monitor.alive() == true) {
             if (i > 9999) {
                 i = 0;
                 j++;
@@ -156,7 +157,7 @@ public class PersistentMemoryPool{
         this.writerHandler = nativeOpenDevice(dev, 50, 10, 0, 51);
         System.out.println("Thread Num: " + this.thread_num + ", block_size: " + bs + "KB, Device: " + dev);
         
-	this.executor = Executors.newFixedThreadPool(this.thread_num);
+	      this.executor = Executors.newFixedThreadPool(this.thread_num);
         for (this.k = 0; this.k < this.thread_num; this.k++) {
             this.executor.submit(this::write);
         }
@@ -165,7 +166,17 @@ public class PersistentMemoryPool{
 
     public void stop() {
         alive = false;
+        System.out.println("start to close writer thread.");
+        System.out.println("inflight io: " + monitor.submittedJobs);
         this.executor.shutdown();
+        try {
+        this.executor.awaitTermination(5000, TimeUnit.MILLISECONDS);
+        } catch(InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+        System.out.println("inflight io: " + monitor.submittedJobs);
+        this.executor.shutdown();
+        System.out.println("closed writer thread, start to close device.");
         nativeCloseDevice(writerHandler);
     }
 
@@ -197,5 +208,6 @@ public class PersistentMemoryPool{
     	for (int i = 0; i < device_list.length; i++) { 
     	    writer[i].stop();
     	}
+      System.out.println("inflight io: " + monitor.submittedJobs);
     }
 }
