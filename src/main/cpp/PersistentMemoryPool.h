@@ -115,9 +115,9 @@ public:
     int core_e;
     std::thread worker;
     bool stop;
-    std::string device;
+    const char* dev;
     WorkQueue<void*> request_queue;
-    PMPool(const char* dev, int maxStage, int maxMap, int core_s, int core_e);
+    PMPool(const char* dev, int maxStage, int maxMap);
     ~PMPool();
     long getRootAddr();
     long setPartition(int partitionNum, int stageId, int mapId, int partitionId, long size, char* data );
@@ -164,66 +164,18 @@ public:
     long getResult();
 };
 
-
-static void taskset(int core_start, int core_end) {
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    for (int cpu = core_start; cpu < core_end; cpu ++) {
-        CPU_SET(cpu, &cpuset);
-    }
-    pthread_t thId = pthread_self();
-    pthread_setaffinity_np(thId, sizeof(cpu_set_t), &cpuset);
-}
-
-
-PMPool::PMPool(const char* dev, int maxStage, int maxMap, int core_s, int core_e):
+PMPool::PMPool(const char* dev, int maxStage, int maxMap):
     maxStage(maxStage),
     maxMap(maxMap),
-    core_s(core_s),
-    core_e(core_e),
     stop(false),
+    dev(dev),
     worker(&PMPool::process, this) {
 
   const char *pool_layout_name = "pmem_spark_shuffle";
-	std::string prefix = "/dev/dax";
-	std::string lock_file = "/tmp/spark_dax.lock";
-	int fd = open(lock_file.c_str(), O_RDWR|O_CREAT);
-	assert(fd != -1);
-	lockf(fd, F_LOCK, 0);
-	char buf[10] = "";
-  std::string next_dax;
-  std::string dax = "0.0";
-  int ret = pread(fd, buf, 2, 0);
-  if (ret == 0) {
-    buf[0] = '0';
-  }
-  int idx = std::stoi(buf);
-  /*dax = std::to_string(idx)+".0";
-  next_dax = std::to_string(idx+1);*/
-
-  if (idx == 0) {
-    dax = "0.0";
-    next_dax = std::to_string(idx+1);
-  } else if (idx == 1) {
-    dax = "0.1";
-    next_dax = std::to_string(idx+1);
-  } else if (idx == 2) {
-    dax = "1.0";
-    next_dax = std::to_string(idx+1);
-  } else {
-    dax = "1.1";
-    next_dax = std::to_string(0);
-  }
-
-  ret = pwrite(fd, next_dax.c_str(), next_dax.length(), 0);
-  device = prefix + dax;
-  lockf(fd, F_ULOCK, 0);
-  close(fd);
-
-  cout << "PMPOOL is " << device << endl;
-  pmpool = pmemobj_open(device.c_str(), pool_layout_name);
+  cout << "PMPOOL is " << dev << endl;
+  pmpool = pmemobj_open(dev, pool_layout_name);
   if (pmpool == NULL) {
-      pmpool = pmemobj_create(device.c_str(), pool_layout_name, 0, S_IRUSR | S_IWUSR);
+      pmpool = pmemobj_create(dev, pool_layout_name, 0, S_IRUSR | S_IWUSR);
   }
   if (pmpool == NULL) {
       cerr << "Failed to open pool " << pmemobj_errormsg() << endl; 
@@ -235,10 +187,10 @@ PMPool::PMPool(const char* dev, int maxStage, int maxMap, int core_s, int core_e
 
 PMPool::~PMPool() {
     while(request_queue.size() > 0) {
-        fprintf(stderr, "%s request queue size is %d\n", device.c_str(), request_queue.size());
+        fprintf(stderr, "%s request queue size is %d\n", dev, request_queue.size());
         sleep(1);
     }
-    fprintf(stderr, "%s request queue size is %d\n", device.c_str(), request_queue.size());
+    fprintf(stderr, "%s request queue size is %d\n", dev, request_queue.size());
     stop = true;
     worker.join();
     pmemobj_close(pmpool);
@@ -265,7 +217,6 @@ long PMPool::setPartition(
         int partitionId,
         long size,
         char* data ) {
-    //fprintf(stderr, "%s request queue size is %d\n", device.c_str(), request_queue.size());
     Request write_request(this, maxStage, maxMap, partitionNum, stageId, mapId, partitionId, size, data);
     request_queue.enqueue((void*)&write_request);
     return write_request.getResult();

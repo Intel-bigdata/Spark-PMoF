@@ -2,9 +2,9 @@
 #include "PersistentMemoryPool.h"
 
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeOpenDevice
-  (JNIEnv *env, jclass obj, jstring path, jint maxStage, jint maxMap, jint core_s, jint core_e) {
+  (JNIEnv *env, jclass obj, jstring path, jint maxStage, jint maxMap) {
     const char *CStr = env->GetStringUTFChars(path, 0);
-    PMPool* pmpool = new PMPool(CStr, maxStage, maxMap, core_s, core_e);
+    PMPool* pmpool = new PMPool(CStr, maxStage, maxMap);
     env->ReleaseStringUTFChars(path, CStr);
     return (long)pmpool;
 }

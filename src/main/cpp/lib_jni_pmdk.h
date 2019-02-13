@@ -10,10 +10,10 @@ extern "C" {
 /*
  * Class:     lib_jni_pmdk
  * Method:    nativeOpenDevice
- * Signature: (Ljava/lang/String;IIII)J
+ * Signature: (Ljava/lang/String;II)J
  */
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeOpenDevice
-  (JNIEnv *, jclass, jstring, jint maxStage, jint maxMap, jint core_s, jint core_e);
+  (JNIEnv *, jclass, jstring, jint maxStage, jint maxMap);
 
 /*
  * Class:     lib_jni_pmdk

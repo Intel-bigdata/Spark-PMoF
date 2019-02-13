@@ -44,9 +44,9 @@ class MetadataResolver(conf: SparkConf) {
 
   val shuffleBlockSize: Int = conf.getInt("spark.shuffle.pmof.shuffle_block_size", defaultValue = 2048)
 
-  val kryo = new Kryo()
+  val info_serialize_stream = new Kryo()
   val shuffleBlockInfoSerializer = new ShuffleBlockInfoSerializer
-  kryo.register(classOf[ShuffleBlockInfo], shuffleBlockInfoSerializer)
+  info_serialize_stream.register(classOf[ShuffleBlockInfo], shuffleBlockInfoSerializer)
 
   val shuffleBlockMap = new ConcurrentHashMap[String, ArrayBuffer[ShuffleBlockInfo]]()
 
@@ -65,7 +65,7 @@ class MetadataResolver(conf: SparkConf) {
       for (i <- 0 until partitionNums) {
         for ((address, length) <- dataAddressMap(i)) {
           val shuffleBlockId = ShuffleBlockId(shuffleId, mapId, i).name
-          kryo.writeObject(output, new ShuffleBlockInfo(shuffleBlockId, address, length.toInt, rkey))
+          info_serialize_stream.writeObject(output, new ShuffleBlockInfo(shuffleBlockId, address, length.toInt, rkey))
         }
       }
     }
@@ -87,7 +87,7 @@ class MetadataResolver(conf: SparkConf) {
     }
 
     RdmaTransferService.getTransferServiceInstance(null, null).
-      syncBlocksInfo(driverHost, driverPort, byteBuffer, 0.toByte, receivedCallback)
+        syncBlocksInfo(driverHost, driverPort, byteBuffer, 0.toByte, receivedCallback)
 
     latch.await()
   }
@@ -128,10 +128,10 @@ class MetadataResolver(conf: SparkConf) {
         val blockNums = currentLength / shuffleBlockSize + (if (currentLength % shuffleBlockSize == 0) 0 else 1)
         for (i <- 0 until blockNums) {
           if (i != blockNums - 1) {
-            kryo.writeObject(output, new ShuffleBlockInfo(shuffleBlockId.name, startedAddress + offset, shuffleBlockSize, rdmaBuffer.getRKey))
+            info_serialize_stream.writeObject(output, new ShuffleBlockInfo(shuffleBlockId.name, startedAddress + offset, shuffleBlockSize, rdmaBuffer.getRKey))
             offset += shuffleBlockSize
           } else {
-            kryo.writeObject(output, new ShuffleBlockInfo(shuffleBlockId.name, startedAddress + offset, currentLength - (i * shuffleBlockSize), rdmaBuffer.getRKey))
+            info_serialize_stream.writeObject(output, new ShuffleBlockInfo(shuffleBlockId.name, startedAddress + offset, currentLength - (i * shuffleBlockSize), rdmaBuffer.getRKey))
             offset += (currentLength - (i * shuffleBlockSize))
           }
         }
@@ -155,8 +155,7 @@ class MetadataResolver(conf: SparkConf) {
     }
 
     RdmaTransferService.getTransferServiceInstance(null, null).
-      syncBlocksInfo(driverHost, driverPort, byteBuffer, 0.toByte, receivedCallback)
-
+        syncBlocksInfo(driverHost, driverPort, byteBuffer, 0.toByte, receivedCallback)
     latch.await()
   }
 
@@ -191,7 +190,7 @@ class MetadataResolver(conf: SparkConf) {
     }
     do {
       if (input.available() > 0) {
-        val shuffleBlockInfo = kryo.readObject(input, classOf[ShuffleBlockInfo])
+        val shuffleBlockInfo = info_serialize_stream.readObject(input, classOf[ShuffleBlockInfo])
         if (shuffleBlockMap.containsKey(shuffleBlockInfo.getShuffleBlockId)) {
           shuffleBlockMap.get(shuffleBlockInfo.getShuffleBlockId)
             .append(shuffleBlockInfo)
@@ -221,7 +220,7 @@ class MetadataResolver(conf: SparkConf) {
       val partitionNums = blockInfoArray.size
       MetadataResolver.this.synchronized {
         for (i <- 0 until partitionNums) {
-          kryo.writeObject(output, blockInfoArray(i))
+          info_serialize_stream.writeObject(output, blockInfoArray(i))
         }
       }
     }
@@ -237,7 +236,7 @@ class MetadataResolver(conf: SparkConf) {
     val input = new Input(bais)
     do {
       if (input.available() > 0) {
-        val shuffleBlockInfo = kryo.readObject(input, classOf[ShuffleBlockInfo])
+        val shuffleBlockInfo = info_serialize_stream.readObject(input, classOf[ShuffleBlockInfo])
         blockInfoArray += shuffleBlockInfo
       } else {
         input.close()
