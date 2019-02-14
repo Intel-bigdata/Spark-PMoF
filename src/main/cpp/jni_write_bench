@@ -1,0 +1,2 @@
+#!/usr/bin/sh
+java -ea -cp .:/hadoop/share/hadoop/common/lib/commons-cli-1.4.jar -Djava.library.path=./ org.apache.spark.storage.pmof.PersistentMemoryPool $@

@@ -35,16 +35,16 @@ private[spark] class PersistentMemoryHandler(
   var rkey: Long = 0
   log("Open PersistentMemoryPool: " + pathId + " ,binds to core " + core_s + "-" + core_e)
 
-  def setPartition(numPartitions: Int, stageId: Int, shuffleId: Int, partitionId: Int, data: Array[Byte]): Long = synchronized {
-    if (data.length > 0) {
-      pmpool.setPartition(numPartitions, stageId, shuffleId, partitionId, data.length, data)
+  def setPartition(numPartitions: Int, stageId: Int, shuffleId: Int, partitionId: Int, data: Array[Byte]): Long = {
+    if (data.size > 0) {
+      pmpool.setPartition(numPartitions, stageId, shuffleId, partitionId, data.size, data)
     } else {
       -1
     }
   }
 
-  def getPartition(stageId: Int, shuffleId: Int, partitionId: Int): ManagedBuffer = synchronized {
-    val data = pmpool.getPartition(stageId, shuffleId, partitionId)
+  def getPartition(stageId: Int, shuffleId: Int, partitionId: Int): ManagedBuffer = {
+    var data = pmpool.getPartition(stageId, shuffleId, partitionId)
     new NioManagedBuffer(ByteBuffer.wrap(data))
   }
 
