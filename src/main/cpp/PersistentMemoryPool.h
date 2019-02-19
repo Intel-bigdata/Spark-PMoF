@@ -120,7 +120,7 @@ public:
     PMPool(const char* dev, int maxStage, int maxMap);
     ~PMPool();
     long getRootAddr();
-    long setPartition(int partitionNum, int stageId, int mapId, int partitionId, long size, char* data );
+    long setPartition(int partitionNum, int stageId, int mapId, int partitionId, long size, char* data, bool clean);
     long getPartition(MemoryBlock* mb, int stageId, int mapId, int partitionId);
     void process();
 };
@@ -147,6 +147,7 @@ public:
     int partitionId;
     long size;
     char *data;
+    bool set_clean;
     char* data_addr;
     PMPool* pmpool_ptr;
 
@@ -158,7 +159,8 @@ public:
             int mapId, 
             int partitionId,
             long size,
-            char* data);
+            char* data,
+            bool set_clean);
     ~Request();
     void setPartition();
     long getResult();
@@ -216,8 +218,9 @@ long PMPool::setPartition(
         int mapId, 
         int partitionId,
         long size,
-        char* data ) {
-    Request write_request(this, maxStage, maxMap, partitionNum, stageId, mapId, partitionId, size, data);
+        char* data,
+        bool clean) {
+    Request write_request(this, maxStage, maxMap, partitionNum, stageId, mapId, partitionId, size, data, clean);
     request_queue.enqueue((void*)&write_request);
     return write_request.getResult();
 }
@@ -279,7 +282,8 @@ Request::Request(PMPool* pmpool_ptr,
         int mapId, 
         int partitionId,
         long size,
-        char* data):
+        char* data,
+        bool set_clean):
     pmpool_ptr(pmpool_ptr),
     maxStage(maxStage),
     maxMap(maxMap),
@@ -290,6 +294,7 @@ Request::Request(PMPool* pmpool_ptr,
     size(size),
     data(data),
     data_addr(nullptr),
+    set_clean(set_clean),
     processed(false),
     committed(false),
     lck(mtx), block_lck(block_mtx) {
@@ -350,11 +355,15 @@ void Request::setPartition() {
         }
         TX_ADD(*partitionArrayItem);
         TX_ADD_FIELD(*partitionArrayItem, partition_size);
-        D_RW(*partitionArrayItem)->partition_size += size;
 
         TOID(struct PartitionBlock) *partitionBlock = &(D_RW(*partitionArrayItem)->first_block);
-        while(!TOID_IS_NULL(*partitionBlock)) {
-            *partitionBlock = D_RW(*partitionBlock)->next_block;
+        if (set_clean == false) {
+            D_RW(*partitionArrayItem)->partition_size += size;
+            while(!TOID_IS_NULL(*partitionBlock)) {
+                *partitionBlock = D_RW(*partitionBlock)->next_block;
+            }
+        } else {
+            D_RW(*partitionArrayItem)->partition_size = size;
         }
 
         TX_ADD_DIRECT(partitionBlock);

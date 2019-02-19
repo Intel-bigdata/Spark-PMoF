@@ -55,9 +55,9 @@ private[spark] class PersistentMemoryHandler(
     pmMetaHandler.insertRecord(shuffleId, device);
   }
 
-  def setPartition(numPartitions: Int, stageId: Int, shuffleId: Int, partitionId: Int, data: Array[Byte]): Long = {
+  def setPartition(numPartitions: Int, stageId: Int, shuffleId: Int, partitionId: Int, data: Array[Byte], clean: Boolean): Long = {
     if (data.size > 0) {
-      pmpool.setPartition(numPartitions, stageId, shuffleId, partitionId, data.size, data)
+      pmpool.setPartition(numPartitions, stageId, shuffleId, partitionId, data.size, data, clean)
     } else {
       -1
     }

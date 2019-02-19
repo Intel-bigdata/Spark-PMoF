@@ -125,6 +125,8 @@ private[spark] class PmemShuffleWriter[K, V, C](
   val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(root_dir, path_list, shuffleBlockId, maxPoolSize, maxStages, maxMaps, enable_rdma)
   var device: String = persistentMemoryWriter.getDevice
   val partitionLengths: Array[Long] = Array.fill[Long](numPartitions)(0)
+  var set_clean: Boolean = true
+  persistentMemoryWriter.updateShuffleMeta(shuffleBlockId)
 
   /**
    * Are we in the process of stopping? Because map tasks can call stop() with success = true
@@ -137,7 +139,10 @@ private[spark] class PmemShuffleWriter[K, V, C](
     if (size >= 4194304) {
       val tmp_data = partitionBuffer.get()
       val start = System.nanoTime()
-      var addr_len_t = (persistentMemoryWriter.setPartition(numPartitions, stageId, mapId, partitionId, tmp_data), tmp_data.length)
+      var addr_len_t = (persistentMemoryWriter.setPartition(numPartitions, stageId, mapId, partitionId, tmp_data, set_clean), tmp_data.length)
+      if (set_clean == true) {
+        set_clean = false
+      }
       data_addr_map(partitionId) += addr_len_t
       writeMetrics.incWriteTime(System.nanoTime() - start)
       writeMetrics.incBytesWritten(tmp_data.length)
@@ -179,7 +184,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
     for (i <- 0 until numPartitions) {
       val data = partitionBufferArray(i).get()
       val start = System.nanoTime()
-      var addr_len_t = (persistentMemoryWriter.setPartition(numPartitions, stageId, mapId, i, data), data.length)
+      var addr_len_t = (persistentMemoryWriter.setPartition(numPartitions, stageId, mapId, i, data, set_clean), data.length)
       data_addr_map(i) += addr_len_t
       writeMetrics.incWriteTime(System.nanoTime() - start)
       writeMetrics.incBytesWritten(data.length)
@@ -196,7 +201,6 @@ private[spark] class PmemShuffleWriter[K, V, C](
     logDebug("shuffle_" + dep.shuffleId + "_" + mapId + ": \n" + output_str)
 
     val shuffleServerId = blockManager.shuffleServerId
-    persistentMemoryWriter.updateShuffleMeta(shuffleBlockId)
     if (enable_rdma) {
       val rkey = persistentMemoryWriter.rkey
       metadataResolver.commitPmemBlockInfo(stageId, mapId, data_addr_map, rkey)

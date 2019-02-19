@@ -18,10 +18,10 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_
 /*
  * Class:     lib_jni_pmdk
  * Method:    nativeSetPartition
- * Signature: (JIIIIJ[B)J
+ * Signature: (JIIIIJ[BZ)J
  */
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetPartition
-  (JNIEnv *, jclass, jlong, jint, jint, jint, jint, jlong, jbyteArray);
+  (JNIEnv *, jclass, jlong, jint, jint, jint, jint, jlong, jbyteArray, jboolean);
 
 /*
  * Class:     lib_jni_pmdk

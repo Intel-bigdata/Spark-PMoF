@@ -10,10 +10,10 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_
 }
 
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetPartition
-  (JNIEnv *env, jclass obj, jlong pmpool, jint partitionNum, jint stageId, jint mapId, jint partitionId, jlong size, jbyteArray data) {
+  (JNIEnv *env, jclass obj, jlong pmpool, jint partitionNum, jint stageId, jint mapId, jint partitionId, jlong size, jbyteArray data, jboolean clean) {
     char* buf = new char[size];
     env->GetByteArrayRegion(data, 0, size, reinterpret_cast<jbyte*>(buf));
-    long addr = ((PMPool*)pmpool)->setPartition(partitionNum, stageId, mapId, partitionId, size, buf);
+    long addr = ((PMPool*)pmpool)->setPartition(partitionNum, stageId, mapId, partitionId, size, buf, clean);
     delete buf;
     return addr;
 }
