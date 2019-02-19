@@ -109,6 +109,8 @@ private[spark] class PmemShuffleWriter[K, V, C](
   private val numPartitions = partitioner.numPartitions
   private val serInstance: SerializerInstance = dep.serializer.newInstance()
   private val shuffleBlockId: String = ShuffleBlockId(stageId, mapId, 0).name 
+  private val numMaps = handle.numMaps
+  logDebug("This stage has "+ numMaps + " maps")
 
   val enable_rdma: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_rdma", defaultValue = true)
   val enable_pmem: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_pmem", defaultValue = true)
@@ -116,7 +118,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
 
   val maxPoolSize: Long = conf.getLong("spark.shuffle.pmof.pmpool_size", defaultValue = 1073741824)
   val maxStages: Int = conf.getInt("spark.shuffle.pmof.max_stage_num", defaultValue = 1000)
-  val maxMaps: Int = conf.getInt("spark.shuffle.pmof.max_task_num", defaultValue = 1000)
+  val maxMaps: Int = numMaps
 
   var data_addr_map: Array[mutable.LinkedHashMap[Long, Int]] = Array.fill(numPartitions)(new mutable.LinkedHashMap[Long, Int])
 
