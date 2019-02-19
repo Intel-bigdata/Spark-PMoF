@@ -27,6 +27,7 @@ import org.apache.spark.storage._
 import org.apache.spark.executor.ShuffleWriteMetrics
 import org.apache.spark.storage.pmof.PersistentMemoryHandler
 import java.io.{ByteArrayOutputStream, OutputStream}
+import org.apache.spark.util.Utils
 
 import scala.collection.mutable
 
@@ -107,31 +108,25 @@ private[spark] class PmemShuffleWriter[K, V, C](
   private val partitioner = dep.partitioner
   private val numPartitions = partitioner.numPartitions
   private val serInstance: SerializerInstance = dep.serializer.newInstance()
+  private val shuffleBlockId: String = ShuffleBlockId(stageId, mapId, 0).name 
 
   val enable_rdma: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_rdma", defaultValue = true)
   val enable_pmem: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_pmem", defaultValue = true)
-  val path_list: Array[String] = conf.get("spark.shuffle.pmof.pmem_list").split(",").map(_.trim).distinct
-  val core_set_map: Array[Array[String]] = conf.get("spark.shuffle.pmof.dev_core_set").split(",").map(_.trim.split(":"))
+  val path_list = conf.get("spark.shuffle.pmof.pmem_list").split(",").map(_.trim).toList
 
   val maxPoolSize: Long = conf.getLong("spark.shuffle.pmof.pmpool_size", defaultValue = 1073741824)
   val maxStages: Int = conf.getInt("spark.shuffle.pmof.max_stage_num", defaultValue = 1000)
   val maxMaps: Int = conf.getInt("spark.shuffle.pmof.max_task_num", defaultValue = 1000)
 
-  var devId: Int = SparkEnv.get.executorId.toInt - 1
-  var path: String = path_list(devId)
-  var core_s = 0
-  var core_e = 0
   var data_addr_map: Array[mutable.LinkedHashMap[Long, Int]] = Array.fill(numPartitions)(new mutable.LinkedHashMap[Long, Int])
-  for (i <- core_set_map) {
-    if (path.indexOf(i(0)) > -1) {
-      val core_set = i(1).split("-")
-      core_s = core_set(0).toInt
-      core_e = core_set(1).toInt
-    }
-  }
 
-  val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(path, maxPoolSize, maxStages, maxMaps, core_s, core_e, enable_rdma)
+  val root_dir = Utils.getConfiguredLocalDirs(conf).toList(0)
+
+  val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(root_dir, path_list, shuffleBlockId, maxPoolSize, maxStages, maxMaps, enable_rdma)
+  var device: String = persistentMemoryWriter.getDevice
   val partitionLengths: Array[Long] = Array.fill[Long](numPartitions)(0)
+  var set_clean: Boolean = true
+  persistentMemoryWriter.updateShuffleMeta(shuffleBlockId)
 
   /**
    * Are we in the process of stopping? Because map tasks can call stop() with success = true
@@ -144,8 +139,11 @@ private[spark] class PmemShuffleWriter[K, V, C](
     if (size >= 4194304) {
       val tmp_data = partitionBuffer.get()
       val start = System.nanoTime()
-      var addr_len_t = (persistentMemoryWriter.setPartition(numPartitions, stageId, mapId, partitionId, tmp_data), tmp_data.length)
-      data_addr_map(partitionId)+=addr_len_t
+      var addr_len_t = (persistentMemoryWriter.setPartition(numPartitions, stageId, mapId, partitionId, tmp_data, set_clean), tmp_data.length)
+      if (set_clean == true) {
+        set_clean = false
+      }
+      data_addr_map(partitionId) += addr_len_t
       writeMetrics.incWriteTime(System.nanoTime() - start)
       writeMetrics.incBytesWritten(tmp_data.length)
     }
@@ -186,7 +184,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
     for (i <- 0 until numPartitions) {
       val data = partitionBufferArray(i).get()
       val start = System.nanoTime()
-      var addr_len_t = (persistentMemoryWriter.setPartition(numPartitions, stageId, mapId, i, data), data.length)
+      var addr_len_t = (persistentMemoryWriter.setPartition(numPartitions, stageId, mapId, i, data, set_clean), data.length)
       data_addr_map(i) += addr_len_t
       writeMetrics.incWriteTime(System.nanoTime() - start)
       writeMetrics.incBytesWritten(data.length)

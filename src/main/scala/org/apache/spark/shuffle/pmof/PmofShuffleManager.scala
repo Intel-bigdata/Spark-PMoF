@@ -24,7 +24,9 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
 
   override def registerShuffle[K, V, C](shuffleId: Int, numMaps: Int, dependency: ShuffleDependency[K, V, C]): ShuffleHandle = {
     val env: SparkEnv = SparkEnv.get
-    RdmaTransferService.getTransferServiceInstance(env.blockManager, this, isDriver = true)
+    if (enable_rdma) {
+      RdmaTransferService.getTransferServiceInstance(env.blockManager, this, isDriver = true)
+    }
     if (enable_pmem) {
       new BaseShuffleHandle(shuffleId, numMaps, dependency)
     } else if (SortShuffleManager.canUseSerializedShuffle(dependency)) {
@@ -38,10 +40,11 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
   }
 
   override def getWriter[K, V](handle: ShuffleHandle, mapId: Int, context: TaskContext): ShuffleWriter[K, V] = {
-    logInfo("Using spark PmofShuffleWriter")
     val env: SparkEnv = SparkEnv.get
     numMapsForShuffle.putIfAbsent(handle.shuffleId, handle.asInstanceOf[BaseShuffleHandle[_, _, _]].numMaps)
-    RdmaTransferService.getTransferServiceInstance(env.blockManager, this)
+    if (enable_rdma) {
+      RdmaTransferService.getTransferServiceInstance(env.blockManager, this)
+    }
     handle match {
       case unsafeShuffleHandle: SerializedShuffleHandle[K @unchecked, V @unchecked] =>
         new SerializedShuffleWriter(

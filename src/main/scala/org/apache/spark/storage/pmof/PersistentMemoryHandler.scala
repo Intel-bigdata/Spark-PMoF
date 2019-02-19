@@ -22,22 +22,42 @@ import java.nio.ByteBuffer
 
 import org.apache.spark.network.buffer.{ManagedBuffer, NioManagedBuffer}
 import org.apache.spark.network.pmof.RdmaTransferService
+import org.apache.spark.storage.pmof.PersistentMemoryMetaHandler
 import org.apache.spark.SparkEnv
+import scala.collection.JavaConverters._
 
 private[spark] class PersistentMemoryHandler(
-    val pathId: String,
+    val root_dir: String,
+    val path_list: List[String],
+    val shuffleId: String,
     val maxStages: Int = 1000,
     val maxShuffles: Int = 1000,
-    val poolSize: Long = -1,
-    val core_s: Int = 0,
-    val core_e: Int = 16) extends Logging {
-  val pmpool = new PersistentMemoryPool(pathId, maxStages, maxShuffles, poolSize, core_s, core_e)
+    val poolSize: Long = -1) extends Logging {
+  // need to use a locked file to get which pmem device should be used.
+  val pmMetaHandler: PersistentMemoryMetaHandler = new PersistentMemoryMetaHandler(root_dir); 
+  var device: String = pmMetaHandler.getShuffleDevice(shuffleId);
+  if(device == "") {
+    //this shuffleId haven't been written before, choose a new device
+    logInfo("This a new shuffleBlock, find an unused device for this task.")
+    val path_array_list = new java.util.ArrayList[String](path_list.asJava)
+    device = pmMetaHandler.getUnusedDevice(path_array_list);
+  }
+  
+  logInfo("Open PersistentMemoryPool: " + device)
+  val pmpool = new PersistentMemoryPool(device, maxStages, maxShuffles, poolSize)
   var rkey: Long = 0
-  log("Open PersistentMemoryPool: " + pathId + " ,binds to core " + core_s + "-" + core_e)
 
-  def setPartition(numPartitions: Int, stageId: Int, shuffleId: Int, partitionId: Int, data: Array[Byte]): Long = {
+  def getDevice(): String = {
+    device
+  }
+
+  def updateShuffleMeta(shuffleId: String): Unit = synchronized {
+    pmMetaHandler.insertRecord(shuffleId, device);
+  }
+
+  def setPartition(numPartitions: Int, stageId: Int, shuffleId: Int, partitionId: Int, data: Array[Byte], clean: Boolean): Long = {
     if (data.size > 0) {
-      pmpool.setPartition(numPartitions, stageId, shuffleId, partitionId, data.size, data)
+      pmpool.setPartition(numPartitions, stageId, shuffleId, partitionId, data.size, data, clean)
     } else {
       -1
     }
@@ -50,6 +70,7 @@ private[spark] class PersistentMemoryHandler(
 
   def close(): Unit = synchronized {
     pmpool.close() 
+    pmMetaHandler.remove()
   }
 
   def getRootAddr(): Long = {
@@ -57,19 +78,18 @@ private[spark] class PersistentMemoryHandler(
   }
 
   def log(printout: String) {
-    logDebug(printout)
+    logInfo(printout)
   }
 }
 
 object PersistentMemoryHandler {
   private var persistentMemoryHandler: PersistentMemoryHandler = _
-  var path: String = _
   var stopped: Boolean = false
-  def getPersistentMemoryHandler(path_arg: String, pmPoolSize: Long, maxStages: Int, maxMaps: Int, core_s: Int, core_e: Int, enable_rdma: Boolean): PersistentMemoryHandler = synchronized {
+  def getPersistentMemoryHandler(root_dir: String, path_arg: List[String], shuffleBlockId: String, pmPoolSize: Long, maxStages: Int, maxMaps: Int, enable_rdma: Boolean): PersistentMemoryHandler = synchronized {
     if (!stopped) {
       if (persistentMemoryHandler == null) {
-        path = path_arg
-        persistentMemoryHandler = new PersistentMemoryHandler(path, maxStages, maxMaps, pmPoolSize, core_s, core_e)
+        persistentMemoryHandler = new PersistentMemoryHandler(root_dir, path_arg, shuffleBlockId, maxStages, maxMaps, pmPoolSize)
+        persistentMemoryHandler.log("Use persistentMemoryHandler Object: " + this)
         if (enable_rdma) {
           val blockManager = SparkEnv.get.blockManager
           val eqService = RdmaTransferService.getTransferServiceInstance(blockManager).server.getEqService
@@ -79,7 +99,6 @@ object PersistentMemoryHandler {
           persistentMemoryHandler.rkey = rdmaBuffer.getRKey()
         }
       }
-      persistentMemoryHandler.log("Using persistentMemoryHandler for " + path)
     }
     persistentMemoryHandler
   }
@@ -89,7 +108,6 @@ object PersistentMemoryHandler {
       if (persistentMemoryHandler == null) {
         throw new NullPointerException("persistentMemoryHandler")
       }
-      persistentMemoryHandler.log("Using persistentMemoryHandler for " + path)
     }
     persistentMemoryHandler
   }

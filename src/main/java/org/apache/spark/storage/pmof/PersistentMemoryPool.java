@@ -7,8 +7,8 @@ public class PersistentMemoryPool {
     static {
         System.load("/usr/local/lib/libjnipmdk.so");
     }
-    private static native long nativeOpenDevice(String path, int maxStage, int maxMap, int core_s, int core_e);
-    private static native long nativeSetPartition(long deviceHandler, int numPartitions, int stageId, int mapId, int partutionId, long size, byte[] data);
+    private static native long nativeOpenDevice(String path, int maxStage, int maxMap);
+    private static native long nativeSetPartition(long deviceHandler, int numPartitions, int stageId, int mapId, int partutionId, long size, byte[] data, boolean clean);
     private static native byte[] nativeGetPartition(long deviceHandler, int stageId, int mapId, int partutionId);
     private static native long nativeGetRoot(long deviceHandler);
     private static native int nativeCloseDevice(long deviceHandler);
@@ -17,22 +17,21 @@ public class PersistentMemoryPool {
     //static final int HEADER_SIZE = 8;
     private static final long DEFAULT_PMPOOL_SIZE = 26843545600L;
 
+    private String device;
     private long deviceHandler;
 
     PersistentMemoryPool(
         String path,
         int max_stages_num,
         int max_shuffles_num,
-        long pool_size,
-        int core_s,
-        int core_e) {
-
+        long pool_size) {
+      this.device = path; 
       pool_size = pool_size == -1 ? DEFAULT_PMPOOL_SIZE : pool_size;
-      this.deviceHandler = nativeOpenDevice(path, max_stages_num, max_shuffles_num, core_s, core_e);
+      this.deviceHandler = nativeOpenDevice(path, max_stages_num, max_shuffles_num);
     }
 
-    public long setPartition(int partitionNum, int stageId, int shuffleId, int partitionId, long partitionLength, byte[] data) {
-      return nativeSetPartition(this.deviceHandler, partitionNum, stageId, shuffleId, partitionId, partitionLength, data);
+    public long setPartition(int partitionNum, int stageId, int shuffleId, int partitionId, long partitionLength, byte[] data, boolean clean) {
+      return nativeSetPartition(this.deviceHandler, partitionNum, stageId, shuffleId, partitionId, partitionLength, data, clean);
     }
 
     public byte[] getPartition(int stageId, int shuffleId, int partitionId) {
@@ -45,5 +44,11 @@ public class PersistentMemoryPool {
 
     public void close() {
       nativeCloseDevice(this.deviceHandler);
+      try {
+        System.out.println("Use pmempool to delete device:" + device);
+        Runtime.getRuntime().exec("pmempool rm " + device);
+      } catch (Exception e) {
+        System.err.println("delete " + device + "failed: " + e.getMessage());
+      }
     }
 }

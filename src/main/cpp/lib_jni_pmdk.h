@@ -10,18 +10,18 @@ extern "C" {
 /*
  * Class:     lib_jni_pmdk
  * Method:    nativeOpenDevice
- * Signature: (Ljava/lang/String;IIII)J
+ * Signature: (Ljava/lang/String;II)J
  */
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeOpenDevice
-  (JNIEnv *, jclass, jstring, jint maxStage, jint maxMap, jint core_s, jint core_e);
+  (JNIEnv *, jclass, jstring, jint maxStage, jint maxMap);
 
 /*
  * Class:     lib_jni_pmdk
  * Method:    nativeSetPartition
- * Signature: (JIIIIJ[B)J
+ * Signature: (JIIIIJ[BZ)J
  */
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetPartition
-  (JNIEnv *, jclass, jlong, jint, jint, jint, jint, jlong, jbyteArray);
+  (JNIEnv *, jclass, jlong, jint, jint, jint, jint, jlong, jbyteArray, jboolean);
 
 /*
  * Class:     lib_jni_pmdk
