@@ -38,12 +38,13 @@ private[spark] class PersistentMemoryHandler(
   var device: String = pmMetaHandler.getShuffleDevice(shuffleId);
   if(device == "") {
     //this shuffleId haven't been written before, choose a new device
-    logInfo("This a new shuffleBlock, find an unused device for this task.")
     val path_array_list = new java.util.ArrayList[String](path_list.asJava)
     device = pmMetaHandler.getUnusedDevice(path_array_list);
+    logInfo("This a new shuffleBlock, find an unused device:" + device + ", numMaps of this stage is " + maxShuffles)
+  } else {
+    logInfo("This a recently opened shuffleBlock, use the original device:" + device + ", numMaps of this stage is " + maxShuffles)
   }
   
-  logInfo("Open PersistentMemoryPool: " + device)
   val pmpool = new PersistentMemoryPool(device, maxStages, maxShuffles, poolSize)
   var rkey: Long = 0
 

@@ -41,7 +41,8 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
 
   override def getWriter[K, V](handle: ShuffleHandle, mapId: Int, context: TaskContext): ShuffleWriter[K, V] = {
     val env: SparkEnv = SparkEnv.get
-    numMapsForShuffle.putIfAbsent(handle.shuffleId, handle.asInstanceOf[BaseShuffleHandle[_, _, _]].numMaps)
+    val numMaps = handle.asInstanceOf[BaseShuffleHandle[_, _, _]].numMaps
+    numMapsForShuffle.putIfAbsent(handle.shuffleId, numMaps)
     if (enable_rdma) {
       RdmaTransferService.getTransferServiceInstance(env.blockManager, this)
     }

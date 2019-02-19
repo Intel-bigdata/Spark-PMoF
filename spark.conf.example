@@ -9,10 +9,8 @@ spark.shuffle.pmof.enable_rdma true
 spark.shuffle.pmof.enable_pmem true
 
 # for persistent memory
-spark.shuffle.pmof.max_stage_num 1
-spark.shuffle.pmof.max_task_num 50000
+spark.shuffle.pmof.max_stage_num 100
 spark.shuffle.pmof.pmem_list /dev/dax0.0,/dev/dax1.0
-spark.shuffle.pmof.dev_core_set dax0:0-87,dax1:0-87
 
 # for rdma
 spark.shuffle.pmof.server_buffer_nums 32
