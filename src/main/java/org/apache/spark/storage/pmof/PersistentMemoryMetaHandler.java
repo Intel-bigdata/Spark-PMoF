@@ -8,6 +8,8 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.io.*;
  
 public class PersistentMemoryMetaHandler {
@@ -33,20 +35,19 @@ public class PersistentMemoryMetaHandler {
       stmt.execute(sql);
 
       sql = "CREATE TABLE IF NOT EXISTS devices (\n"
-                + "	device text UNIQUE\n"
+                + "	device text UNIQUE,\n"
+                + "	mount_count int\n"
                 + ");";
       stmt.execute(sql);
       conn.close();
     } catch (SQLException e) {
-      System.err.println("createTable failed:" + e.getMessage());
-      System.exit(-1);
+      System.out.println("createTable failed:" + e.getMessage());
     }
     System.out.println("Metastore DB connected: " + url);
   }
 
   public void insertRecord(String shuffleId, String device) {
-    String sql = "INSERT OR IGNORE INTO metastore(shuffleId,device) VALUES('" + shuffleId + "','" + device + "');\n";
-    sql += "INSERT OR IGNORE INTO devices(device) VALUES('" + device + "');";
+    String sql = "INSERT OR IGNORE INTO metastore(shuffleId,device) VALUES('" + shuffleId + "','" + device + "')";
  
     try {
       Connection conn = DriverManager.getConnection(url);
@@ -78,9 +79,11 @@ public class PersistentMemoryMetaHandler {
   }
 
   public String getUnusedDevice(ArrayList<String> full_device_list){
-    String sql = "SELECT device FROM devices";
+    String sql = "SELECT device, mount_count FROM devices";
     ArrayList<String> device_list = new ArrayList<String>();
+    HashMap<String, Integer> device_count = new HashMap<String, Integer>();
     String device = "";
+    int count;
     
     try {
       Connection conn = DriverManager.getConnection(url);
@@ -88,16 +91,25 @@ public class PersistentMemoryMetaHandler {
       ResultSet rs = stmt.executeQuery(sql);
       while (rs.next()) {
         device_list.add(rs.getString("device"));
+        device_count.put(rs.getString("device"), rs.getInt("mount_count"));
       }
 
       full_device_list.removeAll(device_list);
       if (full_device_list.size() == 0) {
-        System.err.println("remains zero unused device");
-        System.exit(-1);
+        // reuse old device, picked the device has smallest mount_count
+        device = getDeviceWithMinCount(device_count);
+        if (device == "") {
+          throw new SQLException();
+        }
+        count = (Integer)device_count.get(device) + 1;
+        sql = "UPDATE devices SET mount_count = " + count + " WHERE device = '" + device + "'\n";
+      } else {
+        device = full_device_list.get(0);
+        count = 1;
+        sql = "INSERT OR IGNORE INTO devices(device, mount_count) VALUES('" + device + "', " + count + ")\n";
       }
-      device = full_device_list.get(0);
 
-      sql = "INSERT OR IGNORE INTO devices(device) VALUES('" + device + "')\n";
+      System.out.println(sql);
 
       stmt.executeUpdate(sql);
       conn.close();
@@ -113,27 +125,46 @@ public class PersistentMemoryMetaHandler {
     new File(url).delete();
   }
 
+  private String getDeviceWithMinCount(HashMap<String, Integer> device_count_map) {
+    String device = "";
+    int count = -1;
+    for (Map.Entry<String, Integer> entry : device_count_map.entrySet()) {
+      if (count == -1 || entry.getValue() < count) {
+        device = entry.getKey();
+        count = entry.getValue();
+      }
+    }
+    return device;
+  }
+
   public static void main(String[] args) {
     PersistentMemoryMetaHandler pmMetaHandler = new PersistentMemoryMetaHandler("/tmp/");
-    /*System.out.println("create table");
-    pmMetaHandler.createTable();*/
+    String dev;
     /*System.out.println("insert record");
     pmMetaHandler.insertRecord("shuffle_0_1_0", "/dev/dax0.0");
     pmMetaHandler.insertRecord("shuffle_0_2_0", "/dev/dax0.0");
     pmMetaHandler.insertRecord("shuffle_0_3_0", "/dev/dax1.0");
     pmMetaHandler.insertRecord("shuffle_0_4_0", "/dev/dax1.0");
     */
-    System.out.println("get shuffle device");
+    /*System.out.println("get shuffle device");
     String dev = pmMetaHandler.getShuffleDevice("shuffle_0_85_0");
     System.out.println("shuffle_0_85_0 uses device: " + dev);
-    
-    /*ArrayList<String> device_list = new ArrayList<String>();
+    */
+    ArrayList<String> device_list = new ArrayList<String>();
     device_list.add("/dev/dax0.0");
     device_list.add("/dev/dax1.0");
     device_list.add("/dev/dax2.0");
     device_list.add("/dev/dax3.0");
-    System.out.println("get unused device");
+
     dev = pmMetaHandler.getUnusedDevice(device_list);
-    System.out.println("get currently unused device: " + dev);*/
+    dev = pmMetaHandler.getUnusedDevice(device_list);
+    dev = pmMetaHandler.getUnusedDevice(device_list);
+    dev = pmMetaHandler.getUnusedDevice(device_list);
+
+    dev = pmMetaHandler.getUnusedDevice(device_list);
+    dev = pmMetaHandler.getUnusedDevice(device_list);
+    dev = pmMetaHandler.getUnusedDevice(device_list);
+    dev = pmMetaHandler.getUnusedDevice(device_list);
   }
+
 }

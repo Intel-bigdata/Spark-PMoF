@@ -117,7 +117,7 @@ public:
     bool stop;
     const char* dev;
     WorkQueue<void*> request_queue;
-    PMPool(const char* dev, int maxStage, int maxMap);
+    PMPool(const char* dev, int maxStage, int maxMap, long size);
     ~PMPool();
     long getRootAddr();
     long setPartition(int partitionNum, int stageId, int mapId, int partitionId, long size, char* data, bool clean);
@@ -166,7 +166,7 @@ public:
     long getResult();
 };
 
-PMPool::PMPool(const char* dev, int maxStage, int maxMap):
+PMPool::PMPool(const char* dev, int maxStage, int maxMap, long size):
     maxStage(maxStage),
     maxMap(maxMap),
     stop(false),
@@ -175,12 +175,17 @@ PMPool::PMPool(const char* dev, int maxStage, int maxMap):
 
   const char *pool_layout_name = "pmem_spark_shuffle";
   cout << "PMPOOL is " << dev << endl;
+  // if this is a fsdax device
+  // we need to create 
+  // if this is a devdax device
+
   pmpool = pmemobj_open(dev, pool_layout_name);
   if (pmpool == NULL) {
-      pmpool = pmemobj_create(dev, pool_layout_name, 0, S_IRUSR | S_IWUSR);
+      cout << "Failed to open dev, try to create, errmsg: " << pmemobj_errormsg() << endl; 
+      pmpool = pmemobj_create(dev, pool_layout_name, size, S_IRUSR | S_IWUSR);
   }
   if (pmpool == NULL) {
-      cerr << "Failed to open pool " << pmemobj_errormsg() << endl; 
+      cerr << "Failed to create pool, kill process, errmsg: " << pmemobj_errormsg() << endl; 
       exit(-1);
   }
 
