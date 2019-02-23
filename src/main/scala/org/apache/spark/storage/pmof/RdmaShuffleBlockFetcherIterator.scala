@@ -180,7 +180,7 @@ final class RdmaShuffleBlockFetcherIterator(
     val rdmaTransferService = shuffleClient.asInstanceOf[RdmaTransferService]
 
     val blockFetchingReadCallback = new ReadCallback {
-      def onSuccess(blockIndex: Int, shuffleBuffer: ShuffleBuffer, f: Int => Unit): Unit = {
+      def onSuccess(shuffleBuffer: ShuffleBuffer, f: Int => Unit): Unit = {
         if (!isZombie) {
           RdmaShuffleBlockFetcherIterator.this.synchronized {
             partitionNums -= 1
@@ -192,7 +192,7 @@ final class RdmaShuffleBlockFetcherIterator(
         }
       }
 
-      override def onFailure(blockIndex: Int, e: Throwable): Unit = {
+      override def onFailure(e: Throwable): Unit = {
         results.put(FailureFetchResult(BlockId(shuffleBlockIdName), blockManagerId, e))
       }
     }

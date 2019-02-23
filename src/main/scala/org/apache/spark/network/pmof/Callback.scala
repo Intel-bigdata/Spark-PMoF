@@ -3,8 +3,8 @@ package org.apache.spark.network.pmof
 import scala.collection.mutable.ArrayBuffer
 
 trait ReadCallback {
-  def onSuccess(blockIndex: Int, buffer: ShuffleBuffer, f: (Int) => Unit): Unit
-  def onFailure(blockIndex: Int, e: Throwable): Unit
+  def onSuccess(buffer: ShuffleBuffer, f: (Int) => Unit): Unit
+  def onFailure(e: Throwable): Unit
 }
 
 trait ReceivedCallback {
