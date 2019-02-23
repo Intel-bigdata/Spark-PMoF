@@ -2,7 +2,7 @@ package org.apache.spark.network.pmof
 
 import java.nio.ByteBuffer
 import java.util.Random
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 
 import org.apache.spark.network.BlockDataManager
 import org.apache.spark.network.shuffle.{BlockFetchingListener, TempFileManager}
@@ -13,13 +13,14 @@ import org.apache.spark.{SparkConf, SparkEnv}
 
 import scala.collection.mutable
 
-class RdmaTransferService(conf: SparkConf, val shuffleManager: PmofShuffleManager, val hostname: String, var port: Int, val supportRma: Boolean) extends TransferService {
+class RdmaTransferService(conf: SparkConf, val shuffleManager: PmofShuffleManager, val hostname: String,
+                          var port: Int, val supportRma: Boolean) extends TransferService {
   final var server: RdmaServer = _
   final private var recvHandler: ServerRecvHandler = _
   final private var connectHandler: ServerConnectHandler = _
   final private var clientFactory: RdmaClientFactory = _
   private var appId: String = _
-  private var nextReqId: AtomicInteger = _
+  private var nextReqId: AtomicLong = _
   final val metadataResolver: MetadataResolver = this.shuffleManager.metadataResolver
 
   private val serializer = new JavaSerializer(conf)
@@ -31,8 +32,10 @@ class RdmaTransferService(conf: SparkConf, val shuffleManager: PmofShuffleManage
                            blockFetchingListener: BlockFetchingListener,
                            tempFileManager: TempFileManager): Unit = {}
 
-  def fetchBlock(reqHost: String, reqPort: Int, rmaAddress: Long, rmaLength: Int, rmaRkey: Long, localAddress: Int, shuffleBuffer: ShuffleBuffer, rdmaClient: RdmaClient, callback: ReadCallback): Unit = {
-    rdmaClient.read(shuffleBuffer, 0, rmaLength, rmaAddress, rmaRkey, localAddress, callback)
+  def fetchBlock(reqHost: String, reqPort: Int, rmaAddress: Long, rmaLength: Int,
+                 rmaRkey: Long, localAddress: Int, shuffleBuffer: ShuffleBuffer,
+                 rdmaClient: RdmaClient, callback: ReadCallback): Unit = {
+    rdmaClient.read(shuffleBuffer, rmaLength, rmaAddress, rmaRkey, localAddress, callback)
   }
 
   def fetchBlockInfo(blockIds: Array[BlockId], receivedCallback: ReceivedCallback): Unit = {
@@ -40,8 +43,10 @@ class RdmaTransferService(conf: SparkConf, val shuffleManager: PmofShuffleManage
     metadataResolver.fetchBlockInfo(shuffleBlockIds, receivedCallback)
   }
 
-  def syncBlocksInfo(host: String, port: Int, byteBuffer: ByteBuffer, msgType: Byte, callback: ReceivedCallback): Unit = {
-    clientFactory.createClient(shuffleManager, host, port, supportRma = false).send(byteBuffer, nextReqId.getAndIncrement(), 0, msgType, callback, isDeferred = false)
+  def syncBlocksInfo(host: String, port: Int, byteBuffer: ByteBuffer, msgType: Byte,
+                     callback: ReceivedCallback): Unit = {
+    clientFactory.createClient(shuffleManager, host, port, supportRma = false).
+      send(byteBuffer, nextReqId.getAndIncrement(), msgType, callback, isDeferred = false)
   }
 
   def getClient(reqHost: String, reqPort: Int): RdmaClient = {
@@ -71,7 +76,7 @@ class RdmaTransferService(conf: SparkConf, val shuffleManager: PmofShuffleManage
     this.server.start()
     this.port = server.port
     val random = new Random().nextInt(Integer.MAX_VALUE)
-    this.nextReqId = new AtomicInteger(random)
+    this.nextReqId = new AtomicLong(random)
   }
 
   override def init(blockDataManager: BlockDataManager): Unit = {}
@@ -83,21 +88,26 @@ object RdmaTransferService {
   final val CHUNKSIZE: Int = conf.getInt("spark.shuffle.pmof.chunk_size", 4096*3)
   final val driverHost: String = conf.get("spark.driver.rhost", defaultValue = "172.168.0.43")
   final val driverPort: Int = conf.getInt("spark.driver.rport", defaultValue = 61000)
-  val shuffleNodes: Array[Array[String]] = conf.get("spark.shuffle.pmof.node", defaultValue = "").split(",").map(_.split("-"))
+  val shuffleNodes: Array[Array[String]] =
+    conf.get("spark.shuffle.pmof.node", defaultValue = "").split(",").map(_.split("-"))
   val shuffleNodesMap: mutable.Map[String, String] = new mutable.HashMap[String, String]()
   for (array <- shuffleNodes) {
     shuffleNodesMap.put(array(0), array(1))
   }
   private val initialized = new AtomicBoolean(false)
   private var transferService: RdmaTransferService = _
-  def getTransferServiceInstance(blockManager: BlockManager, shuffleManager: PmofShuffleManager = null, isDriver: Boolean = false): RdmaTransferService = {
+  def getTransferServiceInstance(blockManager: BlockManager, shuffleManager: PmofShuffleManager = null,
+                                 isDriver: Boolean = false): RdmaTransferService = {
     if (!initialized.get()) {
       RdmaTransferService.this.synchronized {
         if (initialized.get()) return transferService
         if (isDriver) {
-          transferService = new RdmaTransferService(conf, shuffleManager, driverHost, driverPort, false)
+          transferService =
+            new RdmaTransferService(conf, shuffleManager, driverHost, driverPort, false)
         } else {
-          transferService = new RdmaTransferService(conf, shuffleManager, shuffleNodesMap(blockManager.shuffleServerId.host), 0, false)
+          transferService =
+            new RdmaTransferService(conf, shuffleManager, shuffleNodesMap(blockManager.shuffleServerId.host),
+              0, false)
         }
         transferService.init()
         initialized.set(true)

@@ -18,15 +18,18 @@ class RdmaClient(conf: SparkConf, val shuffleManager: PmofShuffleManager, addres
     SINGLE_BUFFER_SIZE = RdmaTransferService.CHUNKSIZE
     BUFFER_NUM = conf.getInt("spark.shuffle.pmof.client_buffer_nums", 16)
   }
-  final val eqService = new EqService(address, port.toString, BUFFER_NUM, false)
-  final val cqService = new CqService(eqService, 1, eqService.getNativeHandle)
+  final val eqService = new EqService(address, port.toString, 1, BUFFER_NUM, false).init()
+  final val cqService = new CqService(eqService, eqService.getNativeHandle).init()
+
   final val connectHandler = new ClientConnectHandler(this)
   final val recvHandler = new ClientRecvHandler(this)
   final val readHandler = new ClientReadHandler(this)
   final val started: AtomicBoolean = new AtomicBoolean(false)
 
-  val outstandingReceiveFetches: ConcurrentHashMap[Int, ReceivedCallback] = new ConcurrentHashMap[Int, ReceivedCallback]()
-  val outstandingReadFetches: ConcurrentHashMap[Int, (Int, ReadCallback)] = new ConcurrentHashMap[Int, (Int, ReadCallback)]()
+  val outstandingReceiveFetches: ConcurrentHashMap[Long, ReceivedCallback] =
+    new ConcurrentHashMap[Long, ReceivedCallback]()
+  val outstandingReadFetches: ConcurrentHashMap[Int, ReadCallback] =
+    new ConcurrentHashMap[Int, ReadCallback]()
 
   val shuffleBufferMap: ConcurrentHashMap[Int, ShuffleBuffer] = new ConcurrentHashMap[Int, ShuffleBuffer]()
 
@@ -36,14 +39,8 @@ class RdmaClient(conf: SparkConf, val shuffleManager: PmofShuffleManager, addres
   private val deferredReadList = new LinkedBlockingDeque[ClientDeferredRead]()
 
   def init(): Unit = {
-    for (i <- 0 until BUFFER_NUM) {
-      val sendBuffer = ByteBuffer.allocateDirect(SINGLE_BUFFER_SIZE)
-      eqService.setSendBuffer(sendBuffer, SINGLE_BUFFER_SIZE, i)
-    }
-    for (i <- 0 until BUFFER_NUM * 2) {
-      val recvBuffer = ByteBuffer.allocateDirect(SINGLE_BUFFER_SIZE)
-      eqService.setRecvBuffer(recvBuffer, SINGLE_BUFFER_SIZE, i)
-    }
+    eqService.initBufferPool(BUFFER_NUM, SINGLE_BUFFER_SIZE, BUFFER_NUM*2)
+
     cqService.addExternalEvent(new ExternalHandler {
       override def handle(): Unit = {
         handleDeferredReq()
@@ -57,8 +54,8 @@ class RdmaClient(conf: SparkConf, val shuffleManager: PmofShuffleManager, addres
     eqService.setRecvCallback(recvHandler)
     eqService.setReadCallback(readHandler)
 
+    eqService.start()
     cqService.start()
-    eqService.start(1)
     eqService.waitToConnected()
 
     started.set(true)
@@ -88,53 +85,52 @@ class RdmaClient(conf: SparkConf, val shuffleManager: PmofShuffleManager, addres
       val deferredReq = deferredReqList.pollFirst()
       val byteBuffer = deferredReq.byteBuffer
       val seq = deferredReq.seq
-      val blockIndex = deferredReq.blockIndex
       val msgType = deferredReq.msgType
       val callback = deferredReq.callback
-      send(byteBuffer, seq, blockIndex, msgType, callback, isDeferred = true)
+      send(byteBuffer, seq, msgType, callback, isDeferred = true)
     }
   }
 
   def handleDeferredRead(): Unit = {
     if (!deferredReadList.isEmpty) {
       val deferredRead = deferredReadList.pollFirst()
-      read(deferredRead.shuffleBuffer, deferredRead.blockIndex, deferredRead.reqSize, deferredRead.rmaAddress, deferredRead.rmaRkey, deferredRead.localAddress, null, isDeferred = true)
+      read(deferredRead.shuffleBuffer, deferredRead.reqSize, deferredRead.rmaAddress, deferredRead.rmaRkey, deferredRead.localAddress, null, isDeferred = true)
     }
   }
 
-  def read(shuffleBuffer: ShuffleBuffer, blockIndex: Int,
-           reqSize: Int, rmaAddress: Long, rmaRkey: Long, localAddress: Int,
+  def read(shuffleBuffer: ShuffleBuffer, reqSize: Int,
+           rmaAddress: Long, rmaRkey: Long, localAddress: Int,
            callback: ReadCallback, isDeferred: Boolean = false): Unit = {
     if (!isDeferred) {
-      outstandingReadFetches.putIfAbsent(shuffleBuffer.getRdmaBufferId, (blockIndex, callback))
+      outstandingReadFetches.putIfAbsent(shuffleBuffer.getRdmaBufferId, callback)
       shuffleBufferMap.putIfAbsent(shuffleBuffer.getRdmaBufferId, shuffleBuffer)
     }
     val ret = con.read(shuffleBuffer.getRdmaBufferId, localAddress, reqSize, rmaAddress, rmaRkey)
     if (ret == -11) {
       if (isDeferred) {
-        deferredReadList.addFirst(new ClientDeferredRead(shuffleBuffer, blockIndex, reqSize, rmaAddress, rmaRkey, localAddress))
+        deferredReadList.addFirst(new ClientDeferredRead(shuffleBuffer, reqSize, rmaAddress, rmaRkey, localAddress))
       } else {
-        deferredReadList.addLast(new ClientDeferredRead(shuffleBuffer, blockIndex, reqSize, rmaAddress, rmaRkey, localAddress))
+        deferredReadList.addLast(new ClientDeferredRead(shuffleBuffer, reqSize, rmaAddress, rmaRkey, localAddress))
       }
     }
   }
 
-  def send(byteBuffer: ByteBuffer, seq: Int, blockIndex: Int, msgType: Byte,
+  def send(byteBuffer: ByteBuffer, seq: Long, msgType: Byte,
            callback: ReceivedCallback, isDeferred: Boolean): Unit = {
     assert(con != null)
     if (callback != null) {
       outstandingReceiveFetches.putIfAbsent(seq, callback)
     }
-    val sendBuffer = this.con.getSendBuffer(false)
+    val sendBuffer = this.con.takeSendBuffer(false)
     if (sendBuffer == null) {
       if (isDeferred) {
-        deferredReqList.addFirst(new ClientDeferredReq(byteBuffer, seq, blockIndex, msgType, callback))
+        deferredReqList.addFirst(new ClientDeferredReq(byteBuffer, seq, msgType, callback))
       } else {
-        deferredReqList.addLast(new ClientDeferredReq(byteBuffer, seq, blockIndex, msgType, callback))
+        deferredReqList.addLast(new ClientDeferredReq(byteBuffer, seq, msgType, callback))
       }
       return
     }
-    sendBuffer.put(byteBuffer, msgType, 0, seq)
+    sendBuffer.put(byteBuffer, msgType, seq)
     con.send(sendBuffer.remaining(), sendBuffer.getRdmaBufferId)
   }
 
@@ -170,14 +166,13 @@ class ClientReadHandler(client: RdmaClient) extends Handler {
     client.outstandingReadFetches.remove(v1)
   }
   override def handle(con: Connection, rdmaBufferId: Int, blockBufferSize: Int): Unit = {
-    val blockIndex = client.outstandingReadFetches.get(rdmaBufferId)._1
-    val callback = client.outstandingReadFetches.get(rdmaBufferId)._2
+    val callback = client.outstandingReadFetches.get(rdmaBufferId)
     val shuffleBuffer = client.shuffleBufferMap.get(rdmaBufferId)
-    callback.onSuccess(blockIndex, shuffleBuffer, fun)
+    callback.onSuccess(shuffleBuffer, fun)
   }
 }
 
-class ClientDeferredReq(val byteBuffer: ByteBuffer, val seq: Int, val blockIndex: Int, val msgType: Byte,
+class ClientDeferredReq(val byteBuffer: ByteBuffer, val seq: Long, val msgType: Byte,
                         val callback: ReceivedCallback) {}
 
-class ClientDeferredRead(val shuffleBuffer: ShuffleBuffer, val blockIndex: Int, val reqSize: Int, val rmaAddress: Long, val rmaRkey: Long, val localAddress: Int) {}
+class ClientDeferredRead(val shuffleBuffer: ShuffleBuffer, val reqSize: Int, val rmaAddress: Long, val rmaRkey: Long, val localAddress: Int) {}

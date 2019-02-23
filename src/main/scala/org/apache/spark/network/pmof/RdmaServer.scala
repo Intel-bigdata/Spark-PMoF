@@ -24,27 +24,21 @@ class RdmaServer(conf: SparkConf, val shuffleManager: PmofShuffleManager, addres
     SINGLE_BUFFER_SIZE = RdmaTransferService.CHUNKSIZE
     BUFFER_NUM = conf.getInt("spark.shuffle.pmof.server_buffer_nums", 256)
   }
+
   final val workers = conf.getInt("spark.shuffle.pmof.server_pool_size", 1)
-  final val maxConnections = conf.getInt("spark.shuffle.pmof.max_connection_nums", defaultValue = 20)
-  final val eqService = new EqService(address, port.toString, BUFFER_NUM, true)
-  final val cqService = new CqService(eqService, workers, eqService.getNativeHandle)
+
+  final val eqService = new EqService(address, port.toString, workers, BUFFER_NUM, true).init()
+  final val cqService = new CqService(eqService, eqService.getNativeHandle).init()
 
   val conList = new util.ArrayList[Connection]()
 
   def init(): Unit = {
-    for (i <- 0 until BUFFER_NUM*maxConnections) {
-      val sendBuffer = ByteBuffer.allocateDirect(SINGLE_BUFFER_SIZE)
-      eqService.setSendBuffer(sendBuffer, SINGLE_BUFFER_SIZE, i)
-    }
-    for (i <- 0 until BUFFER_NUM*maxConnections*2) {
-      val recvBuffer = ByteBuffer.allocateDirect(SINGLE_BUFFER_SIZE)
-      eqService.setRecvBuffer(recvBuffer, SINGLE_BUFFER_SIZE, i)
-    }
+    eqService.initBufferPool(BUFFER_NUM, SINGLE_BUFFER_SIZE, BUFFER_NUM*2)
   }
 
   def start(): Unit = {
+    eqService.start()
     cqService.start()
-    eqService.start(1)
   }
 
   def stop(): Unit = {
@@ -88,8 +82,8 @@ class ServerRecvHandler(server: RdmaServer, appid: String, serializer: Serialize
   private final val deferredBufferList = new LinkedBlockingDeque[ServerDeferredReq]()
   private final val byteBufferTmp = ByteBuffer.allocate(4)
 
-  def sendMetadata(con: Connection, byteBuffer: ByteBuffer, msgType: Byte, seq: Int, isDeferred: Boolean): Unit = {
-    val sendBuffer = con.getSendBuffer(false)
+  def sendMetadata(con: Connection, byteBuffer: ByteBuffer, msgType: Byte, seq: Long, isDeferred: Boolean): Unit = {
+    val sendBuffer = con.takeSendBuffer(false)
     if (sendBuffer == null) {
       if (isDeferred) {
         deferredBufferList.addFirst(new ServerDeferredReq(con, byteBuffer, msgType, seq))
@@ -98,7 +92,7 @@ class ServerRecvHandler(server: RdmaServer, appid: String, serializer: Serialize
       }
       return
     }
-    sendBuffer.put(byteBuffer, msgType, 0, seq)
+    sendBuffer.put(byteBuffer, msgType, seq)
     con.send(sendBuffer.remaining(), sendBuffer.getRdmaBufferId)
   }
 
@@ -134,4 +128,4 @@ class ServerConnectHandler(server: RdmaServer) extends Handler {
   }
 }
 
-class ServerDeferredReq(val con: Connection, val byteBuffer: ByteBuffer, val msgType: Byte, val seq: Int) {}
+class ServerDeferredReq(val con: Connection, val byteBuffer: ByteBuffer, val msgType: Byte, val seq: Long) {}
