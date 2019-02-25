@@ -7,7 +7,7 @@ public class PersistentMemoryPool {
     static {
         System.load("/usr/local/lib/libjnipmdk.so");
     }
-    private static native long nativeOpenDevice(String path, int maxStage, int maxMap);
+    private static native long nativeOpenDevice(String path, int maxStage, int maxMap, long size);
     private static native long nativeSetPartition(long deviceHandler, int numPartitions, int stageId, int mapId, int partutionId, long size, byte[] data, boolean clean);
     private static native byte[] nativeGetPartition(long deviceHandler, int stageId, int mapId, int partutionId);
     private static native long nativeGetRoot(long deviceHandler);
@@ -15,7 +15,7 @@ public class PersistentMemoryPool {
   
     //private static final Logger logger = LoggerFactory.getLogger(PersistentMemoryPool.class);
     //static final int HEADER_SIZE = 8;
-    private static final long DEFAULT_PMPOOL_SIZE = 26843545600L;
+    private static final long DEFAULT_PMPOOL_SIZE = 0L;
 
     private String device;
     private long deviceHandler;
@@ -27,7 +27,7 @@ public class PersistentMemoryPool {
         long pool_size) {
       this.device = path; 
       pool_size = pool_size == -1 ? DEFAULT_PMPOOL_SIZE : pool_size;
-      this.deviceHandler = nativeOpenDevice(path, max_stages_num, max_shuffles_num);
+      this.deviceHandler = nativeOpenDevice(path, max_stages_num, max_shuffles_num, pool_size);
     }
 
     public long setPartition(int partitionNum, int stageId, int shuffleId, int partitionId, long partitionLength, byte[] data, boolean clean) {

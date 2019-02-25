@@ -25,6 +25,9 @@ import org.apache.spark.network.pmof.RdmaTransferService
 import org.apache.spark.storage.pmof.PersistentMemoryMetaHandler
 import org.apache.spark.SparkEnv
 import scala.collection.JavaConverters._
+import java.util.UUID
+import java.nio.file.{Files, Paths}
+
 
 private[spark] class PersistentMemoryHandler(
     val root_dir: String,
@@ -32,7 +35,7 @@ private[spark] class PersistentMemoryHandler(
     val shuffleId: String,
     val maxStages: Int = 1000,
     val maxShuffles: Int = 1000,
-    val poolSize: Long = -1) extends Logging {
+    var poolSize: Long = -1) extends Logging {
   // need to use a locked file to get which pmem device should be used.
   val pmMetaHandler: PersistentMemoryMetaHandler = new PersistentMemoryMetaHandler(root_dir); 
   var device: String = pmMetaHandler.getShuffleDevice(shuffleId);
@@ -41,6 +44,15 @@ private[spark] class PersistentMemoryHandler(
     val path_array_list = new java.util.ArrayList[String](path_list.asJava)
     device = pmMetaHandler.getUnusedDevice(path_array_list);
     logInfo("This a new shuffleBlock, find an unused device:" + device + ", numMaps of this stage is " + maxShuffles)
+
+    val dev = Paths.get(device)
+    if (Files.isDirectory(dev)) {
+      // this is fsdax, add a subfile
+      device += "/shuffle_block_" + UUID.randomUUID().toString()
+      logInfo("This is a fsdax, filename:" + device)
+    } else {
+      poolSize = 0
+    }
   } else {
     logInfo("This a recently opened shuffleBlock, use the original device:" + device + ", numMaps of this stage is " + maxShuffles)
   }
@@ -70,7 +82,7 @@ private[spark] class PersistentMemoryHandler(
   }
 
   def close(): Unit = synchronized {
-    pmpool.close() 
+    pmpool.close()
     pmMetaHandler.remove()
   }
 
