@@ -18,16 +18,15 @@
 package org.apache.spark.storage.pmof
 
 import org.apache.spark.internal.Logging
-import java.nio.ByteBuffer
 
-import org.apache.spark.network.buffer.{ManagedBuffer, NioManagedBuffer}
 import org.apache.spark.network.pmof.RdmaTransferService
-import org.apache.spark.storage.pmof.PersistentMemoryMetaHandler
 import org.apache.spark.SparkEnv
-import scala.collection.JavaConverters._
-import java.util.UUID
-import java.nio.file.{Files, Paths}
 
+import scala.collection.JavaConverters._
+import java.nio.file.{Files, Paths}
+import java.util.UUID
+import org.apache.spark.network.buffer.ManagedBuffer
+import org.apache.spark.storage.pmof.PmemManagedBuffer
 
 private[spark] class PersistentMemoryHandler(
     val root_dir: String,
@@ -37,12 +36,12 @@ private[spark] class PersistentMemoryHandler(
     val maxShuffles: Int = 1000,
     var poolSize: Long = -1) extends Logging {
   // need to use a locked file to get which pmem device should be used.
-  val pmMetaHandler: PersistentMemoryMetaHandler = new PersistentMemoryMetaHandler(root_dir); 
-  var device: String = pmMetaHandler.getShuffleDevice(shuffleId);
+  val pmMetaHandler: PersistentMemoryMetaHandler = new PersistentMemoryMetaHandler(root_dir)
+  var device: String = pmMetaHandler.getShuffleDevice(shuffleId)
   if(device == "") {
     //this shuffleId haven't been written before, choose a new device
     val path_array_list = new java.util.ArrayList[String](path_list.asJava)
-    device = pmMetaHandler.getUnusedDevice(path_array_list);
+    device = pmMetaHandler.getUnusedDevice(path_array_list)
     logInfo("This a new shuffleBlock, find an unused device:" + device + ", numMaps of this stage is " + maxShuffles)
 
     val dev = Paths.get(device)
@@ -68,17 +67,48 @@ private[spark] class PersistentMemoryHandler(
     pmMetaHandler.insertRecord(shuffleId, device);
   }
 
-  def setPartition(numPartitions: Int, stageId: Int, shuffleId: Int, partitionId: Int, data: Array[Byte], clean: Boolean): Long = {
+  def getBlockDetail(blockId: String): (String, Int, Int, Int) = {
+    val shuffleBlockIdPattern = raw"shuffle_(\d+)_(\d+)_(\d+)".r
+    val spilledBlockIdPattern = raw"reduce_spill_(\d+)_(\d+)".r
+    blockId match {
+      case shuffleBlockIdPattern(stageId, shuffleId, partitionId) => ("shuffle", stageId.toInt, shuffleId.toInt, partitionId.toInt)
+      case spilledBlockIdPattern(stageId, partitionId) => ("reduce_spill", stageId.toInt, 0, partitionId.toInt)
+    }
+  }
+
+  def setPartition(numPartitions: Int, blockId: String, data: Array[Byte], clean: Boolean): Long = {
     if (data.size > 0) {
-      pmpool.setPartition(numPartitions, stageId, shuffleId, partitionId, data.size, data, clean)
+      val (blockType, stageId, shuffleId, partitionId) = getBlockDetail(blockId)
+      var ret_addr: Long = 0
+      if (blockType == "shuffle") {
+        ret_addr = pmpool.setMapPartition(numPartitions, stageId, shuffleId, partitionId, data.size, data, clean)
+      } else if (blockType == "reduce_spill") {
+        ret_addr = pmpool.setReducePartition(1000/*TODO: should be incrementable*/, stageId, partitionId, data.size, data, clean)
+      }
+      ret_addr
     } else {
       -1
     }
   }
 
-  def getPartition(stageId: Int, shuffleId: Int, partitionId: Int): ManagedBuffer = {
-    var data = pmpool.getPartition(stageId, shuffleId, partitionId)
-    new NioManagedBuffer(ByteBuffer.wrap(data))
+  def getPartition(stageId: Int, shuffleId: Int, partitionId: Int): Array[Byte] = {
+    pmpool.getMapPartition(stageId, shuffleId, partitionId)
+  }
+
+  def getPartition(blockId: String): Array[Byte] = {
+    val (blockType, stageId, shuffleId, partitionId) = getBlockDetail(blockId)
+    if (blockType == "shuffle") {
+      pmpool.getMapPartition(stageId, shuffleId, partitionId)
+    } else if (blockType == "reduce_spill") {
+      logInfo("getReducePartition: partitionId is " + partitionId)
+      pmpool.getReducePartition(stageId, shuffleId, partitionId)
+    } else {
+      new Array[Byte](0)
+    }
+  }
+
+  def getPartitionManagedBuffer(stageId: Int, shuffleId: Int, partitionId: Int): ManagedBuffer = {
+    new PmemManagedBuffer(pmpool, stageId, shuffleId, partitionId)
   }
 
   def close(): Unit = synchronized {

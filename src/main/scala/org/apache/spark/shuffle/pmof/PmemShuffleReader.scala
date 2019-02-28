@@ -1,41 +1,50 @@
-package org.apache.spark.shuffle.pmof
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-import java.util.UUID
+package org.apache.spark.shuffle
 
 import org.apache.spark._
-import org.apache.spark.internal.{Logging, config}
-import org.apache.spark.network.pmof.RdmaTransferService
+import org.apache.spark.internal.{config, Logging}
 import org.apache.spark.serializer.SerializerManager
-import org.apache.spark.shuffle.{BaseShuffleHandle, ShuffleReader}
-import org.apache.spark.storage.{BlockManager, TempShuffleBlockId, BlockId}
-import org.apache.spark.storage.pmof._
+import org.apache.spark.storage.{BlockManager, ShuffleBlockFetcherIterator}
 import org.apache.spark.util.CompletionIterator
-import org.apache.spark.util.collection.ExternalSorter
 import org.apache.spark.util.collection.pmof.PmemExternalSorter
 
 /**
-  * Fetches and reads the partitions in range [startPartition, endPartition) from a shuffle by
-  * requesting them from other nodes' block stores.
-  */
-private[spark] class RdmaShuffleReader[K, C](
-          handle: BaseShuffleHandle[K, _, C],
-          startPartition: Int,
-          endPartition: Int,
-          context: TaskContext,
-          serializerManager: SerializerManager = SparkEnv.get.serializerManager,
-          blockManager: BlockManager = SparkEnv.get.blockManager,
-          mapOutputTracker: MapOutputTracker = SparkEnv.get.mapOutputTracker)
+ * Fetches and reads the partitions in range [startPartition, endPartition) from a shuffle by
+ * requesting them from other nodes' block stores.
+ */
+private[spark] class PmemShuffleReader[K, C](
+    handle: BaseShuffleHandle[K, _, C],
+    startPartition: Int,
+    endPartition: Int,
+    context: TaskContext,
+    serializerManager: SerializerManager = SparkEnv.get.serializerManager,
+    blockManager: BlockManager = SparkEnv.get.blockManager,
+    mapOutputTracker: MapOutputTracker = SparkEnv.get.mapOutputTracker)
   extends ShuffleReader[K, C] with Logging {
 
   private val dep = handle.dependency
-  val serializerInstance = dep.serializer.newInstance()
-  val enable_pmem: Boolean = SparkEnv.get.conf.getBoolean("spark.shuffle.pmof.enable_pmem", defaultValue = true)
 
   /** Read the combined key-values for this reduce task */
   override def read(): Iterator[Product2[K, C]] = {
-    val wrappedStreams: RdmaShuffleBlockFetcherIterator = new RdmaShuffleBlockFetcherIterator(
+    val wrappedStreams = new ShuffleBlockFetcherIterator(
       context,
-      RdmaTransferService.getTransferServiceInstance(blockManager),
+      blockManager.shuffleClient,
       blockManager,
       mapOutputTracker.getMapSizesByExecutorId(handle.shuffleId, startPartition, endPartition),
       serializerManager.wrapStream,
@@ -44,11 +53,12 @@ private[spark] class RdmaShuffleReader[K, C](
       SparkEnv.get.conf.getInt("spark.reducer.maxReqsInFlight", Int.MaxValue),
       SparkEnv.get.conf.get(config.REDUCER_MAX_BLOCKS_IN_FLIGHT_PER_ADDRESS),
       SparkEnv.get.conf.get(config.MAX_REMOTE_BLOCK_SIZE_FETCH_TO_MEM),
-      SparkEnv.get.conf.getBoolean("spark.shuffle.detectCorrupt", defaultValue = true))
+      SparkEnv.get.conf.getBoolean("spark.shuffle.detectCorrupt", true))
 
+    val serializerInstance = dep.serializer.newInstance()
 
     // Create a key/value iterator for each stream
-    val recordIter = wrappedStreams.flatMap { case (_, wrappedStream) =>
+    val recordIter = wrappedStreams.flatMap { case (blockId, wrappedStream) =>
       // Note: the asKeyValueIterator below wraps a key/value iterator inside of a
       // NextIterator. The NextIterator makes sure that close() is called on the
       // underlying InputStream when all records have been read.
@@ -85,23 +95,28 @@ private[spark] class RdmaShuffleReader[K, C](
     }
 
     // Sort the output if there is a sort ordering defined.
-    dep.keyOrdering match {
+    val resultIter = dep.keyOrdering match {
       case Some(keyOrd: Ordering[K]) =>
-        if (enable_pmem == true) {
-          val sorter = new PmemExternalSorter[K, C, C](context, handle, ordering = Some(keyOrd), serializer = dep.serializer)
-          sorter.insertAll(aggregatedIter)
-          CompletionIterator[Product2[K, C], Iterator[Product2[K, C]]](sorter.iterator, sorter.stop())
-        } else {
-          val sorter =
-            new ExternalSorter[K, C, C](context, ordering = Some(keyOrd), serializer = dep.serializer)
-          sorter.insertAll(aggregatedIter)
-          context.taskMetrics().incMemoryBytesSpilled(sorter.memoryBytesSpilled)
-          context.taskMetrics().incDiskBytesSpilled(sorter.diskBytesSpilled)
-          context.taskMetrics().incPeakExecutionMemory(sorter.peakMemoryUsedBytes)
-          CompletionIterator[Product2[K, C], Iterator[Product2[K, C]]](sorter.iterator, sorter.stop())
-        }
+        // Create an ExternalSorter to sort the data.
+        val sorter =
+          new PmemExternalSorter[K, C, C](context, handle, ordering = Some(keyOrd), serializer = dep.serializer)
+        logInfo("call PmemExternalSorter.insertAll for shuffle_0_" + handle.shuffleId + "_[" + startPartition + "," + endPartition + "]" )
+        sorter.insertAll(aggregatedIter)
+        // Use completion callback to stop sorter if task was finished/cancelled.
+        context.addTaskCompletionListener(_ => {
+          sorter.stop()
+        })
+        CompletionIterator[Product2[K, C], Iterator[Product2[K, C]]](sorter.iterator, sorter.stop())
       case None =>
         aggregatedIter
+    }
+
+    resultIter match {
+      case _: InterruptibleIterator[Product2[K, C]] => resultIter
+      case _ =>
+        // Use another interruptible iterator here to support task cancellation as aggregator
+        // or(and) sorter may have consumed previous interruptible iterator.
+        new InterruptibleIterator[Product2[K, C]](context, resultIter)
     }
   }
 }
