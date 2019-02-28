@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap
 import org.apache.spark.internal.Logging
 import org.apache.spark.network.pmof.RdmaTransferService
 import org.apache.spark.shuffle._
+import org.apache.spark.shuffle.pmof._
 import org.apache.spark.shuffle.sort.{SerializedShuffleHandle, SerializedShuffleWriter, SortShuffleManager}
 import org.apache.spark.{ShuffleDependency, SparkConf, SparkEnv, TaskContext}
 
@@ -73,7 +74,7 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
       new RdmaShuffleReader(handle.asInstanceOf[BaseShuffleHandle[K, _, C]],
         startPartition, endPartition, context)
     } else {
-      new BlockStoreShuffleReader(
+      new PmemShuffleReader(
         handle.asInstanceOf[BaseShuffleHandle[K, _, C]], startPartition, endPartition, context)
     }
   }
@@ -93,7 +94,7 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
 
   override val shuffleBlockResolver: ShuffleBlockResolver = {
     if (enable_pmem)
-      new PersistentMemoryShuffleBlockResolver(conf)
+      new PmemShuffleBlockResolver(conf)
     else
       new IndexShuffleBlockResolver(conf)
   }

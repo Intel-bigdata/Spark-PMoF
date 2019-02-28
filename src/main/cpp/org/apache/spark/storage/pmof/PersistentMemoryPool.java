@@ -113,8 +113,9 @@ public class PersistentMemoryPool{
         System.loadLibrary("jnipmdk");
     }
         private static native long nativeOpenDevice(String path, int maxStage, int maxMap, int core_s, int core_e);
-        private static native int nativeSetPartition(long deviceHandler, int numPartitions, int stageId, int mapId, int partutionId, long size, byte[] data);
-        private static native byte[] nativeGetPartition(long deviceHandler, int stageId, int mapId, int partutionId);
+        private static native int nativeSetMapPartition(long deviceHandler, int numPartitions, int stageId, int mapId, int partutionId, long size, byte[] data);
+        private static native int nativeSetReducePartition(long deviceHandler, int numPartitions, int stageId, int partutionId, long size, byte[] data);
+        private static native byte[] nativeMapPartition(long deviceHandler, int stageId, int mapId, int partutionId);
         private static native int nativeCloseDevice(long deviceHandler);
 
     String device;
@@ -141,7 +142,7 @@ public class PersistentMemoryPool{
             }
             //System.out.println("Start set partition "+k+"_"+j+"_"+i);
             monitor.incSubmittedJobs();
-            nativeSetPartition(this.writerHandler, 10000, k, j, i++, this.block_size, this.bytes);
+            nativeSetMapPartition(this.writerHandler, 10000, k, j, i++, this.block_size, this.bytes);
             monitor.incCommittedJobs();
         }
     }

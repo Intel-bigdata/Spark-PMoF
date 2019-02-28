@@ -50,7 +50,7 @@ class MetadataResolver(conf: SparkConf) {
 
   val shuffleBlockMap = new ConcurrentHashMap[String, ArrayBuffer[ShuffleBlockInfo]]()
 
-  def commitPmemBlockInfo(shuffleId: Int, mapId: Int, dataAddressMap: Array[mutable.LinkedHashMap[Long, Int]], rkey: Long): Unit = {
+  def commitPmemBlockInfo(shuffleId: Int, mapId: Int, dataAddressMap: Array[ArrayBuffer[(Long, Int)]], rkey: Long): Unit = {
     val byteBuffer = ByteBuffer.allocate(map_serializer_buffer_size.toInt)
     val bos = new ByteBufferOutputStream(byteBuffer)
     var output: Output = null

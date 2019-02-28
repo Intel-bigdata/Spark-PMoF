@@ -17,18 +17,34 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_
 
 /*
  * Class:     lib_jni_pmdk
- * Method:    nativeSetPartition
+ * Method:    nativeSetMapPartition
  * Signature: (JIIIIJ[BZ)J
  */
-JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetPartition
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetMapPartition
   (JNIEnv *, jclass, jlong, jint, jint, jint, jint, jlong, jbyteArray, jboolean);
+
+/*
+ * Class:     lib_jni_pmdk
+ * Method:    nativeSetReducePartition
+ * Signature: (JIIIIJ[BZ)J
+ */
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetReducePartition
+  (JNIEnv *, jclass, jlong, jint, jint, jint, jlong, jbyteArray, jboolean);
 
 /*
  * Class:     lib_jni_pmdk
  * Method:    nativeGetPartition
  * Signature: (JIII)[B
  */
-JNIEXPORT jbyteArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetPartition
+JNIEXPORT jbyteArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetMapPartition
+  (JNIEnv *, jclass, jlong, jint, jint, jint);
+
+/*
+ * Class:     lib_jni_pmdk
+ * Method:    nativeGetPartition
+ * Signature: (JIII)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetReducePartition
   (JNIEnv *, jclass, jlong, jint, jint, jint);
 
 /*
