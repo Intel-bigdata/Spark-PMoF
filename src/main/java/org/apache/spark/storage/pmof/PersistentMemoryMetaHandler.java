@@ -1,6 +1,7 @@
 package org.apache.spark.storage.pmof;
  
 import java.sql.Connection;
+import org.sqlite.SQLiteConfig;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -50,7 +51,9 @@ public class PersistentMemoryMetaHandler {
     String sql = "INSERT OR IGNORE INTO metastore(shuffleId,device) VALUES('" + shuffleId + "','" + device + "')";
  
     try {
-      Connection conn = DriverManager.getConnection(url);
+      SQLiteConfig config = new SQLiteConfig();
+      config.setBusyTimeout("5000");
+      Connection conn = DriverManager.getConnection(url, config.toProperties());
       Statement stmt = conn.createStatement();
       stmt.executeUpdate(sql);
       conn.close();
