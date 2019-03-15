@@ -97,6 +97,7 @@ struct PartitionArray {
 
 struct PartitionArrayItem {
     TOID(struct PartitionBlock) first_block;
+    TOID(struct PartitionBlock) last_block;
     long partition_size;
 };
 
@@ -328,6 +329,7 @@ long PMPool::getPartition(
         partitionBlock = D_RO(partitionBlock)->next_block;
     }
 
+    //printf("getPartition length is %d\n", data_length);
     return data_length;
 }
 
@@ -427,11 +429,14 @@ void Request::setPartition() {
 
         TOID(struct PartitionBlock) *partitionBlock = &(D_RW(*partitionArrayItem)->first_block);
         if (set_clean == false) {
+            // jump to last block
             D_RW(*partitionArrayItem)->partition_size += size;
-            while(!TOID_IS_NULL(*partitionBlock)) {
+            *partitionBlock = D_RW(*partitionArrayItem)->last_block;
+            /*while(!TOID_IS_NULL(*partitionBlock)) {
                 *partitionBlock = D_RW(*partitionBlock)->next_block;
-            }
+            }*/
         } else {
+            //TODO: we should remove unused blocks
             D_RW(*partitionArrayItem)->partition_size = size;
         }
 
@@ -441,6 +446,7 @@ void Request::setPartition() {
         
         D_RW(*partitionBlock)->data_size = size;
         D_RW(*partitionBlock)->next_block = TOID_NULL(struct PartitionBlock);
+        D_RW(*partitionArrayItem)->last_block = *partitionBlock;
 
         data_addr = (char*)pmemobj_direct(D_RW(*partitionBlock)->data);
         //printf("setPartition data_addr: %p\n", data_addr);
