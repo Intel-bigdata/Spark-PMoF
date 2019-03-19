@@ -64,10 +64,6 @@ private[spark] class PmemExternalSorter[K, V, C](
     partitionBufferArray(partitionBufferArray.length - 1)
   }
 
-  override def insertAll(records: Iterator[Product2[K, V]]): Unit = {
-    super.insertAll(records)
-  }
-
   override protected[this] def spill(collection: WritablePartitionedPairCollection[K, C]): Unit = {
     val inMemoryIterator = collection.destructiveSortedWritablePartitionedIterator(comparator)
     spillMemoryIteratorToPmem(inMemoryIterator)

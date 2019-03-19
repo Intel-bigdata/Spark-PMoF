@@ -45,6 +45,23 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemory
     return data;
 }
 
+JNIEXPORT jlongArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetMapPartitionBlockInfo
+  (JNIEnv *env, jclass obj, jlong pmpool, jint stageId, jint mapId, jint partitionId) {
+    BlockInfo blockInfo;
+    int length = ((PMPool*)pmpool)->getMapPartitionBlockInfo(&blockInfo, stageId, mapId, partitionId);
+    if (length == 0) {
+      return env->NewLongArray(0);
+    }
+    jlongArray data = env->NewLongArray(length);
+    env->SetLongArrayRegion(data, 0, length, (jlong*)(blockInfo.data));
+    return data;
+}
+
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetMapPartitionSize
+  (JNIEnv *env, jclass obj, jlong pmpool, jint stageId, jint mapId, jint partitionId) {
+    return ((PMPool*)pmpool)->getMapPartitionSize(stageId, mapId, partitionId);
+  }
+
 JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeCloseDevice
   (JNIEnv *env, jclass obj, jlong pmpool) {
     delete (PMPool*)pmpool;

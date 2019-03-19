@@ -5,8 +5,9 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.network.buffer.ManagedBuffer
 import org.apache.spark.shuffle.IndexShuffleBlockResolver
 import org.apache.spark.storage.{BlockManager, ShuffleBlockId}
-import org.apache.spark.storage.pmof.PersistentMemoryHandler
+import org.apache.spark.storage.pmof.{PmemBlockObjectStream, PersistentMemoryHandler}
 import org.apache.spark.network.buffer.{ManagedBuffer, NioManagedBuffer}
+import org.apache.spark.storage.pmof.PmemManagedBuffer
 import java.nio.ByteBuffer
 
 private[spark] class PmemShuffleBlockResolver(
@@ -14,12 +15,12 @@ private[spark] class PmemShuffleBlockResolver(
     _blockManager: BlockManager = null)
   extends IndexShuffleBlockResolver(conf, _blockManager) with Logging {
   // create ShuffleHandler here, so multiple executors can share
+  var partitionBufferArray: Array[PmemBlockObjectStream] = _
 
   override def getBlockData(blockId: ShuffleBlockId): ManagedBuffer = {
     // return BlockId corresponding ManagedBuffer
     val persistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler
-    val data = persistentMemoryHandler.getPartition(blockId.shuffleId, blockId.mapId, blockId.reduceId)
-    new NioManagedBuffer(ByteBuffer.wrap(data))
+    persistentMemoryHandler.getPartitionManagedBuffer(blockId.shuffleId, blockId.mapId, blockId.reduceId)
   }
 
   override def stop() {

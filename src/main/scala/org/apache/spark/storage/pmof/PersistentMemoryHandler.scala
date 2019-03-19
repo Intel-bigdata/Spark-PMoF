@@ -25,6 +25,8 @@ import org.apache.spark.SparkEnv
 import scala.collection.JavaConverters._
 import java.nio.file.{Files, Paths}
 import java.util.UUID
+import org.apache.spark.network.buffer.ManagedBuffer
+import org.apache.spark.storage.pmof.PmemManagedBuffer
 
 private[spark] class PersistentMemoryHandler(
     val root_dir: String,
@@ -103,6 +105,10 @@ private[spark] class PersistentMemoryHandler(
     } else {
       new Array[Byte](0)
     }
+  }
+
+  def getPartitionManagedBuffer(stageId: Int, shuffleId: Int, partitionId: Int): ManagedBuffer = {
+    new PmemManagedBuffer(pmpool, stageId, shuffleId, partitionId)
   }
 
   def close(): Unit = synchronized {

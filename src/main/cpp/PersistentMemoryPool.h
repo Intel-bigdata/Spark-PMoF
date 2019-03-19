@@ -99,6 +99,7 @@ struct PartitionArrayItem {
     TOID(struct PartitionBlock) first_block;
     TOID(struct PartitionBlock) last_block;
     long partition_size;
+    int numBlocks;
 };
 
 struct PartitionBlock {
@@ -114,6 +115,16 @@ struct MemoryBlock {
 
     ~MemoryBlock() {
         delete buf;
+    }
+};
+
+struct BlockInfo {
+    long* data;
+    BlockInfo() {
+    }
+
+    ~BlockInfo() {
+        delete data;
     }
 };
 
@@ -138,7 +149,11 @@ public:
     long getMapPartition(MemoryBlock* mb, int stageId, int mapId, int partitionId);
     long getReducePartition(MemoryBlock* mb, int stageId, int mapId, int partitionId);
     long getPartition(MemoryBlock* mb, int stageId, int typeId, int mapId, int partitionId);
+    int getMapPartitionBlockInfo(BlockInfo *block_info, int stageId, int mapId, int partitionId);
+    long getMapPartitionSize(int stageId, int mapId, int partitionId);
+
     void process();
+    TOID(struct PartitionArrayItem) getPartitionBlock(int stageId, int typeId, int mapId, int partitionId);
 };
 
 class Request {
@@ -283,37 +298,8 @@ long PMPool::getPartition(
         int mapId,
         int partitionId ) {
     //taskset(core_s, core_e); 
-    if(TOID_IS_NULL(D_RO(stageArrayRoot)->stageArray)){
-        fprintf(stderr, "get Partition of shuffle_%d_%d_%d failed: stageArray none Exists.\n", stageId, mapId, partitionId);
-        return -1;
-    }
-
-    TOID(struct StageArrayItem) stageArrayItem = D_RO(D_RO(stageArrayRoot)->stageArray)->items[stageId];
-    if(TOID_IS_NULL(stageArrayItem) || TOID_IS_NULL(D_RO(stageArrayItem)->typeArray)) {
-        fprintf(stderr, "get Partition of shuffle_%d_%d_%d failed: stageArrayItem OR typeArray none Exists.\n", stageId, mapId, partitionId);
-        return -1;
-    }
-
-    TOID(struct TypeArray) typeArray = D_RO(stageArrayItem)->typeArray;
-    TOID(struct TypeArrayItem) typeArrayItem = D_RO(D_RO(stageArrayItem)->typeArray)->items[typeId];
-    if(TOID_IS_NULL(typeArrayItem) || TOID_IS_NULL(D_RO(typeArrayItem)->mapArray)) {
-        fprintf(stderr, "get Partition of shuffle_%d_%d_%d failed: typeArrayItem OR mapArray none Exists.\n", stageId, mapId, partitionId);
-        return -1;
-    }
-
-    TOID(struct MapArray) mapArray = D_RO(typeArrayItem)->mapArray;
-    TOID(struct MapArrayItem) mapArrayItem = D_RO(D_RO(typeArrayItem)->mapArray)->items[mapId];
-    if(TOID_IS_NULL(mapArrayItem) || TOID_IS_NULL(D_RO(mapArrayItem)->partitionArray)){
-        fprintf(stderr, "get Partition of shuffle_%d_%d_%d failed: mapArrayItem OR partitionArray none Exists.\n", stageId, mapId, partitionId);
-        return -1;
-    }
-
-    TOID(struct PartitionArrayItem) partitionArrayItem = D_RO(D_RO(mapArrayItem)->partitionArray)->items[partitionId];
-    if(TOID_IS_NULL(partitionArrayItem) || TOID_IS_NULL(D_RO(partitionArrayItem)->first_block)) {
-        fprintf(stderr, "get Partition of shuffle_%d_%d_%d failed: partitionArrayItem OR partitionBlock none Exists.\n", stageId, mapId, partitionId);
-        return -1;
-    }
-
+    TOID(struct PartitionArrayItem) partitionArrayItem = getPartitionBlock(stageId, typeId, mapId, partitionId);
+    if (TOID_IS_NULL(partitionArrayItem)) return -1;
     long data_length = D_RO(partitionArrayItem)->partition_size;
     mb->buf = new char[data_length]();
     long off = 0;
@@ -331,6 +317,74 @@ long PMPool::getPartition(
 
     //printf("getPartition length is %d\n", data_length);
     return data_length;
+}
+
+int PMPool::getMapPartitionBlockInfo(
+        BlockInfo* block_info,
+        int stageId,
+        int mapId,
+        int partitionId) {
+    TOID(struct PartitionArrayItem) partitionArrayItem = getPartitionBlock(stageId, 0, mapId, partitionId);
+    if (TOID_IS_NULL(partitionArrayItem)) return -1;
+    TOID(struct PartitionBlock) partitionBlock = D_RO(partitionArrayItem)->first_block;
+
+    int numBlocks = D_RO(partitionArrayItem)->numBlocks;
+    block_info->data = new long[numBlocks * 2]();
+    int i = 0;
+
+    while(!TOID_IS_NULL(partitionBlock)) {
+        block_info->data[i++] = (long)pmemobj_direct(D_RO(partitionBlock)->data);
+        block_info->data[i++] = D_RO(partitionBlock)->data_size;
+        partitionBlock = D_RO(partitionBlock)->next_block;
+    }
+
+    return numBlocks * 2;
+}
+
+long PMPool::getMapPartitionSize(
+        int stageId,
+        int mapId,
+        int partitionId ) {
+    //taskset(core_s, core_e);
+    TOID(struct PartitionArrayItem) partitionArrayItem = getPartitionBlock(stageId, 0, mapId, partitionId);
+    if (TOID_IS_NULL(partitionArrayItem)) return -1;
+    long data_length = D_RO(partitionArrayItem)->partition_size;
+    return data_length;
+}
+
+TOID(struct PartitionArrayItem) PMPool::getPartitionBlock(int stageId, int typeId, int mapId, int partitionId) {
+    if(TOID_IS_NULL(D_RO(stageArrayRoot)->stageArray)){
+        fprintf(stderr, "get Partition of shuffle_%d_%d_%d failed: stageArray none Exists.\n", stageId, mapId, partitionId);
+        return TOID_NULL(struct PartitionArrayItem);
+    }
+
+    TOID(struct StageArrayItem) stageArrayItem = D_RO(D_RO(stageArrayRoot)->stageArray)->items[stageId];
+    if(TOID_IS_NULL(stageArrayItem) || TOID_IS_NULL(D_RO(stageArrayItem)->typeArray)) {
+        fprintf(stderr, "get Partition of shuffle_%d_%d_%d failed: stageArrayItem OR typeArray none Exists.\n", stageId, mapId, partitionId);
+        return TOID_NULL(struct PartitionArrayItem);
+    }
+
+    TOID(struct TypeArray) typeArray = D_RO(stageArrayItem)->typeArray;
+    TOID(struct TypeArrayItem) typeArrayItem = D_RO(D_RO(stageArrayItem)->typeArray)->items[typeId];
+    if(TOID_IS_NULL(typeArrayItem) || TOID_IS_NULL(D_RO(typeArrayItem)->mapArray)) {
+        fprintf(stderr, "get Partition of shuffle_%d_%d_%d failed: typeArrayItem OR mapArray none Exists.\n", stageId, mapId, partitionId);
+        return TOID_NULL(struct PartitionArrayItem);
+    }
+
+    TOID(struct MapArray) mapArray = D_RO(typeArrayItem)->mapArray;
+    TOID(struct MapArrayItem) mapArrayItem = D_RO(D_RO(typeArrayItem)->mapArray)->items[mapId];
+    if(TOID_IS_NULL(mapArrayItem) || TOID_IS_NULL(D_RO(mapArrayItem)->partitionArray)){
+        fprintf(stderr, "get Partition of shuffle_%d_%d_%d failed: mapArrayItem OR partitionArray none Exists.\n", stageId, mapId, partitionId);
+        return TOID_NULL(struct PartitionArrayItem);
+    }
+
+    TOID(struct PartitionArrayItem) partitionArrayItem = D_RO(D_RO(mapArrayItem)->partitionArray)->items[partitionId];
+    if(TOID_IS_NULL(partitionArrayItem) || TOID_IS_NULL(D_RO(partitionArrayItem)->first_block)) {
+        fprintf(stderr, "get Partition of shuffle_%d_%d_%d failed: partitionArrayItem OR partitionBlock none Exists.\n", stageId, mapId, partitionId);
+        return TOID_NULL(struct PartitionArrayItem);
+    }
+
+    return partitionArrayItem;
 }
 
 Request::Request(PMPool* pmpool_ptr,
@@ -428,16 +482,18 @@ void Request::setPartition() {
         TX_ADD_FIELD(*partitionArrayItem, partition_size);
 
         TOID(struct PartitionBlock) *partitionBlock = &(D_RW(*partitionArrayItem)->first_block);
+        TOID(struct PartitionBlock) *last_partitionBlock = &(D_RW(*partitionArrayItem)->last_block);
         if (set_clean == false) {
             // jump to last block
             D_RW(*partitionArrayItem)->partition_size += size;
-            *partitionBlock = D_RW(*partitionArrayItem)->last_block;
-            /*while(!TOID_IS_NULL(*partitionBlock)) {
-                *partitionBlock = D_RW(*partitionBlock)->next_block;
-            }*/
+            D_RW(*partitionArrayItem)->numBlocks += 1;
+            if (!TOID_IS_NULL(*last_partitionBlock)) {
+              partitionBlock = &(D_RW(*last_partitionBlock)->next_block);
+            }
         } else {
             //TODO: we should remove unused blocks
             D_RW(*partitionArrayItem)->partition_size = size;
+            D_RW(*partitionArrayItem)->numBlocks = 1;
         }
 
         TX_ADD_DIRECT(partitionBlock);

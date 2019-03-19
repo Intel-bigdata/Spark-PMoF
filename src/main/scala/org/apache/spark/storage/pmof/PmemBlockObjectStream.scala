@@ -14,6 +14,7 @@ import java.io.InputStream
 import java.nio.ByteBuffer
 
 import scala.collection.mutable.ArrayBuffer
+import scala.util.control.Breaks._
 
 class PmemBlockId (stageId: Int, tmpId: Int) extends ShuffleBlockId(stageId, 0, tmpId) {
   override def name: String = "reduce_spill_" + stageId + "_" + tmpId
@@ -153,13 +154,17 @@ private[spark] class PmemBlockObjectStream(
     records    
   }
 
+  def getSize(): Long = {
+    size
+  }
+
   def getInputStream(): InputStream = {
     if (inputStream == null) {
       inputStream = new PmemBlockObjectInputStream()
     }
     inputStream
   }
-
+  
   class PmemBlockObjectInputStream extends InputStream {
     var UNSAFE: Unsafe = _
     val f = classOf[Unsafe].getDeclaredField("theUnsafe")
@@ -170,10 +175,11 @@ private[spark] class PmemBlockObjectStream(
     var buf: ByteBuffer = ByteBuffer.allocate(8192 * 1024)
     var index: Int = 0
     var remaining: Int = 0
+    var available_bytes: Int = getSize().toInt
   
-    def loadNextStream(): Unit = {
+    def loadNextStream(): Int = {
       if (index >= partitionMeta.length)
-        return
+        return 0
       val data_length = partitionMeta(index)._2
       val data_addr = partitionMeta(index)._1
       val records = partitionMeta(index)._3
@@ -195,6 +201,7 @@ private[spark] class PmemBlockObjectStream(
       buf.position(0)
       index += 1
       remaining += data_length
+      data_length
     }
   
     override def read(): Int = {
@@ -204,25 +211,30 @@ private[spark] class PmemBlockObjectStream(
           return -1
         }
       }
+      remaining -= 1
+      available_bytes -= 1
       buf.get()
     }
 
     override def read(bytes: Array[Byte], off: Int, len: Int): Int = {
-      if ((remaining > 0 && remaining < len) || remaining == 0) {
-        loadNextStream()
-        if (remaining == 0) {
-          return -1
+      breakable { while ((remaining > 0 && remaining < len) || remaining == 0) {
+        if (loadNextStream() == 0) {
+          break
         }
+      } }
+      if (remaining == 0) {
+        return -1
       }
   
       val real_len = Math.min(len, remaining)
       buf.get(bytes, off, real_len)
       remaining -= real_len
+      available_bytes -= real_len
       real_len
     }
   
     override def available(): Int = {
-      remaining
+      available_bytes
     }
 
     override def close(): Unit = {

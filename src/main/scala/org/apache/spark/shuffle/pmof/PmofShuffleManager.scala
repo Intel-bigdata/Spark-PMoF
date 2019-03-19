@@ -61,7 +61,7 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
           enable_rdma)
       case other: BaseShuffleHandle[K @unchecked, V @unchecked, _] =>
         if (enable_pmem) {
-          new PmemShuffleWriter(shuffleBlockResolver.asInstanceOf[IndexShuffleBlockResolver], metadataResolver,
+          new PmemShuffleWriter(shuffleBlockResolver.asInstanceOf[PmemShuffleBlockResolver], metadataResolver,
       handle.asInstanceOf[BaseShuffleHandle[K, V, _]], mapId, context, env.conf)
         } else {
           new BaseShuffleWriter(shuffleBlockResolver.asInstanceOf[IndexShuffleBlockResolver], metadataResolver, other, mapId, context, enable_rdma)

@@ -56,6 +56,12 @@ JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_n
   (JNIEnv *, jclass, jlong);
 
 
+JNIEXPORT jlongArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetMapPartitionBlockInfo
+  (JNIEnv *, jclass, jlong, jint, jint, jint);
+
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetMapPartitionSize
+  (JNIEnv *, jclass, jlong, jint, jint, jint);
+
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetRoot
   (JNIEnv *, jclass, jlong);
 

@@ -30,7 +30,7 @@ import org.apache.spark.storage.pmof._
 import scala.collection.mutable.ArrayBuffer
 
 private[spark] class PmemShuffleWriter[K, V, C](
-                                                 shuffleBlockResolver: IndexShuffleBlockResolver,
+                                                 shuffleBlockResolver: PmemShuffleBlockResolver,
                                                  metadataResolver: MetadataResolver,
                                                  handle: BaseShuffleHandle[K, V, C],
                                                  mapId: Int,
@@ -86,6 +86,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
         conf,
         numMaps,
         numPartitions))
+
     if (dep.mapSideCombine) { // do aggragation
       if (dep.aggregator.isDefined) {
         sorter = new PmemExternalSorter[K, V, C](context, handle, dep.aggregator, Some(dep.partitioner), dep.keyOrdering, dep.serializer)

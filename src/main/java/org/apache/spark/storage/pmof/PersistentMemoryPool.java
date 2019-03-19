@@ -12,6 +12,8 @@ public class PersistentMemoryPool {
     private static native long nativeSetReducePartition(long deviceHandler, int numPartitions, int stageId, int partutionId, long size, byte[] data, boolean clean);
     private static native byte[] nativeGetMapPartition(long deviceHandler, int stageId, int mapId, int partitionId);
     private static native byte[] nativeGetReducePartition(long deviceHandler, int stageId, int mapId, int partitionId);
+    private static native long[] nativeGetMapPartitionBlockInfo(long deviceHandler, int stageId, int mapId, int partitionId);
+    private static native long nativeGetMapPartitionSize(long deviceHandler, int stageId, int mapId, int partitionId);
     private static native long nativeGetRoot(long deviceHandler);
     private static native int nativeCloseDevice(long deviceHandler);
   
@@ -46,6 +48,14 @@ public class PersistentMemoryPool {
 
     public byte[] getReducePartition(int stageId, int shuffleId, int partitionId) {
       return nativeGetReducePartition(this.deviceHandler, stageId, shuffleId, partitionId);
+    }
+
+    public long[] getMapPartitionBlockInfo(int stageId, int shuffleId, int partitionId) {
+      return nativeGetMapPartitionBlockInfo(this.deviceHandler, stageId, shuffleId, partitionId);
+    }
+
+    public long getMapPartitionSize(int stageId, int shuffleId, int partitionId) {
+      return nativeGetMapPartitionSize(this.deviceHandler, stageId, shuffleId, partitionId);
     }
 
     public long getRootAddr() {
