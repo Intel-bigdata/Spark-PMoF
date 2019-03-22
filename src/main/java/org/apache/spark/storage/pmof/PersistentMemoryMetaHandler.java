@@ -52,7 +52,7 @@ public class PersistentMemoryMetaHandler {
  
     try {
       SQLiteConfig config = new SQLiteConfig();
-      config.setBusyTimeout("5000");
+      config.setBusyTimeout("30000");
       Connection conn = DriverManager.getConnection(url, config.toProperties());
       Statement stmt = conn.createStatement();
       stmt.executeUpdate(sql);

@@ -1,4 +1,5 @@
 #include "lib_jni_pmdk.h"
+#include "PmemBuffer.h"
 #include "PersistentMemoryPool.h"
 
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeOpenDevice
@@ -70,4 +71,30 @@ JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_n
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetRoot
   (JNIEnv *env, jclass obj, jlong pmpool) {
   return ((PMPool*)pmpool)->getRootAddr();
+}
+
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeNewPmemBuffer
+  (JNIEnv *env, jobject obj) {
+  return (long)(new PmemBuffer());
+}
+
+JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeLoadPmemBuffer
+  (JNIEnv *env, jobject obj, jlong pmBuffer, jlong addr, jint len) {
+  ((PmemBuffer*)pmBuffer)->load((char*)addr, len);
+}
+
+JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeReadPmemBuffer
+  (JNIEnv *env, jobject obj, jlong pmBuffer, jbyteArray data, jint len) {
+  jboolean isCopy = JNI_FALSE;
+  jbyte* ret_data = env->GetByteArrayElements(data, &isCopy);
+  int read_len = ((PmemBuffer*)pmBuffer)->read((char*)ret_data, len);
+  if (isCopy == JNI_TRUE) {
+    env->ReleaseByteArrayElements(data, ret_data, 0);
+  }
+  return read_len;
+}
+
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeDeletePmemBuffer
+  (JNIEnv *env, jobject obj, jlong pmBuffer) {
+  delete (PmemBuffer*)pmBuffer;
 }

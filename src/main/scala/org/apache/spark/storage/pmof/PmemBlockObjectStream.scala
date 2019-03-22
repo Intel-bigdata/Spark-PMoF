@@ -166,13 +166,7 @@ private[spark] class PmemBlockObjectStream(
   }
   
   class PmemBlockObjectInputStream extends InputStream {
-    var UNSAFE: Unsafe = _
-    val f = classOf[Unsafe].getDeclaredField("theUnsafe")
-    f.setAccessible(true)
-    UNSAFE = f.get(null).asInstanceOf[Unsafe]
-  
-    var bufferCapacity = partitionMeta(0)._2
-    var buf: ByteBuffer = ByteBuffer.allocate(8192 * 1024)
+    var buf = new PmemBuffer()
     var index: Int = 0
     var remaining: Int = 0
     var available_bytes: Int = getSize().toInt
@@ -185,20 +179,8 @@ private[spark] class PmemBlockObjectStream(
       val records = partitionMeta(index)._3
       logDebug("PmemBlockObjectInputStream.loadNextStream() for " + blockId.name + ", addr: " + data_addr + ", length: " + data_length + ", records: " + records + ", remaining: " + remaining)
 
-      var data = Array.ofDim[Byte](data_length)
-      UNSAFE.copyMemory(null, data_addr, data, Unsafe.ARRAY_BYTE_BASE_OFFSET, data_length)
+      buf.load(data_addr, data_length)
 
-      if (remaining > 0) {
-        // move remaining bytes to buf front
-        var swapBytes = Array.ofDim[Byte](remaining)
-        buf.get(swapBytes)
-        buf.position(0)
-        buf.put(swapBytes)
-      } else {
-        buf.position(0)
-      }
-      buf.put(data)
-      buf.position(0)
       index += 1
       remaining += data_length
       data_length
@@ -206,8 +188,7 @@ private[spark] class PmemBlockObjectStream(
   
     override def read(): Int = {
       if (remaining == 0) {
-        loadNextStream()
-        if (remaining == 0) {
+        if (loadNextStream() == 0) {
           return -1
         }
       }
@@ -227,7 +208,7 @@ private[spark] class PmemBlockObjectStream(
       }
   
       val real_len = Math.min(len, remaining)
-      buf.get(bytes, off, real_len)
+      buf.get(bytes, real_len)
       remaining -= real_len
       available_bytes -= real_len
       real_len
@@ -238,8 +219,7 @@ private[spark] class PmemBlockObjectStream(
     }
 
     override def close(): Unit = {
-      //delete this spill block here
-      logInfo("persistentMemoryWriter.deletePartition(" + blockId.name + ")")
+      buf.close()
     }
   }
 }

@@ -110,11 +110,12 @@ struct PartitionBlock {
 
 struct MemoryBlock {
     char* buf;
+    int len;
     MemoryBlock() {
     }
 
     ~MemoryBlock() {
-        delete buf;
+        delete[] buf;
     }
 };
 

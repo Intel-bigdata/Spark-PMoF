@@ -1,8 +1,5 @@
 package org.apache.spark.storage.pmof;
 
-//import org.slf4j.Logger;
-//import org.slf4j.LoggerFactory;
-
 public class PersistentMemoryPool {
     static {
         System.load("/usr/local/lib/libjnipmdk.so");
@@ -17,8 +14,6 @@ public class PersistentMemoryPool {
     private static native long nativeGetRoot(long deviceHandler);
     private static native int nativeCloseDevice(long deviceHandler);
   
-    //private static final Logger logger = LoggerFactory.getLogger(PersistentMemoryPool.class);
-    //static final int HEADER_SIZE = 8;
     private static final long DEFAULT_PMPOOL_SIZE = 0L;
 
     private String device;

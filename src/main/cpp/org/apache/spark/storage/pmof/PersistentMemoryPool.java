@@ -169,12 +169,12 @@ public class PersistentMemoryPool{
             if (j > 9999) {
                 break;
             }
-            /*PersistentMemoryPool.this.monitor.incSubmittedJobs(PersistentMemoryPool.this.block_size);
+            PersistentMemoryPool.this.monitor.incSubmittedJobs(PersistentMemoryPool.this.block_size);
             nativeSetMapPartition(PersistentMemoryPool.this.writerHandler, 10000, k, j, i, PersistentMemoryPool.this.block_size, PersistentMemoryPool.this.bytes, false);
             i_multi += 1;
             PersistentMemoryPool.this.monitor.incCommittedJobs(PersistentMemoryPool.this.block_size);
-            */
-            long[] block_info = nativeGetMapPartitionBlockInfo(PersistentMemoryPool.this.writerHandler, k, j, i);
+ 
+            /*long[] block_info = nativeGetMapPartitionBlockInfo(PersistentMemoryPool.this.writerHandler, k, j, i);
             //System.out.println("Start to get partition block info for "+k+"_"+j+"_"+i+", numBlocks: "+block_info.length/2);
             int index = 0;
             while (index+1 < block_info.length) {
@@ -184,7 +184,7 @@ public class PersistentMemoryPool{
               PersistentMemoryPool.this.monitor.incCommittedJobs(block_info[index+1]);
               i_multi += 1;
               index += 2;
-            }
+            }*/
         }
         return 0;
       }
