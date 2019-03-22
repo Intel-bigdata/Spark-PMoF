@@ -1,6 +1,7 @@
 package org.apache.spark.storage.pmof
 
 import org.apache.spark.storage._
+import org.apache.spark.storage.pmof.{PmemInputStream, PmemOutputStream}
 import org.apache.spark.serializer._
 import org.apache.spark.executor.TaskMetrics
 import org.apache.spark.internal.Logging
@@ -9,12 +10,9 @@ import java.io.{ByteArrayOutputStream, OutputStream}
 import org.apache.spark.SparkConf
 import org.apache.spark.util.Utils
 import java.io.File
-import sun.misc.Unsafe
-import java.io.InputStream
-import java.nio.ByteBuffer
+import java.io.{InputStream, OutputStream}
 
 import scala.collection.mutable.ArrayBuffer
-import scala.util.control.Breaks._
 
 class PmemBlockId (stageId: Int, tmpId: Int) extends ShuffleBlockId(stageId, 0, tmpId) {
   override def name: String = "reduce_spill_" + stageId + "_" + tmpId
@@ -40,17 +38,14 @@ private[spark] class PmemBlockObjectStream(
     numPartitions: Int = 0
 ) extends DiskBlockObjectWriter(new File(Utils.getConfiguredLocalDirs(conf).toList(0) + "/null"), null, null, 0, true, null, null) with Logging {
   var initialized = false
-  var set_clean = true
-
-  var objStream: SerializationStream = _
-  var wrappedStream: OutputStream = _
-  var bytesStream: ByteArrayOutputStream = _
-  var inputStream: InputStream = _
 
   var size: Int = 0
   var records: Int = 0
+
   var recordsPerBlock: Int = 0
-  var partitionMeta: ArrayBuffer[(Long, Int, Int)] = ArrayBuffer()
+  val recordsArray: ArrayBuffer[Int] = ArrayBuffer()
+  var spilled: Boolean = false
+  var partitionMeta: Array[(Long, Int, Int)] = _
 
   val root_dir = Utils.getConfiguredLocalDirs(conf).toList(0)
   val path_list = conf.get("spark.shuffle.pmof.pmem_list").split(",").map(_.trim).toList
@@ -62,9 +57,14 @@ private[spark] class PmemBlockObjectStream(
   persistentMemoryWriter.updateShuffleMeta(blockId.name)
   logDebug(blockId.name)
 
+  var objStream: SerializationStream = _
+  var wrappedStream: OutputStream = _
+  var bytesStream: OutputStream = new PmemOutputStream(
+    persistentMemoryWriter, numPartitions, blockId.name)
+  var inputStream: InputStream = _
+
   override def write(key: Any, value: Any): Unit = {
     if (!initialized) {
-      bytesStream = new ByteArrayOutputStream()
       wrappedStream = serializerManager.wrapStream(blockId, bytesStream)
       objStream = serializerInstance.serializeStream(wrappedStream)
       initialized = true
@@ -76,30 +76,9 @@ private[spark] class PmemBlockObjectStream(
     maybeSpill()
   }
 
-  private def get() : (Array[Byte], Int) = {
-    if (initialized) {
-      objStream.flush()
-      wrappedStream.flush()
-      bytesStream.flush()
-
-      val data = bytesStream.toByteArray
-      val recordsPerBlock_r = recordsPerBlock
-
-      // update in class variables
-      size += data.size
-      bytesStream.reset()
-      recordsPerBlock = 0
-      (data, recordsPerBlock_r)
-    } else {
-      (Array[Byte](), 0)
-    }
-  }
-  
   override def close() {
     if (initialized) {
       logDebug("PersistentMemoryHandlerPartition: stream closed.")
-      objStream.close()
-      wrappedStream.close()
       bytesStream.close()
     }
   }
@@ -109,32 +88,38 @@ private[spark] class PmemBlockObjectStream(
   }
 
   def maybeSpill(force: Boolean = false): Unit = {
-    if ((spill_throttle != -1 && bytesStream.size >= spill_throttle) || force == true) {
-      val (tmp_data, recordsPerBlock_r) = get()
+    if ((spill_throttle != -1 && bytesStream.asInstanceOf[PmemOutputStream].size >= spill_throttle) || force == true) {
       val start = System.nanoTime()
-      var partitionInfo = (persistentMemoryWriter.setPartition(numPartitions, blockId.name, tmp_data, set_clean), tmp_data.length, recordsPerBlock_r)
-      if (set_clean == true) {
-        // after first written to this partition, set_clean to false for later on appending
-        set_clean = false
-      }
-      partitionMeta += partitionInfo
+      objStream.flush()
+      bytesStream.flush()
+      val bufSize = bytesStream.asInstanceOf[PmemOutputStream].size
+
+      recordsArray += recordsPerBlock
+      recordsPerBlock = 0
+      size += bufSize
+
 			if (blockId.isShuffle == true) {
         val writeMetrics = taskMetrics.shuffleWriteMetrics
         writeMetrics.incWriteTime(System.nanoTime() - start)
-        writeMetrics.incBytesWritten(tmp_data.length)
+        writeMetrics.incBytesWritten(bufSize)
 			} else {
-        //taskMetrics.incMemoryBytesSpilled(sorter.memoryBytesSpilled)
-        taskMetrics.incDiskBytesSpilled(tmp_data.length)
-        //taskMetrics.incPeakExecutionMemory(sorter.peakMemoryUsedBytes)
+        taskMetrics.incDiskBytesSpilled(bufSize)
 			}
+      bytesStream.asInstanceOf[PmemOutputStream].reset()
+      spilled = true
     }
   }
 
   def ifSpilled(): Boolean = {
-    !partitionMeta.isEmpty
+    spilled
   }
 
-  def getPartitionMeta(): ArrayBuffer[(Long, Int, Int)] = {
+  def getPartitionMeta(): Array[(Long, Int, Int)] = {
+    if (partitionMeta == null) {
+      var blockInfo: Array[(Long, Int)] = persistentMemoryWriter.getPartitionBlockInfo(blockId.name)
+      var i = -1
+      partitionMeta = blockInfo.map{ x=> i+=1; (x._1, x._2, recordsArray(i))}
+    }
     partitionMeta
   }
 
@@ -146,9 +131,9 @@ private[spark] class PmemBlockObjectStream(
     persistentMemoryWriter.rkey
   }
 
-  def getAllBytes(): Array[Byte] = {
+  /*def getAllBytes(): Array[Byte] = {
     persistentMemoryWriter.getPartition(blockId.name)
-  }
+  }*/
 
   def getTotalRecords(): Long = {
     records    
@@ -160,66 +145,9 @@ private[spark] class PmemBlockObjectStream(
 
   def getInputStream(): InputStream = {
     if (inputStream == null) {
-      inputStream = new PmemBlockObjectInputStream()
+      inputStream = new PmemInputStream(persistentMemoryWriter, blockId.name)
     }
     inputStream
   }
   
-  class PmemBlockObjectInputStream extends InputStream {
-    var buf = new PmemBuffer()
-    var index: Int = 0
-    var remaining: Int = 0
-    var available_bytes: Int = getSize().toInt
-  
-    def loadNextStream(): Int = {
-      if (index >= partitionMeta.length)
-        return 0
-      val data_length = partitionMeta(index)._2
-      val data_addr = partitionMeta(index)._1
-      val records = partitionMeta(index)._3
-      logDebug("PmemBlockObjectInputStream.loadNextStream() for " + blockId.name + ", addr: " + data_addr + ", length: " + data_length + ", records: " + records + ", remaining: " + remaining)
-
-      buf.load(data_addr, data_length)
-
-      index += 1
-      remaining += data_length
-      data_length
-    }
-  
-    override def read(): Int = {
-      if (remaining == 0) {
-        if (loadNextStream() == 0) {
-          return -1
-        }
-      }
-      remaining -= 1
-      available_bytes -= 1
-      buf.get()
-    }
-
-    override def read(bytes: Array[Byte], off: Int, len: Int): Int = {
-      breakable { while ((remaining > 0 && remaining < len) || remaining == 0) {
-        if (loadNextStream() == 0) {
-          break
-        }
-      } }
-      if (remaining == 0) {
-        return -1
-      }
-  
-      val real_len = Math.min(len, remaining)
-      buf.get(bytes, real_len)
-      remaining -= real_len
-      available_bytes -= real_len
-      real_len
-    }
-  
-    override def available(): Int = {
-      available_bytes
-    }
-
-    override def close(): Unit = {
-      buf.close()
-    }
-  }
 }

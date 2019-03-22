@@ -27,6 +27,7 @@ import java.nio.file.{Files, Paths}
 import java.util.UUID
 import org.apache.spark.network.buffer.ManagedBuffer
 import org.apache.spark.storage.pmof.PmemManagedBuffer
+import org.apache.spark.storage.pmof.PmemBuffer
 
 private[spark] class PersistentMemoryHandler(
     val root_dir: String,
@@ -76,19 +77,31 @@ private[spark] class PersistentMemoryHandler(
     }
   }
 
-  def setPartition(numPartitions: Int, blockId: String, data: Array[Byte], clean: Boolean): Long = {
-    if (data.size > 0) {
-      val (blockType, stageId, shuffleId, partitionId) = getBlockDetail(blockId)
-      var ret_addr: Long = 0
-      if (blockType == "shuffle") {
-        ret_addr = pmpool.setMapPartition(numPartitions, stageId, shuffleId, partitionId, data.size, data, clean)
-      } else if (blockType == "reduce_spill") {
-        ret_addr = pmpool.setReducePartition(1000/*TODO: should be incrementable*/, stageId, partitionId, data.size, data, clean)
-      }
-      ret_addr
-    } else {
-      -1
+  def getPartitionBlockInfo(blockId: String): Array[(Long, Int)] = {
+    val (blockType, stageId, shuffleId, partitionId) = getBlockDetail(blockId)
+    var res_array: Array[Long] = if (blockType == "shuffle") pmpool.getMapPartitionBlockInfo(stageId, shuffleId, partitionId) else pmpool.getReducePartitionBlockInfo(stageId, shuffleId, partitionId)
+    var i = -2
+    var blockInfo = Array.ofDim[(Long, Int)]((res_array.length)/2)
+    blockInfo.map{ x => i += 2; (res_array(i), res_array(i+1).toInt)}
+  }
+
+  def getPartitionSize(blockId: String): Long = {
+    val (blockType, stageId, shuffleId, partitionId) = getBlockDetail(blockId)
+    if (blockType == "shuffle") {
+      return pmpool.getMapPartitionSize(stageId, shuffleId, partitionId)
     }
+    pmpool.getReducePartitionSize(stageId, shuffleId, partitionId)
+  }
+  
+  def setPartition(numPartitions: Int, blockId: String, buf: PmemBuffer, clean: Boolean): Long = {
+    val (blockType, stageId, shuffleId, partitionId) = getBlockDetail(blockId)
+    var ret_addr: Long = 0
+    if (blockType == "shuffle") {
+      ret_addr = pmpool.setMapPartition(numPartitions, stageId, shuffleId, partitionId, buf, clean)
+    } else if (blockType == "reduce_spill") {
+      ret_addr = pmpool.setReducePartition(1000/*TODO: should be incrementable*/, stageId, partitionId, buf, clean)
+    }
+    ret_addr
   }
 
   def getPartition(stageId: Int, shuffleId: Int, partitionId: Int): Array[Byte] = {
@@ -107,8 +120,8 @@ private[spark] class PersistentMemoryHandler(
     }
   }
 
-  def getPartitionManagedBuffer(stageId: Int, shuffleId: Int, partitionId: Int): ManagedBuffer = {
-    new PmemManagedBuffer(pmpool, stageId, shuffleId, partitionId)
+  def getPartitionManagedBuffer(blockId: String): ManagedBuffer = {
+    new PmemManagedBuffer(this, blockId)
   }
 
   def close(): Unit = synchronized {

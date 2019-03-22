@@ -151,7 +151,9 @@ public:
     long getReducePartition(MemoryBlock* mb, int stageId, int mapId, int partitionId);
     long getPartition(MemoryBlock* mb, int stageId, int typeId, int mapId, int partitionId);
     int getMapPartitionBlockInfo(BlockInfo *block_info, int stageId, int mapId, int partitionId);
+    int getReducePartitionBlockInfo(BlockInfo *block_info, int stageId, int mapId, int partitionId);
     long getMapPartitionSize(int stageId, int mapId, int partitionId);
+    long getReducePartitionSize(int stageId, int mapId, int partitionId);
 
     void process();
     TOID(struct PartitionArrayItem) getPartitionBlock(int stageId, int typeId, int mapId, int partitionId);
@@ -342,12 +344,43 @@ int PMPool::getMapPartitionBlockInfo(
     return numBlocks * 2;
 }
 
+int PMPool::getReducePartitionBlockInfo(
+        BlockInfo* block_info,
+        int stageId,
+        int mapId,
+        int partitionId) {
+    TOID(struct PartitionArrayItem) partitionArrayItem = getPartitionBlock(stageId, 1, mapId, partitionId);
+    if (TOID_IS_NULL(partitionArrayItem)) return -1;
+    TOID(struct PartitionBlock) partitionBlock = D_RO(partitionArrayItem)->first_block;
+
+    int numBlocks = D_RO(partitionArrayItem)->numBlocks;
+    block_info->data = new long[numBlocks * 2]();
+    int i = 0;
+
+    while(!TOID_IS_NULL(partitionBlock)) {
+        block_info->data[i++] = (long)pmemobj_direct(D_RO(partitionBlock)->data);
+        block_info->data[i++] = D_RO(partitionBlock)->data_size;
+        partitionBlock = D_RO(partitionBlock)->next_block;
+    }
+
+    return numBlocks * 2;
+}
+
 long PMPool::getMapPartitionSize(
         int stageId,
         int mapId,
         int partitionId ) {
-    //taskset(core_s, core_e);
     TOID(struct PartitionArrayItem) partitionArrayItem = getPartitionBlock(stageId, 0, mapId, partitionId);
+    if (TOID_IS_NULL(partitionArrayItem)) return -1;
+    long data_length = D_RO(partitionArrayItem)->partition_size;
+    return data_length;
+}
+
+long PMPool::getReducePartitionSize(
+        int stageId,
+        int mapId,
+        int partitionId ) {
+    TOID(struct PartitionArrayItem) partitionArrayItem = getPartitionBlock(stageId, 1, mapId, partitionId);
     if (TOID_IS_NULL(partitionArrayItem)) return -1;
     long data_length = D_RO(partitionArrayItem)->partition_size;
     return data_length;

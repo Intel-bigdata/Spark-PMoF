@@ -106,7 +106,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
         partitionBufferArray(partitionId).maybeSpill(force = true)
       }
     }
-    val data_addr_map: Array[ArrayBuffer[(Long, Int)]] = Array.fill[ArrayBuffer[(Long, Int)]](numPartitions)(new ArrayBuffer[(Long, Int)])
+    var data_addr_map = Array.ofDim[(Long, Int)](numPartitions, 1)
     var output_str : String = ""
 
     for (i <- 0 until numPartitions) {

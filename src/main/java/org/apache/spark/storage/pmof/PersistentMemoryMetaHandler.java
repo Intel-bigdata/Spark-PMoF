@@ -89,6 +89,8 @@ public class PersistentMemoryMetaHandler {
     int count;
     
     try {
+      SQLiteConfig config = new SQLiteConfig();
+      config.setBusyTimeout("30000");
       Connection conn = DriverManager.getConnection(url);
       Statement stmt = conn.createStatement();
       ResultSet rs = stmt.executeQuery(sql);

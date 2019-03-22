@@ -11,20 +11,26 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_
 }
 
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetMapPartition
-  (JNIEnv *env, jclass obj, jlong pmpool, jint partitionNum, jint stageId, jint mapId, jint partitionId, jlong size, jbyteArray data, jboolean clean) {
-    char* buf = new char[size];
-    env->GetByteArrayRegion(data, 0, size, reinterpret_cast<jbyte*>(buf));
-    long addr = ((PMPool*)pmpool)->setMapPartition(partitionNum, stageId, mapId, partitionId, size, buf, clean);
-    delete buf;
+  (JNIEnv *env, jclass obj, jlong pmpool, jint partitionNum, jint stageId, jint mapId, jint partitionId, long pmBuffer, jboolean set_clean) {
+    int size = ((PmemBuffer*)pmBuffer)->getRemaining();
+    char* buf = ((PmemBuffer*)pmBuffer)->getDataForFlush(size);
+    if (buf == nullptr) {
+      return -1;
+    }
+    //printf("nativeSetMapPartition for shuffle_%d_%d_%d\n", stageId, mapId, partitionId);
+    long addr = ((PMPool*)pmpool)->setMapPartition(partitionNum, stageId, mapId, partitionId, size, buf, set_clean);
     return addr;
 }
 
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetReducePartition
-  (JNIEnv *env, jclass obj, jlong pmpool, jint partitionNum, jint stageId, jint partitionId, jlong size, jbyteArray data, jboolean clean) {
-    char* buf = new char[size];
-    env->GetByteArrayRegion(data, 0, size, reinterpret_cast<jbyte*>(buf));
+  (JNIEnv *env, jclass obj, jlong pmpool, jint partitionNum, jint stageId, jint partitionId, long pmBuffer, jboolean clean) {
+    int size = ((PmemBuffer*)pmBuffer)->getRemaining();
+    char* buf = ((PmemBuffer*)pmBuffer)->getDataForFlush(size);
+    if (buf == nullptr) {
+      return -1;
+    }
+    //printf("nativeSetMapPartition for spill_%d_%d\n", stageId, partitionId);
     long addr = ((PMPool*)pmpool)->setReducePartition(partitionNum, stageId, partitionId, size, buf, clean);
-    delete buf;
     return addr;
 }
 
@@ -58,9 +64,26 @@ JNIEXPORT jlongArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemory
     return data;
 }
 
+JNIEXPORT jlongArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetReducePartitionBlockInfo
+  (JNIEnv *env, jclass obj, jlong pmpool, jint stageId, jint mapId, jint partitionId) {
+    BlockInfo blockInfo;
+    int length = ((PMPool*)pmpool)->getReducePartitionBlockInfo(&blockInfo, stageId, mapId, partitionId);
+    if (length == 0) {
+      return env->NewLongArray(0);
+    }
+    jlongArray data = env->NewLongArray(length);
+    env->SetLongArrayRegion(data, 0, length, (jlong*)(blockInfo.data));
+    return data;
+}
+
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetMapPartitionSize
   (JNIEnv *env, jclass obj, jlong pmpool, jint stageId, jint mapId, jint partitionId) {
     return ((PMPool*)pmpool)->getMapPartitionSize(stageId, mapId, partitionId);
+  }
+
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetReducePartitionSize
+  (JNIEnv *env, jclass obj, jlong pmpool, jint stageId, jint mapId, jint partitionId) {
+    return ((PMPool*)pmpool)->getReducePartitionSize(stageId, mapId, partitionId);
   }
 
 JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeCloseDevice
@@ -83,18 +106,45 @@ JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeLoadP
   ((PmemBuffer*)pmBuffer)->load((char*)addr, len);
 }
 
-JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeReadPmemBuffer
-  (JNIEnv *env, jobject obj, jlong pmBuffer, jbyteArray data, jint len) {
+JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeReadBytesFromPmemBuffer
+  (JNIEnv *env, jobject obj, jlong pmBuffer, jbyteArray data, jint off, jint len) {
   jboolean isCopy = JNI_FALSE;
   jbyte* ret_data = env->GetByteArrayElements(data, &isCopy);
-  int read_len = ((PmemBuffer*)pmBuffer)->read((char*)ret_data, len);
+  int read_len = ((PmemBuffer*)pmBuffer)->read((char*)ret_data + off, len);
   if (isCopy == JNI_TRUE) {
     env->ReleaseByteArrayElements(data, ret_data, 0);
   }
   return read_len;
 }
 
-JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeDeletePmemBuffer
+JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeWriteBytesToPmemBuffer
+  (JNIEnv *env, jobject obj, jlong pmBuffer, jbyteArray data, jint off, jint len) {
+  jboolean isCopy = JNI_FALSE;
+  jbyte* ret_data = env->GetByteArrayElements(data, &isCopy);
+  int read_len = ((PmemBuffer*)pmBuffer)->write((char*)ret_data + off, len);
+  if (isCopy == JNI_TRUE) {
+    env->ReleaseByteArrayElements(data, ret_data, 0);
+  }
+  return read_len;
+}
+
+JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeGetPmemBufferRemaining
+  (JNIEnv *env, jobject obj, jlong pmBuffer) {
+  ((PmemBuffer*)pmBuffer)->getRemaining();
+}
+
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeGetPmemBufferDataAddr
+  (JNIEnv *env, jobject obj, jlong pmBuffer) {
+  return (long)(((PmemBuffer*)pmBuffer)->getDataAddr());
+}
+
+JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeCleanPmemBuffer
+  (JNIEnv *env, jobject obj, jlong pmBuffer) {
+  ((PmemBuffer*)pmBuffer)->clean();
+}
+
+JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeDeletePmemBuffer
   (JNIEnv *env, jobject obj, jlong pmBuffer) {
   delete (PmemBuffer*)pmBuffer;
+  return 0;
 }
