@@ -18,18 +18,18 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_
 /*
  * Class:     lib_jni_pmdk
  * Method:    nativeSetMapPartition
- * Signature: (JIIIIJ[BZ)J
+ * Signature: (JIIIIJZ)J
  */
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetMapPartition
-  (JNIEnv *, jclass, jlong, jint, jint, jint, jint, jlong, jbyteArray, jboolean);
+  (JNIEnv *, jclass, jlong, jint, jint, jint, jint, jlong, jboolean);
 
 /*
  * Class:     lib_jni_pmdk
  * Method:    nativeSetReducePartition
- * Signature: (JIIIIJ[BZ)J
+ * Signature: (JIIIIJZ)J
  */
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetReducePartition
-  (JNIEnv *, jclass, jlong, jint, jint, jint, jlong, jbyteArray, jboolean);
+  (JNIEnv *, jclass, jlong, jint, jint, jint, jlong, jboolean);
 
 /*
  * Class:     lib_jni_pmdk
@@ -65,10 +65,26 @@ JNIEXPORT jlongArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemory
 
 /*
  * Class:     lib_jni_pmdk
+ * Method:    nativeReduceMapPartitionBlockInfo
+ * Signature: (JIII)[J
+ */
+JNIEXPORT jlongArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetReducePartitionBlockInfo
+  (JNIEnv *, jclass, jlong, jint, jint, jint);
+
+/*
+ * Class:     lib_jni_pmdk
  * Method:    nativeGetMapPartitionSize
  * Signature: (JIII)J
  */
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetMapPartitionSize
+  (JNIEnv *, jclass, jlong, jint, jint, jint);
+
+/*
+ * Class:     lib_jni_pmdk
+ * Method:    nativeGetReducePartitionSize
+ * Signature: (JIII)J
+ */
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetReducePartitionSize
   (JNIEnv *, jclass, jlong, jint, jint, jint);
 
 /*
@@ -97,18 +113,42 @@ JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeLoadP
 
 /*
  * Class:     lib_jni_pmdk
- * Method:    nativeReadPmemBuffer
- * Signature: (J[BI)I
+ * Method:    nativeReadBytesFromPmemBuffer
+ * Signature: (J[BII)I
  */
-JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeReadPmemBuffer
-  (JNIEnv *, jobject, jlong, jbyteArray, jint);
+JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeReadBytesFromPmemBuffer
+  (JNIEnv *, jobject, jlong, jbyteArray, jint, jint);
+
+/*
+ * Class:     lib_jni_pmdk
+ * Method:    nativeWriteBytesToPmemBuffer
+ * Signature: (J[BIII)I
+ */
+JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeWriteBytesToPmemBuffer
+  (JNIEnv *, jobject, jlong, jbyteArray, jint, jint);
+
+/*
+ * Class:     lib_jni_pmdk
+ * Method:    nativeGetPmemBufferRemaining
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeGetPmemBufferRemaining
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     lib_jni_pmdk
+ * Method:    nativeCleanPmemBuffer
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeCleanPmemBuffer
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     lib_jni_pmdk
  * Method:    nativeDeletePmemBuffer
- * Signature: (J)J
+ * Signature: (J)I
  */
-JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeDeletePmemBuffer
+JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeDeletePmemBuffer
   (JNIEnv *, jobject, jlong);
 
 #ifdef __cplusplus
