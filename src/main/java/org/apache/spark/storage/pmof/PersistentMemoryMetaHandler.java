@@ -1,7 +1,7 @@
 package org.apache.spark.storage.pmof;
  
+import java.nio.channels.FileLock;
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.PreparedStatement;
@@ -11,10 +11,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.io.*;
- 
+
 public class PersistentMemoryMetaHandler {
 
   private static String url = "jdbc:sqlite:/tmp/spark_shuffle_meta.db";
+  private static String fileLockPath = "/tmp/spark_shuffle_file.lock";
+
+  private static final File file = new File(fileLockPath);
 
   PersistentMemoryMetaHandler(String root_dir) {
     createTable(root_dir);
@@ -28,52 +31,97 @@ public class PersistentMemoryMetaHandler {
                 + ");\n";
 
     url = "jdbc:sqlite:" + root_dir + "/spark_shuffle_meta.db";
+    synchronized (file) {
+      FileOutputStream fos = null;
+      try {
+        fos = new FileOutputStream(file);
+        FileLock fileLock = fos.getChannel().lock();
+        Connection conn = DriverManager.getConnection(url);
+        Statement stmt = conn.createStatement();
+        stmt.execute(sql);
 
-    try {
-      Connection conn = DriverManager.getConnection(url);
-      Statement stmt = conn.createStatement();
-      stmt.execute(sql);
-
-      sql = "CREATE TABLE IF NOT EXISTS devices (\n"
+        sql = "CREATE TABLE IF NOT EXISTS devices (\n"
                 + "	device text UNIQUE,\n"
                 + "	mount_count int\n"
                 + ");";
-      stmt.execute(sql);
-      conn.close();
-    } catch (SQLException e) {
-      System.out.println("createTable failed:" + e.getMessage());
+        stmt.execute(sql);
+        conn.close();
+        fos.close();
+      } catch (SQLException e) {
+        System.out.println("createTable failed:" + e.getMessage());
+      } catch (IOException e) {
+        e.printStackTrace();
+      } finally {
+        if (fos != null) {
+          try {
+            fos.close();
+          } catch (IOException e) {
+            e.printStackTrace();
+          }
+        }
+      }
     }
     System.out.println("Metastore DB connected: " + url);
   }
 
   public void insertRecord(String shuffleId, String device) {
     String sql = "INSERT OR IGNORE INTO metastore(shuffleId,device) VALUES('" + shuffleId + "','" + device + "')";
- 
-    try {
-      Connection conn = DriverManager.getConnection(url);
-      Statement stmt = conn.createStatement();
-      stmt.executeUpdate(sql);
-      conn.close();
-    } catch (SQLException e) {
-      System.err.println("insertRecord failed:" + e.getMessage());
-      System.exit(-1);
+    synchronized (file) {
+      FileOutputStream fos = null;
+      try {
+        fos = new FileOutputStream(file);
+        FileLock fileLock = fos.getChannel().lock();
+        Connection conn = DriverManager.getConnection(url);
+        Statement stmt = conn.createStatement();
+        stmt.executeUpdate(sql);
+        conn.close();
+        fos.close();
+      } catch (SQLException e) {
+        System.err.println("insertRecord failed:" + e.getMessage());
+        System.exit(-1);
+      } catch (IOException e) {
+        e.printStackTrace();
+      } finally {
+        if (fos != null) {
+          try {
+            fos.close();
+          } catch (IOException e) {
+            e.printStackTrace();
+          }
+        }
+      }
     }
   }
 
   public String getShuffleDevice(String shuffleId){
     String sql = "SELECT device FROM metastore where shuffleId = ?";
     String res = "";
-    
-    try {
-      Connection conn = DriverManager.getConnection(url);
-      PreparedStatement pstmt = conn.prepareStatement(sql);
-      pstmt.setString(1, shuffleId);
-      ResultSet rs = pstmt.executeQuery();
-      if (rs != null) {
-        res = rs.getString("device"); 
+    synchronized (file) {
+      FileOutputStream fos = null;
+      try {
+        fos = new FileOutputStream(file);
+        FileLock fileLock = fos.getChannel().lock();
+        Connection conn = DriverManager.getConnection(url);
+        PreparedStatement pstmt = conn.prepareStatement(sql);
+        pstmt.setString(1, shuffleId);
+        ResultSet rs = pstmt.executeQuery();
+        if (rs != null) {
+          res = rs.getString("device");
+        }
+        conn.close();
+        fos.close();
+      } catch (SQLException e) {
+      } catch (IOException e) {
+        e.printStackTrace();
+      } finally {
+        if (fos != null) {
+          try {
+            fos.close();
+          } catch (IOException e) {
+            e.printStackTrace();
+          }
+        }
       }
-      conn.close();
-    } catch (SQLException e) {
     }
     return res;
   }
@@ -84,38 +132,51 @@ public class PersistentMemoryMetaHandler {
     HashMap<String, Integer> device_count = new HashMap<String, Integer>();
     String device = "";
     int count;
-    
-    try {
-      Connection conn = DriverManager.getConnection(url);
-      Statement stmt = conn.createStatement();
-      ResultSet rs = stmt.executeQuery(sql);
-      while (rs.next()) {
-        device_list.add(rs.getString("device"));
-        device_count.put(rs.getString("device"), rs.getInt("mount_count"));
-      }
-
-      full_device_list.removeAll(device_list);
-      if (full_device_list.size() == 0) {
-        // reuse old device, picked the device has smallest mount_count
-        device = getDeviceWithMinCount(device_count);
-        if (device == "") {
-          throw new SQLException();
+    synchronized (file) {
+      FileOutputStream fos = null;
+      try {
+        fos = new FileOutputStream(file);
+        FileLock fileLock = fos.getChannel().lock();
+        Connection conn = DriverManager.getConnection(url);
+        Statement stmt = conn.createStatement();
+        ResultSet rs = stmt.executeQuery(sql);
+        while (rs.next()) {
+          device_list.add(rs.getString("device"));
+          device_count.put(rs.getString("device"), rs.getInt("mount_count"));
         }
-        count = (Integer)device_count.get(device) + 1;
-        sql = "UPDATE devices SET mount_count = " + count + " WHERE device = '" + device + "'\n";
-      } else {
-        device = full_device_list.get(0);
-        count = 1;
-        sql = "INSERT OR IGNORE INTO devices(device, mount_count) VALUES('" + device + "', " + count + ")\n";
+
+        full_device_list.removeAll(device_list);
+        if (full_device_list.size() == 0) {
+          // reuse old device, picked the device has smallest mount_count
+          device = getDeviceWithMinCount(device_count);
+          if (device == "") {
+            throw new SQLException();
+          }
+          count = (Integer) device_count.get(device) + 1;
+          sql = "UPDATE devices SET mount_count = " + count + " WHERE device = '" + device + "'\n";
+        } else {
+          device = full_device_list.get(0);
+          count = 1;
+          sql = "INSERT OR IGNORE INTO devices(device, mount_count) VALUES('" + device + "', " + count + ")\n";
+        }
+
+        System.out.println(sql);
+
+        stmt.executeUpdate(sql);
+        conn.close();
+        fos.close();
+      } catch (SQLException e) {
+        System.err.println("getUnusedDevice insert device " + device + "failed: " + e.getMessage());
+        System.exit(-1);
+      } catch (IOException e) {
+        e.printStackTrace();
+      } finally {
+        try {
+          fos.close();
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
       }
-
-      System.out.println(sql);
-
-      stmt.executeUpdate(sql);
-      conn.close();
-    } catch (SQLException e) {
-      System.err.println("getUnusedDevice insert device " + device + "failed: " + e.getMessage());
-      System.exit(-1);
     }
     System.out.println("Metastore DB: get unused device, should be " + device + ".");
     return device;
