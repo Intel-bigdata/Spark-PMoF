@@ -2,6 +2,8 @@ package org.apache.spark.storage.pmof;
  
 import java.nio.channels.FileLock;
 import java.sql.Connection;
+import org.sqlite.SQLiteConfig;
+import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.PreparedStatement;
@@ -71,6 +73,8 @@ public class PersistentMemoryMetaHandler {
       try {
         fos = new FileOutputStream(file);
         FileLock fileLock = fos.getChannel().lock();
+        SQLiteConfig config = new SQLiteConfig();
+        config.setBusyTimeout("30000");
         Connection conn = DriverManager.getConnection(url);
         Statement stmt = conn.createStatement();
         stmt.executeUpdate(sql);
@@ -137,6 +141,8 @@ public class PersistentMemoryMetaHandler {
       try {
         fos = new FileOutputStream(file);
         FileLock fileLock = fos.getChannel().lock();
+        SQLiteConfig config = new SQLiteConfig();
+        config.setBusyTimeout("30000");
         Connection conn = DriverManager.getConnection(url);
         Statement stmt = conn.createStatement();
         ResultSet rs = stmt.executeQuery(sql);
