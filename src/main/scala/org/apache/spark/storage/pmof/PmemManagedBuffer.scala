@@ -54,9 +54,9 @@ class PmemManagedBuffer(pmHandler: PersistentMemoryHandler, blockId: String) ext
   override def release(): ManagedBuffer = {
     if (refCount.decrementAndGet() == 0) {
       if (byteBuffer != null) {
-        var cleanerField: java.lang.reflect.Field = byteBuffer.getClass.getDeclaredField("cleaner");
+        val cleanerField: java.lang.reflect.Field = byteBuffer.getClass.getDeclaredField("cleaner");
         cleanerField.setAccessible(true);
-        var cleaner: Cleaner = cleanerField.get(byteBuffer).asInstanceOf[Cleaner]
+        val cleaner: Cleaner = cleanerField.get(byteBuffer).asInstanceOf[Cleaner]
         cleaner.clean();
       }
       if (inputStream != null) {
@@ -67,8 +67,8 @@ class PmemManagedBuffer(pmHandler: PersistentMemoryHandler, blockId: String) ext
   }
 
   override def convertToNetty(): Object = {
-    var data_length = size().toInt
-    var in = createInputStream()
+    val data_length = size().toInt
+    val in = createInputStream()
     in.asInstanceOf[PmemInputStream].load(data_length)
     Unpooled.wrappedBuffer(in.asInstanceOf[PmemInputStream].getByteBufferDirectAddr(), data_length, false)
   }

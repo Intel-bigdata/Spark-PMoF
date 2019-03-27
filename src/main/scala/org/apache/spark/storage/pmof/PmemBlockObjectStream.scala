@@ -22,7 +22,7 @@ class PmemBlockId (stageId: Int, tmpId: Int) extends ShuffleBlockId(stageId, 0, 
 object PmemBlockId {
   private var tempId: Int = 0
   def getTempBlockId(stageId: Int): PmemBlockId = synchronized {
-    var cur_tempId = tempId
+    val cur_tempId = tempId
     tempId += 1
     new PmemBlockId (stageId, cur_tempId)
   }
@@ -53,13 +53,13 @@ private[spark] class PmemBlockObjectStream(
   val maxStages: Int = conf.getInt("spark.shuffle.pmof.max_stage_num", defaultValue = 1000)
   val enable_rdma: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_rdma", defaultValue = true)
   val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(root_dir, path_list, blockId.name, maxPoolSize, maxStages, numMaps, enable_rdma)
-  var spill_throttle = 4194304
+  val spill_throttle = 4194304
   persistentMemoryWriter.updateShuffleMeta(blockId.name)
   logDebug(blockId.name)
 
   var objStream: SerializationStream = _
   var wrappedStream: OutputStream = _
-  var bytesStream: OutputStream = new PmemOutputStream(
+  val bytesStream: OutputStream = new PmemOutputStream(
     persistentMemoryWriter, numPartitions, blockId.name)
   var inputStream: InputStream = _
 
@@ -79,12 +79,9 @@ private[spark] class PmemBlockObjectStream(
   override def close() {
     if (initialized) {
       logDebug("PersistentMemoryHandlerPartition: stream closed.")
+      objStream.close()
       bytesStream.close()
     }
-  }
-
-  def noAutoSpill(): Unit = {
-    spill_throttle = -1
   }
 
   def maybeSpill(force: Boolean = false): Unit = {
@@ -93,6 +90,7 @@ private[spark] class PmemBlockObjectStream(
       objStream.flush()
       bytesStream.flush()
       val bufSize = bytesStream.asInstanceOf[PmemOutputStream].size
+      //logInfo(blockId.name + " do spill, size is " + bufSize)
 
       recordsArray += recordsPerBlock
       recordsPerBlock = 0
@@ -116,9 +114,8 @@ private[spark] class PmemBlockObjectStream(
 
   def getPartitionMeta(): Array[(Long, Int, Int)] = {
     if (partitionMeta == null) {
-      var blockInfo: Array[(Long, Int)] = persistentMemoryWriter.getPartitionBlockInfo(blockId.name)
       var i = -1
-      partitionMeta = blockInfo.map{ x=> i+=1; (x._1, x._2, recordsArray(i))}
+      partitionMeta = persistentMemoryWriter.getPartitionBlockInfo(blockId.name).map{ x=> i+=1; (x._1, x._2, recordsArray(i))}
     }
     partitionMeta
   }

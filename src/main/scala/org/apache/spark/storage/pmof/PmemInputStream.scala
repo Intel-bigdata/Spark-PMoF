@@ -9,11 +9,11 @@ class PmemInputStream(
   persistentMemoryWriter: PersistentMemoryHandler,
   blockId: String
   ) extends InputStream with Logging {
-  var buf = new PmemBuffer()
+  val buf = new PmemBuffer()
   var index: Int = 0
   var remaining: Int = 0
   var available_bytes: Int = persistentMemoryWriter.getPartitionSize(blockId).toInt
-  var blockInfo: Array[(Long, Int)] = persistentMemoryWriter.getPartitionBlockInfo(blockId)
+  val blockInfo: Array[(Long, Int)] = persistentMemoryWriter.getPartitionBlockInfo(blockId)
 
   def loadNextStream(): Int = {
     if (index >= blockInfo.length)

@@ -99,7 +99,7 @@ private[spark] class PersistentMemoryHandler(
     if (blockType == "shuffle") {
       ret_addr = pmpool.setMapPartition(numPartitions, stageId, shuffleId, partitionId, buf, clean)
     } else if (blockType == "reduce_spill") {
-      ret_addr = pmpool.setReducePartition(1000/*TODO: should be incrementable*/, stageId, partitionId, buf, clean)
+      ret_addr = pmpool.setReducePartition(100000/*TODO: should be incrementable*/, stageId, partitionId, buf, clean)
     }
     ret_addr
   }
