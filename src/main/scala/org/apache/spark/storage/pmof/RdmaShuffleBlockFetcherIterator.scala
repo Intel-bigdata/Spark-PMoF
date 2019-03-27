@@ -23,11 +23,12 @@ import java.util.concurrent.LinkedBlockingQueue
 import javax.annotation.concurrent.GuardedBy
 import org.apache.spark.internal.Logging
 import org.apache.spark.network.buffer.{FileSegmentManagedBuffer, ManagedBuffer}
-import org.apache.spark.network.shuffle.{ShuffleClient, TempFileManager}
+import org.apache.spark.network.shuffle.{ShuffleClient, DownloadFileManager, DownloadFile, SimpleDownloadFile}
 import org.apache.spark.network.pmof._
 import org.apache.spark.shuffle.FetchFailedException
 import org.apache.spark.storage._
 import org.apache.spark.{SparkException, TaskContext}
+import org.apache.spark.network.util.TransportConf
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -70,7 +71,7 @@ final class RdmaShuffleBlockFetcherIterator(
                                          maxBlocksInFlightPerAddress: Int,
                                          maxReqSizeShuffleToMem: Long,
                                          detectCorrupt: Boolean)
-  extends Iterator[(BlockId, InputStream)] with TempFileManager with Logging {
+  extends Iterator[(BlockId, InputStream)] with DownloadFileManager with Logging {
 
   import RdmaShuffleBlockFetcherIterator._
 
@@ -126,7 +127,7 @@ final class RdmaShuffleBlockFetcherIterator(
     * deleted when cleanup. This is a layer of defensiveness against disk file leaks.
     */
   @GuardedBy("this")
-  private[this] val shuffleFilesSet = mutable.HashSet[File]()
+  private[this] val shuffleFilesSet = mutable.HashSet[DownloadFile]()
 
   private[this] val remoteRdmaRequestQueue = new LinkedBlockingQueue[RdmaRequest]()
 
@@ -256,11 +257,13 @@ final class RdmaShuffleBlockFetcherIterator(
     currentResult = null
   }
 
-  override def createTempFile(): File = {
-    blockManager.diskBlockManager.createTempLocalBlock()._2
+  //override def createTempFile(): DownloadFile = {
+  override def createTempFile(transportConf: TransportConf): DownloadFile = {
+    new SimpleDownloadFile(
+      blockManager.diskBlockManager.createTempLocalBlock()._2, transportConf)
   }
 
-  override def registerTempFileToClean(file: File): Boolean = synchronized {
+  override def registerTempFileToClean(file: DownloadFile): Boolean = synchronized {
     if (isZombie) {
       false
     } else {
@@ -296,7 +299,7 @@ final class RdmaShuffleBlockFetcherIterator(
     }
     shuffleFilesSet.foreach { file =>
       if (!file.delete()) {
-        logWarning("Failed to cleanup shuffle fetch temp file " + file.getAbsolutePath)
+        //logWarning("Failed to cleanup shuffle fetch temp file " + file.getAbsolutePath)
       }
     }
   }

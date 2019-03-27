@@ -5,7 +5,7 @@ import java.util.Random
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 
 import org.apache.spark.network.BlockDataManager
-import org.apache.spark.network.shuffle.{BlockFetchingListener, TempFileManager}
+import org.apache.spark.network.shuffle.{BlockFetchingListener, DownloadFileManager}
 import org.apache.spark.serializer.JavaSerializer
 import org.apache.spark.shuffle.pmof.{MetadataResolver, PmofShuffleManager}
 import org.apache.spark.storage.{BlockId, BlockManager, ShuffleBlockId}
@@ -30,7 +30,7 @@ class RdmaTransferService(conf: SparkConf, val shuffleManager: PmofShuffleManage
                            executId: String,
                            blockIds: Array[String],
                            blockFetchingListener: BlockFetchingListener,
-                           tempFileManager: TempFileManager): Unit = {}
+                           tempFileManager: DownloadFileManager): Unit = {}
 
   def fetchBlock(reqHost: String, reqPort: Int, rmaAddress: Long, rmaLength: Int,
                  rmaRkey: Long, localAddress: Int, shuffleBuffer: ShuffleBuffer,
