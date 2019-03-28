@@ -30,6 +30,8 @@ private[spark] class PmemExternalSorter[K, V, C](
   private val serializerManager = SparkEnv.get.serializerManager
   private val serInstance = serializer.newInstance()
   private val numPartitions = partitioner.map(_.numPartitions).getOrElse(1)
+  private val inMemoryCollectionSizeThreshold: Long = 
+    SparkEnv.get.conf.getLong("spark.shuffle.spill.pmof.MemoryThreshold", 5 * 1024 * 1024)
 
   private val keyComparator: Comparator[K] = ordering.getOrElse(new Comparator[K] {
     override def compare(a: K, b: K): Int = {
@@ -62,6 +64,20 @@ private[spark] class PmemExternalSorter[K, V, C](
       1,
       numPartitions)
     partitionBufferArray(partitionBufferArray.length - 1)
+  }
+
+  override protected[this] def maybeSpill(collection: WritablePartitionedPairCollection[K, C], currentMemory: Long): Boolean = {
+    var shouldSpill = false
+
+    if (elementsRead % 32 == 0 && currentMemory >= inMemoryCollectionSizeThreshold) {
+      shouldSpill = currentMemory >= inMemoryCollectionSizeThreshold
+      //logInfo("maybeSpill")
+    }
+    // Actually spill
+    if (shouldSpill) {
+      spill(collection)
+    }
+    shouldSpill
   }
 
   override protected[this] def spill(collection: WritablePartitionedPairCollection[K, C]): Unit = {
