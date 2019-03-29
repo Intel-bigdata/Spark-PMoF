@@ -92,6 +92,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
         sorter = new PmemExternalSorter[K, V, C](context, handle, dep.aggregator, Some(dep.partitioner), dep.keyOrdering, dep.serializer)
 				sorter.setPartitionByteBufferArray(partitionBufferArray)
         sorter.insertAll(records)
+        sorter.forceSpillToPmem()
       } else {
         throw new IllegalStateException("Aggregator is empty for map-side combine")
       }
