@@ -7,7 +7,8 @@ import org.apache.spark.internal.Logging
 class PmemOutputStream(
   persistentMemoryWriter: PersistentMemoryHandler,
   numPartitions: Int,
-  blockId: String
+  blockId: String,
+  numMaps: Int
   ) extends OutputStream with Logging {
   val buf = new PmemBuffer()
   var set_clean = true
@@ -24,7 +25,7 @@ class PmemOutputStream(
   }
 
   override def flush(): Unit = {
-    persistentMemoryWriter.setPartition(numPartitions, blockId, buf, set_clean)
+    persistentMemoryWriter.setPartition(numPartitions, blockId, buf, set_clean, numMaps)
     if (set_clean == true) {
       set_clean = false
     }

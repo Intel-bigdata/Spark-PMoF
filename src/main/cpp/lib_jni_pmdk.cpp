@@ -11,26 +11,26 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_
 }
 
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetMapPartition
-  (JNIEnv *env, jclass obj, jlong pmpool, jint partitionNum, jint stageId, jint mapId, jint partitionId, long pmBuffer, jboolean set_clean) {
+  (JNIEnv *env, jclass obj, jlong pmpool, jint partitionNum, jint stageId, jint mapId, jint partitionId, long pmBuffer, jboolean set_clean, jint numMaps) {
     int size = ((PmemBuffer*)pmBuffer)->getRemaining();
     char* buf = ((PmemBuffer*)pmBuffer)->getDataForFlush(size);
     if (buf == nullptr) {
       return -1;
     }
     //printf("nativeSetMapPartition for shuffle_%d_%d_%d\n", stageId, mapId, partitionId);
-    long addr = ((PMPool*)pmpool)->setMapPartition(partitionNum, stageId, mapId, partitionId, size, buf, set_clean);
+    long addr = ((PMPool*)pmpool)->setMapPartition(partitionNum, stageId, mapId, partitionId, size, buf, set_clean, numMaps);
     return addr;
 }
 
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetReducePartition
-  (JNIEnv *env, jclass obj, jlong pmpool, jint partitionNum, jint stageId, jint partitionId, long pmBuffer, jboolean clean) {
+  (JNIEnv *env, jclass obj, jlong pmpool, jint partitionNum, jint stageId, jint partitionId, long pmBuffer, jboolean clean, jint numMaps) {
     int size = ((PmemBuffer*)pmBuffer)->getRemaining();
     char* buf = ((PmemBuffer*)pmBuffer)->getDataForFlush(size);
     if (buf == nullptr) {
       return -1;
     }
     //printf("nativeSetMapPartition for spill_%d_%d\n", stageId, partitionId);
-    long addr = ((PMPool*)pmpool)->setReducePartition(partitionNum, stageId, partitionId, size, buf, clean);
+    long addr = ((PMPool*)pmpool)->setReducePartition(partitionNum, stageId, partitionId, size, buf, clean, numMaps);
     return addr;
 }
 
@@ -84,6 +84,16 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetReducePartitionSize
   (JNIEnv *env, jclass obj, jlong pmpool, jint stageId, jint mapId, jint partitionId) {
     return ((PMPool*)pmpool)->getReducePartitionSize(stageId, mapId, partitionId);
+  }
+
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeDeleteMapPartition
+  (JNIEnv *env, jclass obj, jlong pmpool, jint stageId, jint mapId, jint partitionId) {
+    return ((PMPool*)pmpool)->deleteMapPartition(stageId, mapId, partitionId);
+  }
+
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeDeleteReducePartition
+  (JNIEnv *env, jclass obj, jlong pmpool, jint stageId, jint mapId, jint partitionId) {
+    return ((PMPool*)pmpool)->deleteReducePartition(stageId, mapId, partitionId);
   }
 
 JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeCloseDevice

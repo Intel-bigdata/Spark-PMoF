@@ -34,7 +34,7 @@ private[spark] class PersistentMemoryHandler(
     val path_list: List[String],
     val shuffleId: String,
     val maxStages: Int = 1000,
-    val maxShuffles: Int = 1000,
+    val numMaps: Int = 1000,
     var poolSize: Long = -1) extends Logging {
   // need to use a locked file to get which pmem device should be used.
   val pmMetaHandler: PersistentMemoryMetaHandler = new PersistentMemoryMetaHandler(root_dir)
@@ -43,7 +43,7 @@ private[spark] class PersistentMemoryHandler(
     //this shuffleId haven't been written before, choose a new device
     val path_array_list = new java.util.ArrayList[String](path_list.asJava)
     device = pmMetaHandler.getUnusedDevice(path_array_list)
-    logInfo("This a new shuffleBlock, find an unused device:" + device + ", numMaps of this stage is " + maxShuffles)
+    logInfo("This a new shuffleBlock, find an unused device:" + device + ", numMaps of this stage is " + numMaps)
 
     val dev = Paths.get(device)
     if (Files.isDirectory(dev)) {
@@ -54,10 +54,10 @@ private[spark] class PersistentMemoryHandler(
       poolSize = 0
     }
   } else {
-    logInfo("This a recently opened shuffleBlock, use the original device:" + device + ", numMaps of this stage is " + maxShuffles)
+    logInfo("This a recently opened shuffleBlock, use the original device:" + device + ", numMaps of this stage is " + numMaps)
   }
   
-  val pmpool = new PersistentMemoryPool(device, maxStages, maxShuffles, poolSize)
+  val pmpool = new PersistentMemoryPool(device, maxStages, numMaps, poolSize)
   var rkey: Long = 0
 
   def getDevice(): String = {
@@ -93,13 +93,13 @@ private[spark] class PersistentMemoryHandler(
     pmpool.getReducePartitionSize(stageId, shuffleId, partitionId)
   }
   
-  def setPartition(numPartitions: Int, blockId: String, buf: PmemBuffer, clean: Boolean): Long = {
+  def setPartition(numPartitions: Int, blockId: String, buf: PmemBuffer, clean: Boolean, numMaps: Int = 1): Long = {
     val (blockType, stageId, shuffleId, partitionId) = getBlockDetail(blockId)
     var ret_addr: Long = 0
     if (blockType == "shuffle") {
-      ret_addr = pmpool.setMapPartition(numPartitions, stageId, shuffleId, partitionId, buf, clean)
+      ret_addr = pmpool.setMapPartition(numPartitions, stageId, shuffleId, partitionId, buf, clean, numMaps)
     } else if (blockType == "reduce_spill") {
-      ret_addr = pmpool.setReducePartition(10000000/*TODO: should be incrementable*/, stageId, partitionId, buf, clean)
+      ret_addr = pmpool.setReducePartition(10000, stageId, partitionId, buf, clean, numMaps)
     }
     ret_addr
   }
@@ -113,10 +113,18 @@ private[spark] class PersistentMemoryHandler(
     if (blockType == "shuffle") {
       pmpool.getMapPartition(stageId, shuffleId, partitionId)
     } else if (blockType == "reduce_spill") {
-      logInfo("getReducePartition: partitionId is " + partitionId)
       pmpool.getReducePartition(stageId, shuffleId, partitionId)
     } else {
       new Array[Byte](0)
+    }
+  }
+
+  def deletePartition(blockId: String): Unit = {
+    val (blockType, stageId, shuffleId, partitionId) = getBlockDetail(blockId)
+    if (blockType == "shuffle") {
+      pmpool.deleteMapPartition(stageId, shuffleId, partitionId)
+    } else if (blockType == "reduce_spill") {
+      pmpool.deleteReducePartition(stageId, shuffleId, partitionId)
     }
   }
 
