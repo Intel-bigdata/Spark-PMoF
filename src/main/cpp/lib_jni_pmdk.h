@@ -18,18 +18,18 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_
 /*
  * Class:     lib_jni_pmdk
  * Method:    nativeSetMapPartition
- * Signature: (JIIIIJZ)J
+ * Signature: (JIIIIJZI)J
  */
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetMapPartition
-  (JNIEnv *, jclass, jlong, jint, jint, jint, jint, jlong, jboolean);
+  (JNIEnv *, jclass, jlong, jint, jint, jint, jint, jlong, jboolean, jint);
 
 /*
  * Class:     lib_jni_pmdk
  * Method:    nativeSetReducePartition
- * Signature: (JIIIIJZ)J
+ * Signature: (JIIIIJZI)J
  */
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetReducePartition
-  (JNIEnv *, jclass, jlong, jint, jint, jint, jlong, jboolean);
+  (JNIEnv *, jclass, jlong, jint, jint, jint, jlong, jboolean, jint);
 
 /*
  * Class:     lib_jni_pmdk
@@ -65,7 +65,7 @@ JNIEXPORT jlongArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemory
 
 /*
  * Class:     lib_jni_pmdk
- * Method:    nativeReduceMapPartitionBlockInfo
+ * Method:    nativeGetReduceMapPartitionBlockInfo
  * Signature: (JIII)[J
  */
 JNIEXPORT jlongArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetReducePartitionBlockInfo
@@ -85,6 +85,22 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_
  * Signature: (JIII)J
  */
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetReducePartitionSize
+  (JNIEnv *, jclass, jlong, jint, jint, jint);
+
+/*
+ * Class:     lib_jni_pmdk
+ * Method:    nativeDeleteMapPartition
+ * Signature: (JIII)J
+ */
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeDeleteMapPartition
+  (JNIEnv *, jclass, jlong, jint, jint, jint);
+
+/*
+ * Class:     lib_jni_pmdk
+ * Method:    nativeDeleteReducePartition
+ * Signature: (JIII)J
+ */
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeDeleteReducePartition
   (JNIEnv *, jclass, jlong, jint, jint, jint);
 
 /*

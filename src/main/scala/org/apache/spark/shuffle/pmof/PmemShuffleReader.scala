@@ -100,7 +100,7 @@ private[spark] class PmemShuffleReader[K, C](
         // Create an ExternalSorter to sort the data.
         val sorter =
           new PmemExternalSorter[K, C, C](context, handle, ordering = Some(keyOrd), serializer = dep.serializer)
-        logInfo("call PmemExternalSorter.insertAll for shuffle_0_" + handle.shuffleId + "_[" + startPartition + "," + endPartition + "]" )
+        logDebug("call PmemExternalSorter.insertAll for shuffle_0_" + handle.shuffleId + "_[" + startPartition + "," + endPartition + "]" )
         sorter.insertAll(aggregatedIter)
         // Use completion callback to stop sorter if task was finished/cancelled.
         context.addTaskCompletionListener(_ => {

@@ -6,14 +6,14 @@ import org.apache.spark.internal.Logging
 import scala.util.control.Breaks._
 
 class PmemInputStream(
-  persistentMemoryWriter: PersistentMemoryHandler,
+  persistentMemoryHandler: PersistentMemoryHandler,
   blockId: String
   ) extends InputStream with Logging {
   val buf = new PmemBuffer()
   var index: Int = 0
   var remaining: Int = 0
-  var available_bytes: Int = persistentMemoryWriter.getPartitionSize(blockId).toInt
-  val blockInfo: Array[(Long, Int)] = persistentMemoryWriter.getPartitionBlockInfo(blockId)
+  var available_bytes: Int = persistentMemoryHandler.getPartitionSize(blockId).toInt
+  val blockInfo: Array[(Long, Int)] = persistentMemoryHandler.getPartitionBlockInfo(blockId)
 
   def loadNextStream(): Int = {
     if (index >= blockInfo.length)
@@ -70,5 +70,10 @@ class PmemInputStream(
 
   override def close(): Unit = {
     buf.close()
+  }
+
+  def deleteBlock(): Unit = {
+    // FIXME: DELETE PMEM PARTITON HERE
+    persistentMemoryHandler.deletePartition(blockId)
   }
 }

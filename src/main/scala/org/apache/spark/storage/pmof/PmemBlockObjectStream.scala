@@ -60,7 +60,7 @@ private[spark] class PmemBlockObjectStream(
   var objStream: SerializationStream = _
   var wrappedStream: OutputStream = _
   val bytesStream: OutputStream = new PmemOutputStream(
-    persistentMemoryWriter, numPartitions, blockId.name)
+    persistentMemoryWriter, numPartitions, blockId.name, numMaps)
   var inputStream: InputStream = _
 
   override def write(key: Any, value: Any): Unit = {

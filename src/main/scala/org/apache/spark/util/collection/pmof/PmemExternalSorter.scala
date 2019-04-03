@@ -356,6 +356,7 @@ private[spark] class PmemExternalSorter[K, V, C](
       if (inObjStream == null) {
         if (inStream != null) {
           inStream.close()
+          inStream.asInstanceOf[PmemInputStream].deleteBlock()
         }
         return null
       }

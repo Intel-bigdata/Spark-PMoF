@@ -52,10 +52,6 @@ private[spark] class PmemShuffleWriter[K, V, C](
   val enable_rdma: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_rdma", defaultValue = true)
   val enable_pmem: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_pmem", defaultValue = true)
 
-  val maxPoolSize: Long = conf.getLong("spark.shuffle.pmof.pmpool_size", defaultValue = 1073741824)
-  val maxStages: Int = conf.getInt("spark.shuffle.pmof.max_stage_num", defaultValue = 1000)
-  val maxMaps: Int = numMaps
-
   val partitionLengths: Array[Long] = Array.fill[Long](numPartitions)(0)
   var set_clean: Boolean = true
   private var sorter: PmemExternalSorter[K, V, _] = null
@@ -107,14 +103,22 @@ private[spark] class PmemShuffleWriter[K, V, C](
         partitionBufferArray(partitionId).maybeSpill(force = true)
       }
     }
-    val data_addr_map = Array.ofDim[(Long, Int)](numPartitions, 1)
+
+    var numSpilledPartitions = 0
+    while( numSpilledPartitions < numPartitions && partitionBufferArray(numSpilledPartitions).ifSpilled ) {
+      numSpilledPartitions += 1
+    }
+    val data_addr_map = Array.ofDim[(Long, Int)](numSpilledPartitions, 1)
     var output_str : String = ""
 
-    for (i <- 0 until numPartitions) {
+    for (i <- 0 until numSpilledPartitions) {
       data_addr_map(i) = partitionBufferArray(i).getPartitionMeta.map{info => (info._1, info._2)}
       writeMetrics.incRecordsWritten(partitionBufferArray(i).records)
       partitionLengths(i) = partitionBufferArray(i).size
       output_str += "\tPartition " + i + ": " + partitionLengths(i) + ", records: " + partitionBufferArray(i).records + "\n"
+      partitionBufferArray(i).close()
+    }
+    for (i <- numSpilledPartitions until numPartitions) {
       partitionBufferArray(i).close()
     }
 

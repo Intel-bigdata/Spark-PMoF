@@ -1,5 +1,4 @@
 #ifndef WORKQUEUE_H
-    std::unique_lock<std::mutex> lck;
 #define WORKQUEUE_H
 
 #include <queue>
@@ -7,19 +6,18 @@
 #include <condition_variable>
 #include <iostream>
 #include <chrono>
+#include <unistd.h>
 
 template <typename T> class WorkQueue{
 public:
     typedef T queue_type;
     std::queue<queue_type> _queue;
     std::mutex _queue_lock;
-    std::mutex cond_lock;
-    //std::mutex::scoped_lock scope_cond_lock;
-    std::condition_variable m_cond;
-    std::unique_lock<std::mutex> unique_lock;
+    //std::mutex cond_lock;
+    //std::condition_variable m_cond;
+    //std::unique_lock<std::mutex> unique_lock;
 
-    //WorkQueue():scope_cond_lock(cond_lock){}
-    WorkQueue():unique_lock(cond_lock){}
+    WorkQueue(){}
 
     void enqueue( queue_type _work ){
         std::lock_guard<std::mutex> guard(_queue_lock);
@@ -52,8 +50,8 @@ public:
         return this->_queue.size();
     }
 
-    void wake_all(){
+    /*void wake_all(){
         m_cond.notify_all();
-    }
+    }*/
 };
 #endif
