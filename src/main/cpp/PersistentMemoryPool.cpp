@@ -1,5 +1,5 @@
 #include "PersistentMemoryPool.h"
-#include <string>
+#include <functional>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,18 +7,14 @@
 #include <fcntl.h>
 #include <fstream>
 
-PMPool::PMPool(const char* dev, int maxStage, int maxMap, long size):
-    maxStage(maxStage),
-    maxMap(maxMap),
+template<typename T>
+PMPool<T>::PMPool(const char* dev, long size):
     stop(false),
     dev(dev),
-    worker(&PMPool::process, this) {
+    worker(&PMPool<T>::process, this) {
 
-  const char *pool_layout_name = "pmem_spark_shuffle";
-  cout << "PMPOOL is " << dev << endl;
-  // if this is a fsdax device
-  // we need to create 
-  // if this is a devdax device
+  const char *pool_layout_name = "pmempool_sso";
+  cout << "PMPOOL is " << dev << ", pid is " << getpid() << endl;
 
   pmpool = pmemobj_open(dev, pool_layout_name);
   if (pmpool == NULL) {
@@ -29,10 +25,11 @@ PMPool::PMPool(const char* dev, int maxStage, int maxMap, long size):
       exit(-1);
   }
 
-  stageArrayRoot = POBJ_ROOT(pmpool, struct StageArrayRoot);
+  hashMapRoot = POBJ_ROOT(pmpool, struct HashMapRoot);
 }
 
-PMPool::~PMPool() {
+template<typename T>
+PMPool<T>::~PMPool() {
     while(request_queue.size() > 0) {
         fprintf(stderr, "%s request queue size is %d\n", dev, request_queue.size());
         sleep(1);
@@ -43,11 +40,13 @@ PMPool::~PMPool() {
     pmemobj_close(pmpool);
 }
 
-long PMPool::getRootAddr() {
+template<typename T>
+long PMPool<T>::getRootAddr() {
     return (long)pmpool;
 }
 
-void PMPool::process() {
+template<typename T>
+void PMPool<T>::process() {
     Request *cur_req;
     while(!stop) {
         cur_req = (Request*)request_queue.dequeue();
@@ -57,87 +56,71 @@ void PMPool::process() {
     }
 }
 
-long PMPool::setMapPartition(
-        int partitionNum,
-        int stageId, 
-        int mapId, 
-        int partitionId,
-        long size,
-        char* data,
-        bool clean,
-        int numMaps) {
-    WriteRequest write_request(this, maxStage, numMaps, partitionNum, stageId, 0, mapId, partitionId, size, data, clean);
+template<typename T>
+long PMPool<T>::setBlock(T key, long size, char* data, bool clean) {
+    size_t key_i = hash_fn(key);
+    return setBlock(key_i, size, data, clean);
+}
+
+template<typename T>
+long PMPool<T>::setBlock(size_t key, long size, char* data, bool clean) {
+    WriteRequest write_request(this, key, size, data, clean);
     request_queue.enqueue((void*)&write_request);
+    //write_request.exec();
     return write_request.getResult();
 }
 
-long PMPool::setReducePartition(
-        int partitionNum,
-        int stageId, 
-        int partitionId,
-        long size,
-        char* data,
-        bool clean,
-        int numMaps) {
-    WriteRequest write_request(this, maxStage, 1, partitionNum, stageId, 1, 0, partitionId, size, data, clean);
-    request_queue.enqueue((void*)&write_request);
-    
-    return write_request.getResult();
+template<typename T>
+long PMPool<T>::getBlock(MemoryBlock* mb, T key) {
+    size_t key_i = hash_fn(key);
+    return getBlock(mb, key_i);
 }
 
-long PMPool::getMapPartition(
-        MemoryBlock* mb,
-        int stageId,
-        int mapId,
-        int partitionId ) {
-    ReadRequest read_request(this, mb, stageId, 0, mapId, partitionId);
+template<typename T>
+long PMPool<T>::getBlock(MemoryBlock* mb, size_t key) {
+    ReadRequest read_request(this, mb, key);
     read_request.exec();
     return read_request.getResult();
 }
     
-long PMPool::getReducePartition(
-        MemoryBlock* mb,
-        int stageId,
-        int mapId,
-        int partitionId ) {
-    ReadRequest read_request(this, mb, stageId, 1, mapId, partitionId);
-    read_request.exec();
-    read_request.getResult();
+template<typename T>
+long PMPool<T>::getBlockIndex(BlockInfo *blockInfo, T key) {
+    size_t key_i = hash_fn(key);
+    return getBlockIndex(blockInfo, key_i);
 }
 
-long PMPool::getMapPartitionBlockInfo(BlockInfo *blockInfo, int stageId, int mapId, int partitionId) {
-    MetaRequest meta_request(this, blockInfo, stageId, 0, mapId, partitionId);
+template<typename T>
+long PMPool<T>::getBlockIndex(BlockInfo *blockInfo, size_t key) {
+    MetaRequest meta_request(this, blockInfo, key);
     meta_request.exec();
     return meta_request.getResult();
 }
 
-long PMPool::getReducePartitionBlockInfo(BlockInfo *blockInfo, int stageId, int mapId, int partitionId) {
-    MetaRequest meta_request(this, blockInfo, stageId, 1, mapId, partitionId);
-    meta_request.exec();
-    return meta_request.getResult();
+template<typename T>
+long PMPool<T>::getBlockSize(T key) {
+    size_t key_i = hash_fn(key);
+    return getBlockSize(key_i);
 }
 
-long PMPool::getMapPartitionSize(int stageId, int mapId, int partitionId) {
-    SizeRequest size_request(this, stageId, 0, mapId, partitionId);
+template<typename T>
+long PMPool<T>::getBlockSize(size_t key) {
+    SizeRequest size_request(this, key);
     size_request.exec();
     return size_request.getResult();
 }
 
-long PMPool::getReducePartitionSize(int stageId, int mapId, int partitionId) {
-    SizeRequest size_request(this, stageId, 1, mapId, partitionId);
-    size_request.exec();
-    return size_request.getResult();
+template<typename T>
+long PMPool<T>::deleteBlock(T key) {
+    size_t key_i = hash_fn(key);
+    return deleteBlock(key_i);
 }
 
-long PMPool::deleteMapPartition(int stageId, int mapId, int partitionId) {
-    DeleteRequest delete_request(this, stageId, 0, mapId, partitionId);
+template<typename T>
+long PMPool<T>::deleteBlock(size_t key) {
+    DeleteRequest delete_request(this, key);
     request_queue.enqueue((void*)&delete_request);
     return delete_request.getResult();
+
 }
 
-long PMPool::deleteReducePartition(int stageId, int mapId, int partitionId) {
-    DeleteRequest delete_request(this, stageId, 1, mapId, partitionId);
-    request_queue.enqueue((void*)&delete_request);
-    return delete_request.getResult();
-}
-
+template class PMPool<string>;

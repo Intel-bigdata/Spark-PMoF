@@ -13,39 +13,23 @@ extern "C" {
  * Signature: (Ljava/lang/String;IIJ)J
  */
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeOpenDevice
-  (JNIEnv *, jclass, jstring, jint maxStage, jint maxMap, jlong size);
+  (JNIEnv *, jclass, jstring, jlong size);
 
 /*
  * Class:     lib_jni_pmdk
- * Method:    nativeSetMapPartition
- * Signature: (JIIIIJZI)J
+ * Method:    nativeSetBlock
+ * Signature: (JLjava/lang/String;JZI)J
  */
-JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetMapPartition
-  (JNIEnv *, jclass, jlong, jint, jint, jint, jint, jlong, jboolean, jint);
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetBlock
+  (JNIEnv *, jclass, jlong, jstring, jlong, jboolean);
 
 /*
  * Class:     lib_jni_pmdk
- * Method:    nativeSetReducePartition
- * Signature: (JIIIIJZI)J
+ * Method:    nativeGetBlock
+ * Signature: (JLjava/lang/String;)[B
  */
-JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetReducePartition
-  (JNIEnv *, jclass, jlong, jint, jint, jint, jlong, jboolean, jint);
-
-/*
- * Class:     lib_jni_pmdk
- * Method:    nativeGetPartition
- * Signature: (JIII)[B
- */
-JNIEXPORT jbyteArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetMapPartition
-  (JNIEnv *, jclass, jlong, jint, jint, jint);
-
-/*
- * Class:     lib_jni_pmdk
- * Method:    nativeGetPartition
- * Signature: (JIII)[B
- */
-JNIEXPORT jbyteArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetReducePartition
-  (JNIEnv *, jclass, jlong, jint, jint, jint);
+JNIEXPORT jbyteArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetBlock
+  (JNIEnv *, jclass, jlong, jstring);
 
 /*
  * Class:     lib_jni_pmdk
@@ -57,51 +41,27 @@ JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_n
 
 /*
  * Class:     lib_jni_pmdk
- * Method:    nativeGetMapPartitionBlockInfo
- * Signature: (JIII)[J
+ * Method:    nativeGetBlockIndex
+ * Signature: (JLjava/lang/String;)[J
  */
-JNIEXPORT jlongArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetMapPartitionBlockInfo
-  (JNIEnv *, jclass, jlong, jint, jint, jint);
+JNIEXPORT jlongArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetBlockIndex
+  (JNIEnv *, jclass, jlong, jstring);
 
 /*
  * Class:     lib_jni_pmdk
- * Method:    nativeGetReduceMapPartitionBlockInfo
- * Signature: (JIII)[J
+ * Method:    nativeGetBlockSize
+ * Signature: (JLjava/lang/String;)J
  */
-JNIEXPORT jlongArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetReducePartitionBlockInfo
-  (JNIEnv *, jclass, jlong, jint, jint, jint);
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetBlockSize
+  (JNIEnv *, jclass, jlong, jstring);
 
 /*
  * Class:     lib_jni_pmdk
- * Method:    nativeGetMapPartitionSize
- * Signature: (JIII)J
+ * Method:    nativeDeleteBlock
+ * Signature: (JLjava/lang/String;)J
  */
-JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetMapPartitionSize
-  (JNIEnv *, jclass, jlong, jint, jint, jint);
-
-/*
- * Class:     lib_jni_pmdk
- * Method:    nativeGetReducePartitionSize
- * Signature: (JIII)J
- */
-JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetReducePartitionSize
-  (JNIEnv *, jclass, jlong, jint, jint, jint);
-
-/*
- * Class:     lib_jni_pmdk
- * Method:    nativeDeleteMapPartition
- * Signature: (JIII)J
- */
-JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeDeleteMapPartition
-  (JNIEnv *, jclass, jlong, jint, jint, jint);
-
-/*
- * Class:     lib_jni_pmdk
- * Method:    nativeDeleteReducePartition
- * Signature: (JIII)J
- */
-JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeDeleteReducePartition
-  (JNIEnv *, jclass, jlong, jint, jint, jint);
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeDeleteBlock
+  (JNIEnv *, jclass, jlong, jstring);
 
 /*
  * Class:     lib_jni_pmdk

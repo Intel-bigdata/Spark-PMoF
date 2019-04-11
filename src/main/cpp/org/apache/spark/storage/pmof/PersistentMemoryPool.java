@@ -114,7 +114,7 @@ public class PersistentMemoryPool{
         System.loadLibrary("jnipmdk");
     }
         private static native long nativeOpenDevice(String path, int maxStage, int maxMap, long size);
-        private static native int nativeSetMapPartition(long deviceHandler, int numPartitions, int stageId, int mapId, int partitionId, long size, byte[] data, boolean set_clean);
+        private static native int nativeSetBlock(long deviceHandler, int numPartitions, int stageId, int mapId, int partitionId, long size, byte[] data, boolean set_clean);
         private static native int nativeSetReducePartition(long deviceHandler, int numPartitions, int stageId, int partutionId, long size, byte[] data, boolean set_clean);
         private static native byte[] nativeGetMapPartition(long deviceHandler, int stageId, int mapId, int partutionId);
         private static native long[] nativeGetMapPartitionBlockInfo(long deviceHandler, int stageId, int mapId, int partitionId);
@@ -170,7 +170,7 @@ public class PersistentMemoryPool{
                 break;
             }
             PersistentMemoryPool.this.monitor.incSubmittedJobs(PersistentMemoryPool.this.block_size);
-            nativeSetMapPartition(PersistentMemoryPool.this.writerHandler, 10000, k, j, i, PersistentMemoryPool.this.block_size, PersistentMemoryPool.this.bytes, false);
+            nativeSetBlock(PersistentMemoryPool.this.writerHandler, "shuffle_" + k + "_" + j + "_" + i, PersistentMemoryPool.this.block_size, PersistentMemoryPool.this.bytes, false);
             i_multi += 1;
             PersistentMemoryPool.this.monitor.incCommittedJobs(PersistentMemoryPool.this.block_size);
  
