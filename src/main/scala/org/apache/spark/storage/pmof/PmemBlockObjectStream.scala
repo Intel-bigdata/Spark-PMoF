@@ -52,7 +52,7 @@ private[spark] class PmemBlockObjectStream(
   val maxPoolSize: Long = conf.getLong("spark.shuffle.pmof.pmpool_size", defaultValue = 1073741824)
   val maxStages: Int = conf.getInt("spark.shuffle.pmof.max_stage_num", defaultValue = 1000)
   val enable_rdma: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_rdma", defaultValue = true)
-  val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(root_dir, path_list, blockId.name, maxPoolSize, maxStages, numMaps, enable_rdma)
+  val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(root_dir, path_list, blockId.name, maxPoolSize, enable_rdma)
   val spill_throttle = 4194304
   persistentMemoryWriter.updateShuffleMeta(blockId.name)
   logDebug(blockId.name)
