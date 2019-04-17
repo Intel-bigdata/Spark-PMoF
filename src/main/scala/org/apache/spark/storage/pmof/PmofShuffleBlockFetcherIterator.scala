@@ -162,7 +162,7 @@ final class RdmaShuffleBlockFetcherIterator(
 
     numBlocksToFetch += blockIds.length
 
-    val rdmaTransferService = shuffleClient.asInstanceOf[RdmaTransferService]
+    val rdmaTransferService = shuffleClient.asInstanceOf[PmofTransferService]
     rdmaTransferService.fetchBlockInfo(blockIds, receivedCallback)
   }
 
@@ -177,7 +177,7 @@ final class RdmaShuffleBlockFetcherIterator(
     numBlocksInFlightPerAddress(blockManagerId) =
         numBlocksInFlightPerAddress.getOrElse(blockManagerId, 0) + 1
 
-    val rdmaTransferService = shuffleClient.asInstanceOf[RdmaTransferService]
+    val pmofTransferService = shuffleClient.asInstanceOf[PmofTransferService]
 
     val blockFetchingReadCallback = new ReadCallback {
       def onSuccess(shuffleBuffer: ShuffleBuffer, f: Int => Unit): Unit = {
@@ -197,14 +197,17 @@ final class RdmaShuffleBlockFetcherIterator(
       }
     }
 
-    val rdmaClient = rdmaTransferService.getClient(blockManagerId.host, blockManagerId.port)
-    val shuffleBuffer = new ShuffleBuffer(rdmaRequest.reqSize, rdmaClient.getEqService, true)
-    val rdmaBuffer = rdmaClient.getEqService.regRmaBufferByAddress(shuffleBuffer.nioByteBuffer(), shuffleBuffer.getAddress, shuffleBuffer.getLength.toInt)
-    shuffleBuffer.setRdmaBufferId(rdmaBuffer.getRdmaBufferId)
+    val client = pmofTransferService.getClient(blockManagerId.host, blockManagerId.port)
+    val shuffleBuffer = new ShuffleBuffer(rdmaRequest.reqSize, client.getEqService, true)
+    val rdmaBuffer = client.getEqService.regRmaBufferByAddress(shuffleBuffer.nioByteBuffer(),
+      shuffleBuffer.getAddress, shuffleBuffer.getLength.toInt)
+    shuffleBuffer.setRdmaBufferId(rdmaBuffer.getBufferId)
 
     var offset = 0
     for (i <- 0 until partitionNums) {
-      rdmaTransferService.fetchBlock(blockManagerId.host, blockManagerId.port, shuffleBlockInfos(i).getAddress, shuffleBlockInfos(i).getLength, shuffleBlockInfos(i).getRkey, offset, shuffleBuffer, rdmaClient, blockFetchingReadCallback)
+      pmofTransferService.fetchBlock(blockManagerId.host, blockManagerId.port,
+        shuffleBlockInfos(i).getAddress, shuffleBlockInfos(i).getLength,
+        shuffleBlockInfos(i).getRkey, offset, shuffleBuffer, client, blockFetchingReadCallback)
       offset += shuffleBlockInfos(i).getLength
     }
   }

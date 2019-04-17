@@ -25,7 +25,7 @@ import java.util.Iterator;
 import org.apache.spark.shuffle.pmof.MetadataResolver;
 import org.apache.spark.storage.BlockManagerId;
 import org.apache.spark.storage.BlockManagerId$;
-import org.apache.spark.network.pmof.RdmaTransferService;
+import org.apache.spark.network.pmof.PmofTransferService;
 import scala.Option;
 import scala.Product2;
 import scala.collection.JavaConverters;
@@ -266,8 +266,8 @@ public class SerializedShuffleWriter<K, V> extends ShuffleWriter<K, V> {
         }
         BlockManagerId shuffleServerId = blockManager.shuffleServerId();
         if (enable_rdma) {
-            BlockManagerId blockManagerId = BlockManagerId$.MODULE$.apply(shuffleServerId.executorId(), RdmaTransferService.shuffleNodesMap().get(shuffleServerId.host()).get(),
-                    RdmaTransferService.getTransferServiceInstance(blockManager, null, false).port(), shuffleServerId.topologyInfo());
+            BlockManagerId blockManagerId = BlockManagerId$.MODULE$.apply(shuffleServerId.executorId(), PmofTransferService.shuffleNodesMap().get(shuffleServerId.host()).get(),
+                    PmofTransferService.getTransferServiceInstance(blockManager, null, false).port(), shuffleServerId.topologyInfo());
             mapStatus = MapStatus$.MODULE$.apply(blockManagerId, partitionLengths);
         } else {
           mapStatus = MapStatus$.MODULE$.apply(shuffleServerId, partitionLengths);

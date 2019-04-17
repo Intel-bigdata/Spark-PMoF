@@ -1,13 +1,11 @@
 package org.apache.spark.shuffle.pmof
 
-import java.util.UUID
-
 import org.apache.spark._
 import org.apache.spark.internal.{Logging, config}
-import org.apache.spark.network.pmof.RdmaTransferService
-import org.apache.spark.serializer.SerializerManager
+import org.apache.spark.network.pmof.PmofTransferService
+import org.apache.spark.serializer.{SerializerInstance, SerializerManager}
 import org.apache.spark.shuffle.{BaseShuffleHandle, ShuffleReader}
-import org.apache.spark.storage.{BlockManager, TempShuffleBlockId, BlockId}
+import org.apache.spark.storage.BlockManager
 import org.apache.spark.storage.pmof._
 import org.apache.spark.util.CompletionIterator
 import org.apache.spark.util.collection.ExternalSorter
@@ -28,14 +26,14 @@ private[spark] class RdmaShuffleReader[K, C](
   extends ShuffleReader[K, C] with Logging {
 
   private val dep = handle.dependency
-  val serializerInstance = dep.serializer.newInstance()
+  val serializerInstance: SerializerInstance = dep.serializer.newInstance()
   val enable_pmem: Boolean = SparkEnv.get.conf.getBoolean("spark.shuffle.pmof.enable_pmem", defaultValue = true)
 
   /** Read the combined key-values for this reduce task */
   override def read(): Iterator[Product2[K, C]] = {
     val wrappedStreams: RdmaShuffleBlockFetcherIterator = new RdmaShuffleBlockFetcherIterator(
       context,
-      RdmaTransferService.getTransferServiceInstance(blockManager),
+      PmofTransferService.getTransferServiceInstance(blockManager),
       blockManager,
       mapOutputTracker.getMapSizesByExecutorId(handle.shuffleId, startPartition, endPartition),
       serializerManager.wrapStream,
@@ -87,7 +85,7 @@ private[spark] class RdmaShuffleReader[K, C](
     // Sort the output if there is a sort ordering defined.
     dep.keyOrdering match {
       case Some(keyOrd: Ordering[K]) =>
-        if (enable_pmem == true) {
+        if (enable_pmem) {
           val sorter = new PmemExternalSorter[K, C, C](context, handle, ordering = Some(keyOrd), serializer = dep.serializer)
           sorter.insertAll(aggregatedIter)
           CompletionIterator[Product2[K, C], Iterator[Product2[K, C]]](sorter.iterator, sorter.stop())
