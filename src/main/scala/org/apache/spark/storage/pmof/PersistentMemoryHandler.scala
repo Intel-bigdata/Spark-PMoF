@@ -19,7 +19,7 @@ package org.apache.spark.storage.pmof
 
 import org.apache.spark.internal.Logging
 
-import org.apache.spark.network.pmof.RdmaTransferService
+import org.apache.spark.network.pmof.PmofTransferService
 import org.apache.spark.SparkEnv
 
 import scala.collection.JavaConverters._
@@ -156,7 +156,7 @@ object PersistentMemoryHandler {
         persistentMemoryHandler.log("Use persistentMemoryHandler Object: " + this)
         if (enable_rdma) {
           val blockManager = SparkEnv.get.blockManager
-          val eqService = RdmaTransferService.getTransferServiceInstance(blockManager).server.getEqService
+          val eqService = PmofTransferService.getTransferServiceInstance(blockManager).server.getEqService
           val size: Long = 264239054848L
           val offset: Long = persistentMemoryHandler.getRootAddr
           val rdmaBuffer = eqService.regRmaBufferByAddress(null, offset, size)

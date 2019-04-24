@@ -19,7 +19,7 @@ package org.apache.spark.shuffle.pmof
 
 import org.apache.spark._
 import org.apache.spark.internal.Logging
-import org.apache.spark.network.pmof.RdmaTransferService
+import org.apache.spark.network.pmof.PmofTransferService
 import org.apache.spark.scheduler.MapStatus
 import org.apache.spark.shuffle.{BaseShuffleHandle, IndexShuffleBlockResolver, ShuffleWriter}
 import org.apache.spark.storage.{BlockManagerId, ShuffleBlockId}
@@ -80,8 +80,8 @@ private[spark] class BaseShuffleWriter[K, V, C](
       val shuffleServerId = blockManager.shuffleServerId
       if (enable_rdma) {
         val blockManagerId: BlockManagerId =
-        BlockManagerId(shuffleServerId.executorId, RdmaTransferService.shuffleNodesMap(shuffleServerId.host),
-          RdmaTransferService.getTransferServiceInstance(blockManager).port, shuffleServerId.topologyInfo)
+        BlockManagerId(shuffleServerId.executorId, PmofTransferService.shuffleNodesMap(shuffleServerId.host),
+          PmofTransferService.getTransferServiceInstance(blockManager).port, shuffleServerId.topologyInfo)
         mapStatus = MapStatus(blockManagerId, partitionLengths)
       } else {
         mapStatus = MapStatus(shuffleServerId, partitionLengths)

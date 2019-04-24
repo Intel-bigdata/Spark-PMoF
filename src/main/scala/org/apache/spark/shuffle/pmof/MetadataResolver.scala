@@ -15,7 +15,6 @@ import org.apache.spark.shuffle.IndexShuffleBlockResolver.NOOP_REDUCE_ID
 import org.apache.spark.storage.{ShuffleBlockId, ShuffleDataBlockId}
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 class MetadataResolver(conf: SparkConf) {
@@ -86,7 +85,7 @@ class MetadataResolver(conf: SparkConf) {
       }
     }
 
-    RdmaTransferService.getTransferServiceInstance(null, null).
+    PmofTransferService.getTransferServiceInstance(null, null).
         syncBlocksInfo(driverHost, driverPort, byteBuffer, 0.toByte, receivedCallback)
 
     latch.await()
@@ -103,11 +102,11 @@ class MetadataResolver(conf: SparkConf) {
       totalLength = totalLength + currentLength
     }
 
-    val eqService = RdmaTransferService.getTransferServiceInstance(blockManager).server.getEqService
+    val eqService = PmofTransferService.getTransferServiceInstance(blockManager).server.getEqService
     val shuffleBuffer = new ShuffleBuffer(0, totalLength, channel, eqService)
     val startedAddress = shuffleBuffer.getAddress
     val rdmaBuffer = eqService.regRmaBufferByAddress(shuffleBuffer.nioByteBuffer(), startedAddress, totalLength.toInt)
-    shuffleBuffer.setRdmaBufferId(rdmaBuffer.getRdmaBufferId)
+    shuffleBuffer.setRdmaBufferId(rdmaBuffer.getBufferId)
     shuffleBuffer.setRkey(rdmaBuffer.getRKey)
     val blockId = ShuffleBlockId(shuffleId, mapId, IndexShuffleBlockResolver.NOOP_REDUCE_ID)
     blockMap.put(blockId.name, shuffleBuffer)
@@ -154,7 +153,7 @@ class MetadataResolver(conf: SparkConf) {
       }
     }
 
-    RdmaTransferService.getTransferServiceInstance(null, null).
+    PmofTransferService.getTransferServiceInstance(null, null).
         syncBlocksInfo(driverHost, driverPort, byteBuffer, 0.toByte, receivedCallback)
     latch.await()
   }
@@ -175,7 +174,7 @@ class MetadataResolver(conf: SparkConf) {
       byteBufferTmp.putInt(blockIds(i).reduceId)
     }
     byteBufferTmp.flip()
-    RdmaTransferService.getTransferServiceInstance(null, null).
+    PmofTransferService.getTransferServiceInstance(null, null).
       syncBlocksInfo(driverHost, driverPort, byteBufferTmp, 1.toByte, receivedCallback)
   }
 

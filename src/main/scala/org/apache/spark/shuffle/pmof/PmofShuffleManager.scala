@@ -3,9 +3,8 @@ package org.apache.spark.shuffle.pmof
 import java.util.concurrent.ConcurrentHashMap
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.network.pmof.RdmaTransferService
+import org.apache.spark.network.pmof.PmofTransferService
 import org.apache.spark.shuffle._
-import org.apache.spark.shuffle.pmof._
 import org.apache.spark.shuffle.sort.{SerializedShuffleHandle, SerializedShuffleWriter, SortShuffleManager}
 import org.apache.spark.{ShuffleDependency, SparkConf, SparkEnv, TaskContext}
 
@@ -26,7 +25,7 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
   override def registerShuffle[K, V, C](shuffleId: Int, numMaps: Int, dependency: ShuffleDependency[K, V, C]): ShuffleHandle = {
     val env: SparkEnv = SparkEnv.get
     if (enable_rdma) {
-      RdmaTransferService.getTransferServiceInstance(env.blockManager, this, isDriver = true)
+      PmofTransferService.getTransferServiceInstance(env.blockManager, this, isDriver = true)
     }
     if (enable_pmem) {
       new BaseShuffleHandle(shuffleId, numMaps, dependency)
@@ -45,7 +44,7 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
     val numMaps = handle.asInstanceOf[BaseShuffleHandle[_, _, _]].numMaps
     numMapsForShuffle.putIfAbsent(handle.shuffleId, numMaps)
     if (enable_rdma) {
-      RdmaTransferService.getTransferServiceInstance(env.blockManager, this)
+      PmofTransferService.getTransferServiceInstance(env.blockManager, this)
     }
     handle match {
       case unsafeShuffleHandle: SerializedShuffleHandle[K @unchecked, V @unchecked] =>
