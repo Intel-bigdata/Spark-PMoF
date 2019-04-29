@@ -21,7 +21,7 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_
  * Signature: (JIIIIJZI)J
  */
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetMapPartition
-  (JNIEnv *, jclass, jlong, jint, jint, jint, jint, jlong, jboolean, jint);
+  (JNIEnv *, jclass, jlong, jint, jint, jint, jint, jobject, jint, jboolean, jint);
 
 /*
  * Class:     lib_jni_pmdk
@@ -29,7 +29,7 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_
  * Signature: (JIIIIJZI)J
  */
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetReducePartition
-  (JNIEnv *, jclass, jlong, jint, jint, jint, jlong, jboolean, jint);
+  (JNIEnv *, jclass, jlong, jint, jint, jint, jobject, jint, jboolean, jint);
 
 /*
  * Class:     lib_jni_pmdk

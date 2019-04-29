@@ -17,17 +17,17 @@
 
 package org.apache.spark.storage.pmof
 
-import org.apache.spark.internal.Logging
+import java.nio.ByteBuffer
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.network.pmof.PmofTransferService
 import org.apache.spark.SparkEnv
 
 import scala.collection.JavaConverters._
 import java.nio.file.{Files, Paths}
 import java.util.UUID
+
 import org.apache.spark.network.buffer.ManagedBuffer
-import org.apache.spark.storage.pmof.PmemManagedBuffer
-import org.apache.spark.storage.pmof.PmemBuffer
 
 private[spark] class PersistentMemoryHandler(
     val root_dir: String,
@@ -93,13 +93,13 @@ private[spark] class PersistentMemoryHandler(
     pmpool.getReducePartitionSize(stageId, shuffleId, partitionId)
   }
   
-  def setPartition(numPartitions: Int, blockId: String, buf: PmemBuffer, clean: Boolean, numMaps: Int = 1): Long = {
+  def setPartition(numPartitions: Int, blockId: String, unsafeByteBuffer: ByteBuffer, dataSize: Int, clean: Boolean, numMaps: Int = 1): Long = {
     val (blockType, stageId, shuffleId, partitionId) = getBlockDetail(blockId)
     var ret_addr: Long = 0
     if (blockType == "shuffle") {
-      ret_addr = pmpool.setMapPartition(numPartitions, stageId, shuffleId, partitionId, buf, clean, numMaps)
+      ret_addr = pmpool.setMapPartition(numPartitions, stageId, shuffleId, partitionId, unsafeByteBuffer, dataSize, clean, numMaps)
     } else if (blockType == "reduce_spill") {
-      ret_addr = pmpool.setReducePartition(10000, stageId, partitionId, buf, clean, numMaps)
+      ret_addr = pmpool.setReducePartition(10000, stageId, partitionId, unsafeByteBuffer, dataSize, clean, numMaps)
     }
     ret_addr
   }

@@ -1,11 +1,9 @@
 package org.apache.spark.storage.pmof
 
 import org.apache.spark.storage._
-import org.apache.spark.storage.pmof.{PmemInputStream, PmemOutputStream}
 import org.apache.spark.serializer._
 import org.apache.spark.executor.TaskMetrics
 import org.apache.spark.internal.Logging
-import java.io.{ByteArrayOutputStream, OutputStream}
 
 import org.apache.spark.SparkConf
 import org.apache.spark.util.Utils

@@ -1,13 +1,14 @@
 package org.apache.spark.storage.pmof;
 
-import org.apache.spark.storage.pmof.PmemBuffer;
+import java.nio.ByteBuffer;
+
 public class PersistentMemoryPool {
     static {
         System.load("/usr/local/lib/libjnipmdk.so");
     }
     private static native long nativeOpenDevice(String path, int maxStage, int maxMap, long size);
-    private static native long nativeSetMapPartition(long deviceHandler, int numPartitions, int stageId, int mapId, int partutionId, long pmemBufferHandler, boolean clean, int numMaps);
-    private static native long nativeSetReducePartition(long deviceHandler, int numPartitions, int stageId, int partutionId, long pmemBufferHandler, boolean clean, int numMaps);
+    private static native long nativeSetMapPartition(long deviceHandler, int numPartitions, int stageId, int mapId, int partutionId, ByteBuffer unsafeByteBuffer, int dataSize, boolean clean, int numMaps);
+    private static native long nativeSetReducePartition(long deviceHandler, int numPartitions, int stageId, int partutionId, ByteBuffer unsafeByteBuffer, int dataSize, boolean clean, int numMaps);
     private static native byte[] nativeGetMapPartition(long deviceHandler, int stageId, int mapId, int partitionId);
     private static native byte[] nativeGetReducePartition(long deviceHandler, int stageId, int mapId, int partitionId);
     private static native long[] nativeGetMapPartitionBlockInfo(long deviceHandler, int stageId, int mapId, int partitionId);
@@ -34,12 +35,12 @@ public class PersistentMemoryPool {
       this.deviceHandler = nativeOpenDevice(path, max_stages_num, max_shuffles_num, pool_size);
     }
 
-    public long setMapPartition(int partitionNum, int stageId, int shuffleId, int partitionId, PmemBuffer buf, boolean set_clean, int numMaps) {
-      return nativeSetMapPartition(this.deviceHandler, partitionNum, stageId, shuffleId, partitionId, buf.getNativeObject(), set_clean, numMaps);
+    public long setMapPartition(int partitionNum, int stageId, int shuffleId, int partitionId, ByteBuffer unsafeByteBuffer, int dataSize, boolean set_clean, int numMaps) {
+      return nativeSetMapPartition(this.deviceHandler, partitionNum, stageId, shuffleId, partitionId, unsafeByteBuffer, dataSize, set_clean, numMaps);
     }
 
-    public long setReducePartition(int partitionNum, int stageId, int partitionId, PmemBuffer buf, boolean set_clean, int numMaps) {
-        return nativeSetReducePartition(this.deviceHandler, partitionNum, stageId, partitionId, buf.getNativeObject(), set_clean, numMaps);
+    public long setReducePartition(int partitionNum, int stageId, int partitionId, ByteBuffer unsafeByteBuffer, int dataSize, boolean set_clean, int numMaps) {
+        return nativeSetReducePartition(this.deviceHandler, partitionNum, stageId, partitionId, unsafeByteBuffer, dataSize, set_clean, numMaps);
     }
 
     public byte[] getMapPartition(int stageId, int shuffleId, int partitionId) {
