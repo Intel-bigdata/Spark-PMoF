@@ -21,7 +21,7 @@ import java.nio.ByteBuffer
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.network.pmof.PmofTransferService
-import org.apache.spark.SparkEnv
+import org.apache.spark.{SparkConf, SparkEnv}
 
 import scala.collection.JavaConverters._
 import java.nio.file.{Files, Paths}
@@ -149,17 +149,18 @@ private[spark] class PersistentMemoryHandler(
 object PersistentMemoryHandler {
   private var persistentMemoryHandler: PersistentMemoryHandler = _
   var stopped: Boolean = false
-  def getPersistentMemoryHandler(root_dir: String, path_arg: List[String], shuffleBlockId: String, pmPoolSize: Long, maxStages: Int, maxMaps: Int, enable_rdma: Boolean): PersistentMemoryHandler = synchronized {
+  def getPersistentMemoryHandler(conf: SparkConf, root_dir: String, path_arg: List[String], shuffleBlockId: String, pmPoolSize: Long, maxStages: Int, maxMaps: Int): PersistentMemoryHandler = synchronized {
     if (!stopped) {
       if (persistentMemoryHandler == null) {
         persistentMemoryHandler = new PersistentMemoryHandler(root_dir, path_arg, shuffleBlockId, maxStages, maxMaps, pmPoolSize)
         persistentMemoryHandler.log("Use persistentMemoryHandler Object: " + this)
+        val enable_rdma: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_rdma", defaultValue = true)
         if (enable_rdma) {
+          val pmem_capacity: Long = conf.getLong("spark.shuffle.pmof.pmem_capacity", defaultValue = 264239054848L)
           val blockManager = SparkEnv.get.blockManager
           val eqService = PmofTransferService.getTransferServiceInstance(blockManager).server.getEqService
-          val size: Long = 264239054848L
           val offset: Long = persistentMemoryHandler.getRootAddr
-          val rdmaBuffer = eqService.regRmaBufferByAddress(null, offset, size)
+          val rdmaBuffer = eqService.regRmaBufferByAddress(null, offset, pmem_capacity)
           persistentMemoryHandler.rkey = rdmaBuffer.getRKey()
         }
       }
