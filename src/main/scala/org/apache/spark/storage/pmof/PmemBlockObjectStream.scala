@@ -51,7 +51,8 @@ private[spark] class PmemBlockObjectStream(
   val maxStages: Int = conf.getInt("spark.shuffle.pmof.max_stage_num", defaultValue = 1000)
   val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(conf, root_dir, path_list, blockId.name, maxPoolSize, maxStages, numMaps)
   val spill_throttle = 4194304
-  persistentMemoryWriter.updateShuffleMeta(blockId.name)
+  //disable metadata updating by default
+  //persistentMemoryWriter.updateShuffleMeta(blockId.name)
   logDebug(blockId.name)
 
   var objStream: SerializationStream = _
