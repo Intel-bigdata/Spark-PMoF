@@ -1,11 +1,9 @@
 package org.apache.spark.storage.pmof
 
 import org.apache.spark.storage._
-import org.apache.spark.storage.pmof.{PmemInputStream, PmemOutputStream}
 import org.apache.spark.serializer._
 import org.apache.spark.executor.TaskMetrics
 import org.apache.spark.internal.Logging
-import java.io.{ByteArrayOutputStream, OutputStream}
 
 import org.apache.spark.SparkConf
 import org.apache.spark.util.Utils
@@ -51,10 +49,10 @@ private[spark] class PmemBlockObjectStream(
   val path_list = conf.get("spark.shuffle.pmof.pmem_list").split(",").map(_.trim).toList
   val maxPoolSize: Long = conf.getLong("spark.shuffle.pmof.pmpool_size", defaultValue = 1073741824)
   val maxStages: Int = conf.getInt("spark.shuffle.pmof.max_stage_num", defaultValue = 1000)
-  val enable_rdma: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_rdma", defaultValue = true)
-  val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(root_dir, path_list, blockId.name, maxPoolSize, maxStages, numMaps, enable_rdma)
+  val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(conf, root_dir, path_list, blockId.name, maxPoolSize, maxStages, numMaps)
   val spill_throttle = 4194304
-  persistentMemoryWriter.updateShuffleMeta(blockId.name)
+  //disable metadata updating by default
+  //persistentMemoryWriter.updateShuffleMeta(blockId.name)
   logDebug(blockId.name)
 
   var objStream: SerializationStream = _

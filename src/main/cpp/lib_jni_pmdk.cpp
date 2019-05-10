@@ -11,26 +11,22 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_
 }
 
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetMapPartition
-  (JNIEnv *env, jclass obj, jlong pmpool, jint partitionNum, jint stageId, jint mapId, jint partitionId, long pmBuffer, jboolean set_clean, jint numMaps) {
-    int size = ((PmemBuffer*)pmBuffer)->getRemaining();
-    char* buf = ((PmemBuffer*)pmBuffer)->getDataForFlush(size);
+  (JNIEnv *env, jclass obj, jlong pmpool, jint partitionNum, jint stageId, jint mapId, jint partitionId, jobject unsafeByteBuffer, jint dataSize, jboolean clean, jint numMaps) {
+    jbyte* buf = (jbyte*)(*env).GetDirectBufferAddress(unsafeByteBuffer);
     if (buf == nullptr) {
       return -1;
     }
-    //printf("nativeSetMapPartition for shuffle_%d_%d_%d\n", stageId, mapId, partitionId);
-    long addr = ((PMPool*)pmpool)->setMapPartition(partitionNum, stageId, mapId, partitionId, size, buf, set_clean, numMaps);
+    long addr = ((PMPool*)pmpool)->setMapPartition(partitionNum, stageId, mapId, partitionId, dataSize, (char*)buf, clean, numMaps);
     return addr;
 }
 
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetReducePartition
-  (JNIEnv *env, jclass obj, jlong pmpool, jint partitionNum, jint stageId, jint partitionId, long pmBuffer, jboolean clean, jint numMaps) {
-    int size = ((PmemBuffer*)pmBuffer)->getRemaining();
-    char* buf = ((PmemBuffer*)pmBuffer)->getDataForFlush(size);
+  (JNIEnv *env, jclass obj, jlong pmpool, jint partitionNum, jint stageId, jint partitionId, jobject unsafeByteBuffer, jint dataSize, jboolean clean, jint numMaps) {
+    jbyte* buf = (jbyte*)(*env).GetDirectBufferAddress(unsafeByteBuffer);
     if (buf == nullptr) {
       return -1;
     }
-    //printf("nativeSetMapPartition for spill_%d_%d\n", stageId, partitionId);
-    long addr = ((PMPool*)pmpool)->setReducePartition(partitionNum, stageId, partitionId, size, buf, clean, numMaps);
+    long addr = ((PMPool*)pmpool)->setReducePartition(partitionNum, stageId, partitionId, dataSize, (char*)buf, clean, numMaps);
     return addr;
 }
 

@@ -1,7 +1,9 @@
 package org.apache.spark.storage.pmof
 
 import java.io.OutputStream
-import org.apache.spark.storage.pmof.PmemBuffer
+import java.nio.ByteBuffer
+
+import io.netty.buffer.{ByteBuf, PooledByteBufAllocator}
 import org.apache.spark.internal.Logging
 
 class PmemOutputStream(
@@ -10,38 +12,46 @@ class PmemOutputStream(
   blockId: String,
   numMaps: Int
   ) extends OutputStream with Logging {
-  val buf = new PmemBuffer()
   var set_clean = true
   var is_closed = false
+
+  val length: Int = 1024*1024*6
+  var total: Int = 0
+  val buf: ByteBuf = PooledByteBufAllocator.DEFAULT.directBuffer(length, length)
+  val byteBuffer: ByteBuffer = buf.nioBuffer(0, length)
+
   logDebug(blockId)
 
   override def write(bytes: Array[Byte], off: Int, len: Int): Unit = {
-    buf.put(bytes, off, len)
+    byteBuffer.put(bytes, off, len)
+    total += len
   }
 
   override def write(byte: Int): Unit = {
-    var bytes: Array[Byte] = Array(byte.toByte)
-    buf.put(bytes, 0, 1)
+    byteBuffer.putInt(byte)
+    total += 4
   }
 
   override def flush(): Unit = {
-    persistentMemoryWriter.setPartition(numPartitions, blockId, buf, set_clean, numMaps)
-    if (set_clean == true) {
+    persistentMemoryWriter.setPartition(numPartitions, blockId, byteBuffer, size(), set_clean, numMaps)
+    if (set_clean) {
       set_clean = false
     }
   }
 
   def size(): Int = {
-    buf.size()
+    total
   }
 
   def reset(): Unit = {
-    buf.clean()
+    total = 0
+    byteBuffer.clear()
   }
 
   override def close(): Unit = {
     if (!is_closed) {
-      buf.close()
+      reset()
+      buf.release()
       is_closed = true
     }
   }

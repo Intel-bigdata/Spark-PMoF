@@ -17,17 +17,17 @@
 
 package org.apache.spark.storage.pmof
 
-import org.apache.spark.internal.Logging
+import java.nio.ByteBuffer
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.network.pmof.PmofTransferService
-import org.apache.spark.SparkEnv
+import org.apache.spark.{SparkConf, SparkEnv}
 
 import scala.collection.JavaConverters._
 import java.nio.file.{Files, Paths}
 import java.util.UUID
+
 import org.apache.spark.network.buffer.ManagedBuffer
-import org.apache.spark.storage.pmof.PmemManagedBuffer
-import org.apache.spark.storage.pmof.PmemBuffer
 
 private[spark] class PersistentMemoryHandler(
     val root_dir: String,
@@ -93,13 +93,13 @@ private[spark] class PersistentMemoryHandler(
     pmpool.getReducePartitionSize(stageId, shuffleId, partitionId)
   }
   
-  def setPartition(numPartitions: Int, blockId: String, buf: PmemBuffer, clean: Boolean, numMaps: Int = 1): Long = {
+  def setPartition(numPartitions: Int, blockId: String, unsafeByteBuffer: ByteBuffer, dataSize: Int, clean: Boolean, numMaps: Int = 1): Long = {
     val (blockType, stageId, shuffleId, partitionId) = getBlockDetail(blockId)
     var ret_addr: Long = 0
     if (blockType == "shuffle") {
-      ret_addr = pmpool.setMapPartition(numPartitions, stageId, shuffleId, partitionId, buf, clean, numMaps)
+      ret_addr = pmpool.setMapPartition(numPartitions, stageId, shuffleId, partitionId, unsafeByteBuffer, dataSize, clean, numMaps)
     } else if (blockType == "reduce_spill") {
-      ret_addr = pmpool.setReducePartition(10000, stageId, partitionId, buf, clean, numMaps)
+      ret_addr = pmpool.setReducePartition(10000, stageId, partitionId, unsafeByteBuffer, dataSize, clean, numMaps)
     }
     ret_addr
   }
@@ -149,17 +149,18 @@ private[spark] class PersistentMemoryHandler(
 object PersistentMemoryHandler {
   private var persistentMemoryHandler: PersistentMemoryHandler = _
   var stopped: Boolean = false
-  def getPersistentMemoryHandler(root_dir: String, path_arg: List[String], shuffleBlockId: String, pmPoolSize: Long, maxStages: Int, maxMaps: Int, enable_rdma: Boolean): PersistentMemoryHandler = synchronized {
+  def getPersistentMemoryHandler(conf: SparkConf, root_dir: String, path_arg: List[String], shuffleBlockId: String, pmPoolSize: Long, maxStages: Int, maxMaps: Int): PersistentMemoryHandler = synchronized {
     if (!stopped) {
       if (persistentMemoryHandler == null) {
         persistentMemoryHandler = new PersistentMemoryHandler(root_dir, path_arg, shuffleBlockId, maxStages, maxMaps, pmPoolSize)
         persistentMemoryHandler.log("Use persistentMemoryHandler Object: " + this)
+        val enable_rdma: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_rdma", defaultValue = true)
         if (enable_rdma) {
+          val pmem_capacity: Long = conf.getLong("spark.shuffle.pmof.pmem_capacity", defaultValue = 264239054848L)
           val blockManager = SparkEnv.get.blockManager
           val eqService = PmofTransferService.getTransferServiceInstance(blockManager).server.getEqService
-          val size: Long = 264239054848L
           val offset: Long = persistentMemoryHandler.getRootAddr
-          val rdmaBuffer = eqService.regRmaBufferByAddress(null, offset, size)
+          val rdmaBuffer = eqService.regRmaBufferByAddress(null, offset, pmem_capacity)
           persistentMemoryHandler.rkey = rdmaBuffer.getRKey()
         }
       }
