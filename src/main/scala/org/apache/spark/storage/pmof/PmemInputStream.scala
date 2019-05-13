@@ -14,6 +14,7 @@ class PmemInputStream(
   var remaining: Int = 0
   var available_bytes: Int = persistentMemoryHandler.getPartitionSize(blockId).toInt
   val blockInfo: Array[(Long, Int)] = persistentMemoryHandler.getPartitionBlockInfo(blockId)
+  var is_closed = false
 
   def loadNextStream(): Int = {
     if (index >= blockInfo.length)
@@ -69,7 +70,10 @@ class PmemInputStream(
   }
 
   override def close(): Unit = {
-    buf.close()
+    if (!is_closed) {
+      buf.close()
+      is_closed = true
+    }
   }
 
   def deleteBlock(): Unit = {

@@ -21,13 +21,11 @@ import org.apache.spark._
 import org.apache.spark.internal.Logging
 import org.apache.spark.network.pmof.PmofTransferService
 import org.apache.spark.scheduler.MapStatus
-import org.apache.spark.shuffle.{BaseShuffleHandle, IndexShuffleBlockResolver, ShuffleWriter}
-import org.apache.spark.shuffle.pmof._
+import org.apache.spark.shuffle.{BaseShuffleHandle, ShuffleWriter}
 import org.apache.spark.storage._
 import org.apache.spark.util.collection.pmof.PmemExternalSorter
 import org.apache.spark.serializer.SerializerInstance
 import org.apache.spark.storage.pmof._
-import scala.collection.mutable.ArrayBuffer
 
 private[spark] class PmemShuffleWriter[K, V, C](
                                                  shuffleBlockResolver: PmemShuffleBlockResolver,
