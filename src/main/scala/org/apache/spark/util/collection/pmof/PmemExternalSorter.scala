@@ -1,6 +1,6 @@
 package org.apache.spark.util.collection.pmof
 
-import java.io.{ByteArrayInputStream, InputStream}
+import java.io.InputStream
 import java.util.Comparator
 
 import scala.collection.mutable
@@ -9,10 +9,8 @@ import org.apache.spark._
 import org.apache.spark.internal.Logging
 import org.apache.spark.serializer._
 import org.apache.spark.shuffle.BaseShuffleHandle
-import org.apache.spark.storage.{BlockId, ShuffleBlockId}
 import org.apache.spark.util.collection._
 import org.apache.spark.storage.pmof._
-import collection.mutable.Map
 import com.esotericsoftware.kryo.KryoException
 import org.apache.commons.lang3.exception.ExceptionUtils
 
@@ -31,6 +29,10 @@ private[spark] class PmemExternalSorter[K, V, C](
   private val serializerManager = SparkEnv.get.serializerManager
   private val serInstance = serializer.newInstance()
   private val numPartitions = partitioner.map(_.numPartitions).getOrElse(1)
+  private val shouldPartition = numPartitions > 1
+  private def getPartition(key: K): Int = {
+    if (shouldPartition) partitioner.get.getPartition(key) else 0
+  }
   private val inMemoryCollectionSizeThreshold: Long = 
     SparkEnv.get.conf.getLong("spark.shuffle.spill.pmof.MemoryThreshold", 5 * 1024 * 1024)
 
@@ -117,6 +119,10 @@ private[spark] class PmemExternalSorter[K, V, C](
       //elementsPerPartition(partitionId) += 1
     }
     buffer.maybeSpill(true)
+  }
+
+  override def stop(): Unit = {
+    partitionBufferArray.foreach(_.close())
   }
 
   /**
@@ -339,7 +345,7 @@ private[spark] class PmemExternalSorter[K, V, C](
             return false
           }
         }
-        return dep.partitioner.getPartition(nextItem._1) == partitionId
+        return getPartition(nextItem._1) == partitionId
       }
 
       override def next(): Product2[K, C] = {

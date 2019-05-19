@@ -18,9 +18,6 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
   val metadataResolver: MetadataResolver = new MetadataResolver(conf)
 
   private[this] val numMapsForShuffle = new ConcurrentHashMap[Int, Int]()
-  if (enable_rdma) {
-    logInfo("spark pmof rdma support enabled")
-  }
 
   override def registerShuffle[K, V, C](shuffleId: Int, numMaps: Int, dependency: ShuffleDependency[K, V, C]): ShuffleHandle = {
     val env: SparkEnv = SparkEnv.get
