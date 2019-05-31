@@ -15,6 +15,7 @@ import org.apache.spark.shuffle.IndexShuffleBlockResolver.NOOP_REDUCE_ID
 import org.apache.spark.storage.{ShuffleBlockId, ShuffleDataBlockId}
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 class MetadataResolver(conf: SparkConf) {
@@ -49,7 +50,7 @@ class MetadataResolver(conf: SparkConf) {
 
   val shuffleBlockMap = new ConcurrentHashMap[String, ArrayBuffer[ShuffleBlockInfo]]()
 
-  def commitPmemBlockInfo(shuffleId: Int, mapId: Int, dataAddressMap: Array[Array[(Long, Int)]], rkey: Long): Unit = {
+  def commitPmemBlockInfo(shuffleId: Int, mapId: Int, dataAddressMap: mutable.HashMap[Int, Array[(Long, Int)]], rkey: Long): Unit = {
     val byteBuffer = ByteBuffer.allocate(map_serializer_buffer_size.toInt)
     val bos = new ByteBufferOutputStream(byteBuffer)
     var output: Output = null
@@ -59,11 +60,10 @@ class MetadataResolver(conf: SparkConf) {
     } else {
       output = new Output(bos)
     }
-    val partitionNums = dataAddressMap.length
     MetadataResolver.this.synchronized {
-      for (i <- 0 until partitionNums) {
-        for ((address, length) <- dataAddressMap(i)) {
-          val shuffleBlockId = ShuffleBlockId(shuffleId, mapId, i).name
+      for (iter <- dataAddressMap) {
+        for ((address, length) <- iter._2) {
+          val shuffleBlockId = ShuffleBlockId(shuffleId, mapId, iter._1).name
           info_serialize_stream.writeObject(output, new ShuffleBlockInfo(shuffleBlockId, address, length.toInt, rkey))
         }
       }
@@ -215,11 +215,13 @@ class MetadataResolver(conf: SparkConf) {
       val mapId = byteBuffer.getInt()
       val reducerId = byteBuffer.getInt()
       val shuffleBlockId = ShuffleBlockId(shuffleId, mapId, reducerId).name
-      val blockInfoArray = shuffleBlockMap.get(shuffleBlockId)
-      val partitionNums = blockInfoArray.size
-      MetadataResolver.this.synchronized {
-        for (i <- 0 until partitionNums) {
-          info_serialize_stream.writeObject(output, blockInfoArray(i))
+      if (shuffleBlockMap.containsKey(shuffleBlockId)) {
+        val blockInfoArray = shuffleBlockMap.get(shuffleBlockId)
+        val partitionNums = blockInfoArray.size
+        MetadataResolver.this.synchronized {
+          for (i <- 0 until partitionNums) {
+            info_serialize_stream.writeObject(output, blockInfoArray(i))
+          }
         }
       }
     }

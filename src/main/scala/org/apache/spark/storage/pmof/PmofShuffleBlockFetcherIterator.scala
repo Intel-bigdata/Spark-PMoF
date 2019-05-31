@@ -133,6 +133,7 @@ final class RdmaShuffleBlockFetcherIterator(
   initialize()
 
   def startFetchMetadata(blockManagerId: BlockManagerId, blockIds: Array[BlockId]): Unit = {
+    if (blockIds.length == 0) return
     val receivedCallback = new ReceivedCallback {
       override def onSuccess(blockInfoArray: ArrayBuffer[ShuffleBlockInfo]): Unit = {
         val num = blockInfoArray.size
@@ -168,7 +169,7 @@ final class RdmaShuffleBlockFetcherIterator(
 
   def sendRequest(rdmaRequest: RdmaRequest): Unit = {
     val shuffleBlockInfos = rdmaRequest.shuffleBlockInfos
-    var partitionNums = shuffleBlockInfos.size
+    var blockNums= shuffleBlockInfos.size
     bytesInFlight += rdmaRequest.reqSize
     reqsInFlight += 1
     val blockManagerId = rdmaRequest.blockManagerId
@@ -183,8 +184,8 @@ final class RdmaShuffleBlockFetcherIterator(
       def onSuccess(shuffleBuffer: ShuffleBuffer, f: Int => Unit): Unit = {
         if (!isZombie) {
           RdmaShuffleBlockFetcherIterator.this.synchronized {
-            partitionNums -= 1
-            if (partitionNums == 0) {
+            blockNums -= 1
+            if (blockNums == 0) {
               results.put(SuccessFetchResult(BlockId(shuffleBlockIdName), blockManagerId, rdmaRequest.reqSize, shuffleBuffer, isNetworkReqDone = true))
               f(shuffleBuffer.getRdmaBufferId)
             }
@@ -204,7 +205,7 @@ final class RdmaShuffleBlockFetcherIterator(
     shuffleBuffer.setRdmaBufferId(rdmaBuffer.getBufferId)
 
     var offset = 0
-    for (i <- 0 until partitionNums) {
+    for (i <- 0 until blockNums) {
       pmofTransferService.fetchBlock(blockManagerId.host, blockManagerId.port,
         shuffleBlockInfos(i).getAddress, shuffleBlockInfos(i).getLength,
         shuffleBlockInfos(i).getRkey, offset, shuffleBuffer, client, blockFetchingReadCallback)
@@ -230,7 +231,7 @@ final class RdmaShuffleBlockFetcherIterator(
 
   def startFetch(remoteBlocksByAddress: Seq[(BlockManagerId, Seq[(BlockId, Long)])]): Unit = {
     for ((blockManagerId, blockInfos) <- remoteBlocksByAddress) {
-      startFetchMetadata(blockManagerId, blockInfos.map(_._1).toArray)
+      startFetchMetadata(blockManagerId, blockInfos.filter(_._2 != 0).map(_._1).toArray)
     }
     fetchLocalBlocks()
   }
