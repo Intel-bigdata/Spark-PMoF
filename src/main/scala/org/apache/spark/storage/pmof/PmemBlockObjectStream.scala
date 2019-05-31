@@ -79,7 +79,8 @@ private[spark] class PmemBlockObjectStream(
       logDebug("PersistentMemoryHandlerPartition: stream closed.")
       objStream.close()
       bytesStream.close()
-      inputStream.close()
+      if (inputStream != null)
+        inputStream.close()
     }
   }
 
