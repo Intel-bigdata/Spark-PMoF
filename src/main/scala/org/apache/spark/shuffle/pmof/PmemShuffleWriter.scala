@@ -27,6 +27,9 @@ import org.apache.spark.util.collection.pmof.PmemExternalSorter
 import org.apache.spark.serializer.SerializerInstance
 import org.apache.spark.storage.pmof._
 
+import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
+
 private[spark] class PmemShuffleWriter[K, V, C](
                                                  shuffleBlockResolver: PmemShuffleBlockResolver,
                                                  metadataResolver: MetadataResolver,
@@ -52,7 +55,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
 
   val partitionLengths: Array[Long] = Array.fill[Long](numPartitions)(0)
   var set_clean: Boolean = true
-  private var sorter: PmemExternalSorter[K, V, _] = null
+  private var sorter: PmemExternalSorter[K, V, _] = _
 
   /**
    * Are we in the process of stopping? Because map tasks can call stop() with success = true
@@ -103,20 +106,23 @@ private[spark] class PmemShuffleWriter[K, V, C](
     }
 
     var numSpilledPartitions = 0
-    while( numSpilledPartitions < numPartitions && partitionBufferArray(numSpilledPartitions).ifSpilled ) {
+    val partitionSpilled: ArrayBuffer[Int] = ArrayBuffer[Int]()
+    while (numSpilledPartitions < numPartitions) {
+      if (partitionBufferArray(numSpilledPartitions).ifSpilled()) {
+        partitionSpilled.append(numSpilledPartitions)
+      }
       numSpilledPartitions += 1
     }
-    val data_addr_map = Array.ofDim[(Long, Int)](numSpilledPartitions, 1)
+    val data_addr_map = mutable.HashMap.empty[Int, Array[(Long, Int)]]
     var output_str : String = ""
 
-    for (i <- 0 until numSpilledPartitions) {
-      data_addr_map(i) = partitionBufferArray(i).getPartitionMeta.map{info => (info._1, info._2)}
+    for (i <- partitionSpilled) {
+      data_addr_map(i) = partitionBufferArray(i).getPartitionMeta().map{ info => (info._1, info._2)}
       writeMetrics.incRecordsWritten(partitionBufferArray(i).records)
       partitionLengths(i) = partitionBufferArray(i).size
       output_str += "\tPartition " + i + ": " + partitionLengths(i) + ", records: " + partitionBufferArray(i).records + "\n"
-      partitionBufferArray(i).close()
     }
-    for (i <- numSpilledPartitions until numPartitions) {
+    for (i <- 0 until numPartitions) {
       partitionBufferArray(i).close()
     }
 
@@ -149,8 +155,12 @@ private[spark] class PmemShuffleWriter[K, V, C](
       }
     } finally {
       // Clean up our sorter, which may have its own intermediate files
-      val startTime = System.nanoTime()
-      writeMetrics.incWriteTime(System.nanoTime - startTime)
+      if (sorter != null) {
+        val startTime = System.nanoTime()
+        sorter.stop()
+        writeMetrics.incWriteTime(System.nanoTime - startTime)
+        sorter = null
+      }
     }
   }
 }
