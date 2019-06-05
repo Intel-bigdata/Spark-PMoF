@@ -1,5 +1,5 @@
-# SSO
-SSO is a Spark Shuffle Plugin which aims to accelerate Shuffle operation with **AEP+RDMA**.
+# PMoF plugin for Spark
+Spark-PMoF, PMoF plugin for Spark is a Spark Shuffle Plugin which aims to accelerate Shuffle operation with **AEP+RDMA**.
 
 ## Contents
 - [Introduction](#introduction)
