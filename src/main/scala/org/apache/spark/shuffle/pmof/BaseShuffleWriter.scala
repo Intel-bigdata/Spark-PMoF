@@ -75,10 +75,9 @@ private[spark] class BaseShuffleWriter[K, V, C](
       val partitionLengths = sorter.writePartitionedFile(blockId, tmp)
       shuffleBlockResolver.writeIndexFileAndCommit(dep.shuffleId, mapId, partitionLengths, tmp)
 
-      metadataResolver.commitBlockInfo(dep.shuffleId, mapId, partitionLengths)
-
       val shuffleServerId = blockManager.shuffleServerId
       if (enable_rdma) {
+        metadataResolver.commitBlockInfo(dep.shuffleId, mapId, partitionLengths)
         val blockManagerId: BlockManagerId =
         BlockManagerId(shuffleServerId.executorId, PmofTransferService.shuffleNodesMap(shuffleServerId.host),
           PmofTransferService.getTransferServiceInstance(blockManager).port, shuffleServerId.topologyInfo)
