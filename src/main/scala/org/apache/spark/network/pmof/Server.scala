@@ -71,8 +71,10 @@ class ServerRecvHandler(server: Server) extends Handler with Logging {
       metadataResolver.addShuffleBlockInfo(message)
       sendMetadata(con, byteBufferTmp, 0.toByte, seq, isDeferred = false)
     } else {
-      val outputBuffer = metadataResolver.serializeShuffleBlockInfo(message)
-      sendMetadata(con, outputBuffer, 1.toByte, seq, isDeferred = false)
+      val bufferArray = metadataResolver.serializeShuffleBlockInfo(message)
+      for (buffer <- bufferArray) {
+        sendMetadata(con, buffer, 1.toByte, seq, isDeferred = false)
+      }
     }
   }
 }
