@@ -214,7 +214,6 @@ void WriteRequest::setPartition() {
     } TX_END
 
     block_cv.wait(block_lck, [&]{return committed;});
-    //fprintf(stderr, "request committed %d_%d_%d\n", stageId, mapId, partitionId);
 
     processed = true;
     //cv.notify_all();
@@ -334,7 +333,6 @@ void DeleteRequest::deletePartition() {
     } TX_END
 
     block_cv.wait(block_lck, [&]{return committed;});
-    //fprintf(stderr, "request committed %d_%d_%d\n", stageId, mapId, partitionId);
 
     processed = true;
 }

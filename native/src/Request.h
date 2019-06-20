@@ -81,7 +81,9 @@ struct MemoryBlock {
     }
 
     ~MemoryBlock() {
+      if (buf != nullptr) {
         delete[] buf;
+      }
     }
 };
 
@@ -91,7 +93,9 @@ struct BlockInfo {
     }
 
     ~BlockInfo() {
+      if (data != nullptr) {
         delete data;
+      }
     }
 };
 

@@ -10,7 +10,7 @@
       <version>1.0</version>
       <relativePath>../pom.xml</relativePath>
     </parent>
-    <packaging>jar</packaging>
+    <packaging>pom</packaging>
 
     <groupId>com.intel.spark-pmof.native</groupId>
     <artifactId>native</artifactId>

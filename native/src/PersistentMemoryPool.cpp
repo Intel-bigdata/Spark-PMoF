@@ -15,7 +15,6 @@ PMPool::PMPool(const char* dev, int maxStage, int maxMap, long size):
     worker(&PMPool::process, this) {
 
   const char *pool_layout_name = "pmem_spark_shuffle";
-  cout << "PMPOOL is " << dev << endl;
   // if this is a fsdax device
   // we need to create 
   // if this is a devdax device
@@ -25,7 +24,7 @@ PMPool::PMPool(const char* dev, int maxStage, int maxMap, long size):
       pmpool = pmemobj_create(dev, pool_layout_name, size, S_IRUSR | S_IWUSR);
   }
   if (pmpool == NULL) {
-      cerr << "Failed to create pool, kill process, errmsg: " << pmemobj_errormsg() << endl; 
+      cerr << "Failed to create pool, kill process, errmsg: devname is " << dev << ", size is " << size << ", " << pmemobj_errormsg() << endl; 
       exit(-1);
   }
 
@@ -103,6 +102,7 @@ long PMPool::getReducePartition(
     ReadRequest read_request(this, mb, stageId, 1, mapId, partitionId);
     read_request.exec();
     read_request.getResult();
+    return 0;
 }
 
 long PMPool::getMapPartitionBlockInfo(BlockInfo *blockInfo, int stageId, int mapId, int partitionId) {
