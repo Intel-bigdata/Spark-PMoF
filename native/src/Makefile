@@ -7,11 +7,15 @@ LIBS=-lpmemobj -lpthread
 MAIN=libjnipmdk.so
 
 
-all: $(MAIN) install
+all: clean $(MAIN) install
 
 $(MAIN):
-	$(CC) $(CFLAGS) $(INCLUDES) -o $(MAIN) lib_jni_pmdk.cpp PersistentMemoryPool.cpp Request.cpp
+	$(CC) $(CFLAGS) $(INCLUDES) -o $(MAIN) lib_jni_pmdk.cpp PersistentMemoryPool.cpp Request.cpp $(LIBS)
 
 install:
 	cp -rf $(MAIN) /usr/lib/
 	cp -rf $(MAIN) /usr/lib64/
+	cp -rf $(MAIN) /usr/local/lib/
+
+clean:
+	rm -rf $(MAIN)
