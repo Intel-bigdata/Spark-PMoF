@@ -7,7 +7,7 @@ import org.apache.spark.internal.Logging
 
 import org.apache.spark.SparkConf
 import org.apache.spark.util.Utils
-import java.io.File
+import java.io._
 import java.io.{InputStream, OutputStream}
 
 import scala.collection.mutable.ArrayBuffer
@@ -33,7 +33,7 @@ private[spark] class PmemBlockObjectStream(
     blockId: BlockId,
     conf: SparkConf,
     numMaps: Int = 0,
-    numPartitions: Int = 0
+    numPartitions: Int = 1
 ) extends DiskBlockObjectWriter(new File(Utils.getConfiguredLocalDirs(conf).toList(0) + "/null"), null, null, 0, true, null, null) with Logging {
   var initialized = false
 
@@ -71,17 +71,25 @@ private[spark] class PmemBlockObjectStream(
     objStream.writeObject(value)
     records += 1
     recordsPerBlock += 1
+		if (blockId.isShuffle == true) {
+      taskMetrics.shuffleWriteMetrics.incRecordsWritten(1)
+    }
     maybeSpill()
   }
 
   override def close() {
-    bytesStream.close()
     if (initialized) {
-      logDebug("PersistentMemoryHandlerPartition: stream closed.")
+      logDebug("Serialize stream closed.")
       objStream.close()
       if (inputStream != null)
         inputStream.close()
     }
+    logDebug("PersistentMemoryHandlerPartition: stream closed.")
+    bytesStream.close()
+  }
+
+  override def flush() {
+    maybeSpill(true)
   }
 
   def maybeSpill(force: Boolean = false): Unit = {

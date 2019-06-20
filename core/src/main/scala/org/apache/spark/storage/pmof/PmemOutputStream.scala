@@ -23,17 +23,22 @@ class PmemOutputStream(
   logDebug(blockId)
 
   override def write(bytes: Array[Byte], off: Int, len: Int): Unit = {
+    logDebug("write")
     byteBuffer.put(bytes, off, len)
     total += len
   }
 
   override def write(byte: Int): Unit = {
+    logDebug("write")
     byteBuffer.putInt(byte)
     total += 4
   }
 
   override def flush(): Unit = {
-    persistentMemoryWriter.setPartition(numPartitions, blockId, byteBuffer, size(), set_clean, numMaps)
+    if (size() > 0) {
+      logDebug("flush")
+      persistentMemoryWriter.setPartition(numPartitions, blockId, byteBuffer, size(), set_clean, numMaps)
+    }
     if (set_clean) {
       set_clean = false
     }
@@ -50,6 +55,7 @@ class PmemOutputStream(
 
   override def close(): Unit = {
     if (!is_closed) {
+      flush()
       reset()
       buf.release()
       is_closed = true

@@ -51,6 +51,7 @@ private[spark] class PersistentMemoryHandler(
       device += "/shuffle_block_" + UUID.randomUUID().toString()
       logInfo("This is a fsdax, filename:" + device)
     } else {
+      logInfo("This is a devdax, name:" + device)
       poolSize = 0
     }
   } else {
