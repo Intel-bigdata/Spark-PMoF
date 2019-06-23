@@ -8,7 +8,6 @@ import java.util.zip.{Deflater, DeflaterOutputStream, Inflater, InflaterInputStr
 
 import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.io.{ByteBufferInputStream, ByteBufferOutputStream, Input, Output}
-
 import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.network.pmof._
 import org.apache.spark.shuffle.IndexShuffleBlockResolver
@@ -18,7 +17,7 @@ import org.apache.spark.storage.{ShuffleBlockId, ShuffleDataBlockId}
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.util.control.Breaks
+import scala.util.control.{Breaks, ControlThrowable}
 
 class MetadataResolver(conf: SparkConf) {
   private lazy val blockManager = SparkEnv.get.blockManager
@@ -226,37 +225,42 @@ class MetadataResolver(conf: SparkConf) {
     var psbi: String = null
     var csbi: String = null
     MetadataResolver.this.synchronized {
-      while (cur < totalBlock) {
-        if (cur == pre) {
-          csbi = psbi
-        } else {
-          csbi = ShuffleBlockId(byteBuffer.getInt(), byteBuffer.getInt(), byteBuffer.getInt()).name
-          psbi = csbi
-          pre = cur
-        }
-        if (shuffleBlockMap.containsKey(csbi)) {
-          val blockInfoArray = shuffleBlockMap.get(csbi)
-          val startPos = output.position()
-          val loop = Breaks
-          loop.breakable {
-            for (i <- blockInfoArray.indices) {
-              info_serialize_stream.writeObject(output, blockInfoArray(i))
-              if (output.position() >= reduce_serializer_buffer_size * 0.9) {
-                output.setPosition(startPos)
-                val blockBuffer = ByteBuffer.wrap(output.getBuffer)
-                blockBuffer.position(output.position())
-                blockBuffer.flip()
-                bufferArray += blockBuffer
-                output.close()
-                val new_buffer = new Array[Byte](reduce_serializer_buffer_size.toInt)
-                output = new Output(new_buffer)
-                cur -= 1
-                loop.break()
+      try {
+        while (cur < totalBlock) {
+          if (cur == pre) {
+            csbi = psbi
+          } else {
+            csbi = ShuffleBlockId(byteBuffer.getInt(), byteBuffer.getInt(), byteBuffer.getInt()).name
+            psbi = csbi
+            pre = cur
+          }
+          if (shuffleBlockMap.containsKey(csbi)) {
+            val blockInfoArray = shuffleBlockMap.get(csbi)
+            val startPos = output.position()
+            val loop = Breaks
+            loop.breakable {
+              for (i <- blockInfoArray.indices) {
+                info_serialize_stream.writeObject(output, blockInfoArray(i))
+                if (output.position() >= reduce_serializer_buffer_size * 0.9) {
+                  output.setPosition(startPos)
+                  val blockBuffer = ByteBuffer.wrap(output.getBuffer)
+                  blockBuffer.position(output.position())
+                  blockBuffer.flip()
+                  bufferArray += blockBuffer
+                  output.close()
+                  val new_buffer = new Array[Byte](reduce_serializer_buffer_size.toInt)
+                  output = new Output(new_buffer)
+                  cur -= 1
+                  loop.break()
+                }
               }
             }
           }
+          cur += 1
         }
-        cur += 1
+      } catch {
+        case c: ControlThrowable => throw c
+        case t: Throwable => t.printStackTrace()
       }
       if (output.position() != 0) {
         val blockBuffer = ByteBuffer.wrap(output.getBuffer)
