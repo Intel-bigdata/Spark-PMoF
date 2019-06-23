@@ -14,8 +14,8 @@ Spark-PMoF (Persistent Memory over Fabric), PMoF plugin for spark, is a Spark Sh
 Make sure you got [HPNL](https://github.com/Intel-bigdata/HPNL) installed.
 
 ```shell
-git clone https://github.com/Intel-bigdata/SSO.git
-cd SSO; mvn package
+git clone https://github.com/Intel-bigdata/Spark-PMoF.git
+cd Spark-PMoF; mvn package
 ```
 
 ## Benchmark
@@ -24,8 +24,8 @@ cd SSO; mvn package
 This plugin current supports Spark 2.3 and works well on various Network fabrics, including Socket, **RDMA** and **Omni-Path**. Before runing Spark workload, add following contents in spark-defaults.conf, then have fun! :-)
 
 ```shell
-spark.driver.extraClassPath SSO-PATH/target/sso-0.1-jar-with-dependencies.jar
-spark.executor.extraClassPath SSO-PATH/target/sso-0.1-jar-with-dependencies.jar
+spark.driver.extraClassPath Spark-PMoF-PATH/target/sso-0.1-jar-with-dependencies.jar
+spark.executor.extraClassPath Spark-PMoF-PATH/target/sso-0.1-jar-with-dependencies.jar
 spark.shuffle.manager org.apache.spark.shuffle.pmof.RdmaShuffleManager
 ```
 
