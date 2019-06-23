@@ -35,7 +35,6 @@ private[spark] class PmemBlockObjectStream(
     numMaps: Int = 0,
     numPartitions: Int = 1
 ) extends DiskBlockObjectWriter(new File(Utils.getConfiguredLocalDirs(conf).toList(0) + "/null"), null, null, 0, true, null, null) with Logging {
-  var initialized = false
 
   var size: Int = 0
   var records: Int = 0
@@ -55,18 +54,13 @@ private[spark] class PmemBlockObjectStream(
   //persistentMemoryWriter.updateShuffleMeta(blockId.name)
   logDebug(blockId.name)
 
-  var objStream: SerializationStream = _
-  var wrappedStream: OutputStream = _
   val bytesStream: OutputStream = new PmemOutputStream(
     persistentMemoryWriter, numPartitions, blockId.name, numMaps)
+  val wrappedStream: OutputStream = serializerManager.wrapStream(blockId, bytesStream)
+  val objStream: SerializationStream = serializerInstance.serializeStream(wrappedStream)
   var inputStream: InputStream = _
 
   override def write(key: Any, value: Any): Unit = {
-    if (!initialized) {
-      wrappedStream = serializerManager.wrapStream(blockId, bytesStream)
-      objStream = serializerInstance.serializeStream(wrappedStream)
-      initialized = true
-    }
     objStream.writeObject(key)
     objStream.writeObject(value)
     records += 1
@@ -78,14 +72,11 @@ private[spark] class PmemBlockObjectStream(
   }
 
   override def close() {
-    if (initialized) {
-      logDebug("Serialize stream closed.")
-      objStream.close()
-      if (inputStream != null)
-        inputStream.close()
-    }
-    logDebug("PersistentMemoryHandlerPartition: stream closed.")
     bytesStream.close()
+    logDebug("Serialize stream closed.")
+    if (inputStream != null)
+      inputStream.close()
+    logDebug("PersistentMemoryHandlerPartition: stream closed.")
   }
 
   override def flush() {
