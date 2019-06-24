@@ -16,12 +16,14 @@ import java.io.*;
 
 public class PersistentMemoryMetaHandler {
 
-  private static String url = "jdbc:sqlite:/tmp/spark_shuffle_meta.db";
-  private static String fileLockPath = "/tmp/spark_shuffle_file.lock";
-
-  private static final File file = new File(fileLockPath);
+  private static String url;
+  private static String fileLockPath;
+  private static File file;
 
   PersistentMemoryMetaHandler(String root_dir) {
+    url = "jdbc:sqlite:" + root_dir + "/spark_shuffle_meta.db";
+    fileLockPath = root_dir + "spark_shuffle_file.lock";
+    file = new File(fileLockPath);
     createTable(root_dir);
   }
 
@@ -32,14 +34,15 @@ public class PersistentMemoryMetaHandler {
                 + " UNIQUE(shuffleId, device)\n"
                 + ");\n";
 
-    url = "jdbc:sqlite:" + root_dir + "/spark_shuffle_meta.db";
     synchronized (file) {
       FileOutputStream fos = null;
+      Connection conn = null;
+      Statement stmt = null;
       try {
         fos = new FileOutputStream(file);
-        FileLock fileLock = fos.getChannel().lock();
-        Connection conn = DriverManager.getConnection(url);
-        Statement stmt = conn.createStatement();
+        fos.getChannel().lock();
+        conn = DriverManager.getConnection(url);
+        stmt = conn.createStatement();
         stmt.execute(sql);
 
         sql = "CREATE TABLE IF NOT EXISTS devices (\n"
@@ -47,19 +50,27 @@ public class PersistentMemoryMetaHandler {
                 + "	mount_count int\n"
                 + ");";
         stmt.execute(sql);
-        conn.close();
-        fos.close();
       } catch (SQLException e) {
         System.out.println("createTable failed:" + e.getMessage());
       } catch (IOException e) {
         e.printStackTrace();
       } finally {
-        if (fos != null) {
-          try {
+        try {
+          if (stmt != null) stmt.close();
+        } catch (SQLException e) {
+          e.printStackTrace();
+        }
+        try {
+          if (conn != null) conn.close();
+        } catch (SQLException e) {
+          e.printStackTrace();
+        }
+        try {
+          if (fos != null) {
             fos.close();
-          } catch (IOException e) {
-            e.printStackTrace();
           }
+        } catch (IOException e) {
+          e.printStackTrace();
         }
       }
     }
@@ -70,28 +81,38 @@ public class PersistentMemoryMetaHandler {
     String sql = "INSERT OR IGNORE INTO metastore(shuffleId,device) VALUES('" + shuffleId + "','" + device + "')";
     synchronized (file) {
       FileOutputStream fos = null;
+      Connection conn = null;
+      Statement stmt = null;
       try {
         fos = new FileOutputStream(file);
-        FileLock fileLock = fos.getChannel().lock();
+        fos.getChannel().lock();
         SQLiteConfig config = new SQLiteConfig();
         config.setBusyTimeout("30000");
-        Connection conn = DriverManager.getConnection(url);
-        Statement stmt = conn.createStatement();
+        conn = DriverManager.getConnection(url);
+        stmt = conn.createStatement();
         stmt.executeUpdate(sql);
-        conn.close();
-        fos.close();
       } catch (SQLException e) {
-        System.err.println("insertRecord failed:" + e.getMessage());
+        e.printStackTrace();
         System.exit(-1);
       } catch (IOException e) {
         e.printStackTrace();
       } finally {
-        if (fos != null) {
-          try {
+        try {
+          if (stmt != null) stmt.close();
+        } catch (SQLException e) {
+          e.printStackTrace();
+        }
+        try {
+          if (conn != null) conn.close();
+        } catch (SQLException e) {
+          e.printStackTrace();
+        }
+        try {
+          if (fos != null) {
             fos.close();
-          } catch (IOException e) {
-            e.printStackTrace();
           }
+        } catch (IOException e) {
+          e.printStackTrace();
         }
       }
     }
@@ -102,28 +123,46 @@ public class PersistentMemoryMetaHandler {
     String res = "";
     synchronized (file) {
       FileOutputStream fos = null;
+      Connection conn = null;
+      PreparedStatement stmt = null;
+      ResultSet rs = null;
       try {
         fos = new FileOutputStream(file);
-        FileLock fileLock = fos.getChannel().lock();
-        Connection conn = DriverManager.getConnection(url);
-        PreparedStatement pstmt = conn.prepareStatement(sql);
-        pstmt.setString(1, shuffleId);
-        ResultSet rs = pstmt.executeQuery();
-        if (rs != null) {
+        fos.getChannel().lock();
+        conn = DriverManager.getConnection(url);
+        stmt = conn.prepareStatement(sql);
+        stmt.setString(1, shuffleId);
+        rs = stmt.executeQuery();
+        while (rs.next()) {
           res = rs.getString("device");
         }
-        conn.close();
-        fos.close();
       } catch (SQLException e) {
+        e.printStackTrace();
+        System.exit(-1);
       } catch (IOException e) {
         e.printStackTrace();
       } finally {
-        if (fos != null) {
-          try {
+        try {
+          if (rs != null) rs.close();
+        } catch (SQLException e) {
+          e.printStackTrace();
+        }
+        try {
+          if (stmt != null) stmt.close();
+        } catch (SQLException e) {
+          e.printStackTrace();
+        }
+        try {
+          if (conn != null) conn.close();
+        } catch (SQLException e) {
+          e.printStackTrace();
+        }
+        try {
+          if (fos != null) {
             fos.close();
-          } catch (IOException e) {
-            e.printStackTrace();
           }
+        } catch (IOException e) {
+          e.printStackTrace();
         }
       }
     }
@@ -138,24 +177,26 @@ public class PersistentMemoryMetaHandler {
     int count;
     synchronized (file) {
       FileOutputStream fos = null;
+      Connection conn = null;
+      Statement stmt = null;
+      ResultSet rs = null;
       try {
         fos = new FileOutputStream(file);
-        FileLock fileLock = fos.getChannel().lock();
+        fos.getChannel().lock();
         SQLiteConfig config = new SQLiteConfig();
         config.setBusyTimeout("30000");
-        Connection conn = DriverManager.getConnection(url);
-        Statement stmt = conn.createStatement();
-        ResultSet rs = stmt.executeQuery(sql);
+        conn = DriverManager.getConnection(url);
+        stmt = conn.createStatement();
+        rs = stmt.executeQuery(sql);
         while (rs.next()) {
           device_list.add(rs.getString("device"));
           device_count.put(rs.getString("device"), rs.getInt("mount_count"));
         }
-
         full_device_list.removeAll(device_list);
         if (full_device_list.size() == 0) {
           // reuse old device, picked the device has smallest mount_count
           device = getDeviceWithMinCount(device_count);
-          if (device == "") {
+          if (device != null && device.length() == 0) {
             throw new SQLException();
           }
           count = (Integer) device_count.get(device) + 1;
@@ -169,16 +210,31 @@ public class PersistentMemoryMetaHandler {
         System.out.println(sql);
 
         stmt.executeUpdate(sql);
-        conn.close();
-        fos.close();
       } catch (SQLException e) {
-        System.err.println("getUnusedDevice insert device " + device + "failed: " + e.getMessage());
+        e.printStackTrace();
         System.exit(-1);
       } catch (IOException e) {
         e.printStackTrace();
       } finally {
         try {
-          fos.close();
+          if (rs != null) rs.close();
+        } catch (SQLException e) {
+          e.printStackTrace();
+        }
+        try {
+          if (stmt != null) stmt.close();
+        } catch (SQLException e) {
+          e.printStackTrace();
+        }
+        try {
+          if (conn != null) conn.close();
+        } catch (SQLException e) {
+          e.printStackTrace();
+        }
+        try {
+          if (fos != null) {
+            fos.close();
+          }
         } catch (IOException e) {
           e.printStackTrace();
         }
@@ -203,35 +259,4 @@ public class PersistentMemoryMetaHandler {
     }
     return device;
   }
-
-  public static void main(String[] args) {
-    PersistentMemoryMetaHandler pmMetaHandler = new PersistentMemoryMetaHandler("/tmp/");
-    String dev;
-    /*System.out.println("insert record");
-    pmMetaHandler.insertRecord("shuffle_0_1_0", "/dev/dax0.0");
-    pmMetaHandler.insertRecord("shuffle_0_2_0", "/dev/dax0.0");
-    pmMetaHandler.insertRecord("shuffle_0_3_0", "/dev/dax1.0");
-    pmMetaHandler.insertRecord("shuffle_0_4_0", "/dev/dax1.0");
-    */
-    /*System.out.println("get shuffle device");
-    String dev = pmMetaHandler.getShuffleDevice("shuffle_0_85_0");
-    System.out.println("shuffle_0_85_0 uses device: " + dev);
-    */
-    ArrayList<String> device_list = new ArrayList<String>();
-    device_list.add("/dev/dax0.0");
-    device_list.add("/dev/dax1.0");
-    device_list.add("/dev/dax2.0");
-    device_list.add("/dev/dax3.0");
-
-    dev = pmMetaHandler.getUnusedDevice(device_list);
-    dev = pmMetaHandler.getUnusedDevice(device_list);
-    dev = pmMetaHandler.getUnusedDevice(device_list);
-    dev = pmMetaHandler.getUnusedDevice(device_list);
-
-    dev = pmMetaHandler.getUnusedDevice(device_list);
-    dev = pmMetaHandler.getUnusedDevice(device_list);
-    dev = pmMetaHandler.getUnusedDevice(device_list);
-    dev = pmMetaHandler.getUnusedDevice(device_list);
-  }
-
 }
