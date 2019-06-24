@@ -75,28 +75,38 @@ struct PartitionBlock {
 };
 
 struct MemoryBlock {
-    char* buf;
-    int len;
-    MemoryBlock() {
-    }
+  char* buf;
+  int len;
+  MemoryBlock() {
+  }
 
-    ~MemoryBlock() {
-      if (buf != nullptr) {
-        delete[] buf;
-      }
+  ~MemoryBlock() {
+    if (buf != nullptr) {
+      delete[] buf;
     }
+  }
+  
+  MemoryBlock& operator=(const MemoryBlock&) {
+    return *this;
+  }
+  MemoryBlock(const MemoryBlock& src){ /* do not create copies */ }
 };
 
 struct BlockInfo {
-    long* data;
-    BlockInfo() {
-    }
+  long* data;
+  BlockInfo() {
+  }
 
-    ~BlockInfo() {
-      if (data != nullptr) {
-        delete data;
-      }
+  ~BlockInfo() {
+    if (data != nullptr) {
+      delete data;
     }
+  }
+  
+  BlockInfo& operator=(const BlockInfo&) {
+    return *this;
+  }
+  BlockInfo(const BlockInfo& src){ /* do not create copies */ }
 };
 
 using namespace std;
