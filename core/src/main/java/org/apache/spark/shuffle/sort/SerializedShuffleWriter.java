@@ -251,10 +251,8 @@ public class SerializedShuffleWriter<K, V> extends ShuffleWriter<K, V> {
                 partitionLengths = mergeSpills(spills, tmp);
             } finally {
                 for (SpillInfo spill : spills) {
-                    if (spill.file.exists()) {
-                       if(!spill.file.delete()) {
-                          logger.error("Error while deleting spill file {}", spill.file.getPath());
-                       }
+                    if (spill.file.exists() && ! spill.file.delete()) {
+                        logger.error("Error while deleting spill file {}", spill.file.getPath());
                     }
                 }
             }
