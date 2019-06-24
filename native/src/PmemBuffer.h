@@ -29,13 +29,13 @@ public:
   int load(char* pmem_data_addr, int pmem_data_len) {
     std::lock_guard<std::mutex> lock(buffer_mtx);
     if (buf_data_capacity == 0 && pmem_data_len > 0) {
-      buf_data = (char*)malloc(sizeof(char*) * pmem_data_len);
+      buf_data = (char*)malloc(sizeof(char) * pmem_data_len);
     }
 
     buf_data_capacity = remaining + pmem_data_len;
     if (remaining > 0 && buf_data_capacity > 0) {
       char* tmp_buf_data = buf_data;
-      buf_data = (char*)malloc(sizeof(char*) * buf_data_capacity);
+      buf_data = (char*)malloc(sizeof(char) * buf_data_capacity);
       if (buf_data != nullptr && tmp_buf_data != nullptr) {
         memcpy(buf_data, tmp_buf_data + pos, remaining);
       }
@@ -102,24 +102,23 @@ public:
     if (buf_data_capacity == 0) {
       buf_data_capacity = DEFAULT_BUFSIZE;
       if (buf_data_capacity > 0) {
-        buf_data = (char*)malloc(sizeof(char*) * buf_data_capacity);
+        buf_data = (char*)malloc(sizeof(char) * buf_data_capacity);
       }
     }
     if ((pos + remaining + len) > buf_data_capacity) {
       if ((remaining + len) > buf_data_capacity) {
         buf_data_capacity += DEFAULT_BUFSIZE;
       }
-      char* original_buf_data = buf_data;
       if (buf_data_capacity > 0) {
-        buf_data = (char*)malloc(sizeof(char*) * buf_data_capacity);
+        char* original_buf_data = buf_data;
+        buf_data = (char*)malloc(sizeof(char) * buf_data_capacity);
+        if (buf_data != nullptr && original_buf_data != nullptr) {
+          memcpy(buf_data, original_buf_data + pos, remaining);
+        }
+        free(original_buf_data);
+        pos = 0;
+        pos_dirty = 0;
       }
-      if (buf_data != nullptr && original_buf_data != nullptr) {
-        memcpy(buf_data, original_buf_data + pos, remaining);
-      }
-      free(original_buf_data);
-
-      pos = 0;
-      pos_dirty = 0;
     }
     if (buf_data != nullptr && data != nullptr) {
       memcpy(buf_data + pos + remaining, data, len);
@@ -146,4 +145,10 @@ private:
   int min(int x, int y) {
     return x > y ? y : x;
   }
+  
+  PmemBuffer& operator=(const PmemBuffer&) {
+    return *this;
+  }
+
+  PmemBuffer(const PmemBuffer& src){ /* do not create copies */ }
 };

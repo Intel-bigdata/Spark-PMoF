@@ -33,10 +33,10 @@ PMPool::PMPool(const char* dev, int maxStage, int maxMap, long size):
 
 PMPool::~PMPool() {
     while(request_queue.size() > 0) {
-        fprintf(stderr, "%s request queue size is %d\n", dev, request_queue.size());
+        fprintf(stderr, "%s request queue size is %ld\n", dev, request_queue.size());
         sleep(1);
     }
-    fprintf(stderr, "%s request queue size is %d\n", dev, request_queue.size());
+    fprintf(stderr, "%s request queue size is %ld\n", dev, request_queue.size());
     stop = true;
     worker.join();
     pmemobj_close(pmpool);
