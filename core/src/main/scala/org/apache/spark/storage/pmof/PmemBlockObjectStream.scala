@@ -79,12 +79,10 @@ private[spark] class PmemBlockObjectStream(
 
   override def close() {
     if (initialized) {
-      logDebug("Serialize stream closed.")
       objStream.close()
       if (inputStream != null)
         inputStream.close()
     }
-    logDebug("PersistentMemoryHandlerPartition: stream closed.")
     bytesStream.close()
   }
 

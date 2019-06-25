@@ -34,7 +34,10 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemory
   (JNIEnv *env, jclass obj, jlong pmpool, jint stageId, jint mapId, jint partitionId) {
   MemoryBlock mb;
   long size = ((PMPool*)pmpool)->getMapPartition(&mb, stageId, mapId, partitionId);
-  jbyteArray data = env->NewByteArray(size);
+  if (size <= 0) {
+    return env->NewByteArray(0);
+  }
+  jbyteArray data = data = env->NewByteArray(size);
   env->SetByteArrayRegion(data, 0, size, (jbyte*)(mb.buf));
   return data;
 }
@@ -43,6 +46,9 @@ JNIEXPORT jbyteArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemory
   (JNIEnv *env, jclass obj, jlong pmpool, jint stageId, jint mapId, jint partitionId) {
   MemoryBlock mb;
   long size = ((PMPool*)pmpool)->getReducePartition(&mb, stageId, mapId, partitionId);
+  if (size <= 0) {
+    return env->NewByteArray(0);
+  }
   jbyteArray data = env->NewByteArray(size);
   env->SetByteArrayRegion(data, 0, size, (jbyte*)(mb.buf));
   return data;
@@ -52,7 +58,7 @@ JNIEXPORT jlongArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemory
   (JNIEnv *env, jclass obj, jlong pmpool, jint stageId, jint mapId, jint partitionId) {
   BlockInfo blockInfo;
   int length = ((PMPool*)pmpool)->getMapPartitionBlockInfo(&blockInfo, stageId, mapId, partitionId);
-  if (length == 0) {
+  if (length <= 0) {
     return env->NewLongArray(0);
   }
   jlongArray data = env->NewLongArray(length);
@@ -64,7 +70,7 @@ JNIEXPORT jlongArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemory
   (JNIEnv *env, jclass obj, jlong pmpool, jint stageId, jint mapId, jint partitionId) {
   BlockInfo blockInfo;
   int length = ((PMPool*)pmpool)->getReducePartitionBlockInfo(&blockInfo, stageId, mapId, partitionId);
-  if (length == 0) {
+  if (length <= 0) {
     return env->NewLongArray(0);
   }
   jlongArray data = env->NewLongArray(length);

@@ -75,7 +75,7 @@ struct PartitionBlock {
 };
 
 struct MemoryBlock {
-  char* buf;
+  char* buf = nullptr;
   int len;
   MemoryBlock() {
   }
@@ -93,13 +93,13 @@ struct MemoryBlock {
 };
 
 struct BlockInfo {
-  long* data;
+  long* data = nullptr;
   BlockInfo() {
   }
 
   ~BlockInfo() {
     if (data != nullptr) {
-      delete data;
+      delete[] data;
     }
   }
   
@@ -201,7 +201,7 @@ public:
     void exec();
     long getResult();
 private:
-    MemoryBlock *mb;
+    MemoryBlock *mb = nullptr;
     long data_length = -1;
     void getPartition();
 };
@@ -220,7 +220,7 @@ public:
     void exec();
     long getResult();
 private:
-    BlockInfo* block_info;
+    BlockInfo* block_info = nullptr;
     long array_length = -1;
     void getPartitionBlockInfo();
 };

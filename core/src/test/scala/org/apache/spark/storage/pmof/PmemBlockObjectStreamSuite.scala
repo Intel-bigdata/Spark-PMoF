@@ -25,40 +25,36 @@ import org.apache.spark.executor.{TaskMetrics, ShuffleWriteMetrics}
 import org.apache.spark.serializer._
 import org.apache.spark.util.Utils
 import org.apache.spark.storage._
+import org.apache.spark.storage.pmof._
 
 class PmemBlockObjectStreamSuite extends SparkFunSuite with BeforeAndAfterEach {
 
-  var tempDir: File = _
+  val conf = new SparkConf()
+  conf.set("spark.shuffle.pmof.enable_rdma", "false")
+  conf.set("spark.shuffle.pmof.enable_pmem", "true")
+  //val serializer = new JavaSerializer(conf)
+  val serializer = new KryoSerializer(conf)
+  val serializerManager = new SerializerManager(serializer, conf)
+  val taskMetrics = new TaskMetrics()
 
   override def beforeEach(): Unit = {
     super.beforeEach()
-    tempDir = Utils.createTempDir()
   }
 
   override def afterEach(): Unit = {
-    try {
-      Utils.deleteRecursively(tempDir)
-    } finally {
-      super.afterEach()
-    }
+    super.afterEach()
   }
 
-  private def createWriter(): (PmemBlockObjectStream, ShuffleWriteMetrics) = {
-    val conf = new SparkConf()
-    conf.set("spark.shuffle.pmof.enable_rdma", "false")
-    conf.set("spark.shuffle.pmof.enable_pmem", "true")
-    //val serializer = new JavaSerializer(conf)
-    val serializer = new KryoSerializer(conf)
-    val serializerManager = new SerializerManager(serializer, conf)
-    val taskMetrics = new TaskMetrics()
+  private def createWriter(blockId: ShuffleBlockId): (PmemBlockObjectStream, ShuffleWriteMetrics) = {
     val writeMetrics = taskMetrics.shuffleWriteMetrics
     val writer = new PmemBlockObjectStream(
-      serializerManager, serializer.newInstance(), taskMetrics, ShuffleBlockId(0, 0, 0), conf, 100, 100)
+      serializerManager, serializer.newInstance(), taskMetrics, blockId, conf, 100, 100)
     (writer, writeMetrics)
   }
 
-  test("verify write metrics") {
-    val (writer, writeMetrics) = createWriter()
+  test("verify ShuffleWrite of Shuffle_0_0_0, then check read") {
+    val blockId = ShuffleBlockId(0, 0, 0)
+    val (writer, writeMetrics) = createWriter(blockId)
     val key: String = "key"
     val value: String = "value"
     writer.write(key, value)
@@ -71,7 +67,46 @@ class PmemBlockObjectStreamSuite extends SparkFunSuite with BeforeAndAfterEach {
     writer.flush()
     assert(writeMetrics.recordsWritten === 2)
     writer.close()
-    //assert(writeMetrics.bytesWritten > 0)
-    //assert(writer.size == writeMetrics.bytesWritten)
+
+    val inStream = writer.getInputStream()
+    val wrappedStream = serializerManager.wrapStream(blockId, inStream)
+    val inObjStream = serializer.newInstance().deserializeStream(wrappedStream)
+    val k = inObjStream.readObject().asInstanceOf[String]
+    val v = inObjStream.readObject().asInstanceOf[String]
+    assert(k.equals(key))
+    assert(v.equals(value))
+    inObjStream.close()
+  }
+
+  test("verify ShuffleRead of Shuffle_0_0_0") {
+    val blockId = ShuffleBlockId(0, 0, 0)
+    val persistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler
+    val buf = persistentMemoryHandler.getPartitionManagedBuffer(blockId.name)
+    val inStream = buf.createInputStream()
+    val wrappedStream = serializerManager.wrapStream(blockId, inStream)
+    val inObjStream = serializer.newInstance().deserializeStream(wrappedStream)
+    val k = inObjStream.readObject().asInstanceOf[String]
+    val v = inObjStream.readObject().asInstanceOf[String]
+    assert(k.equals("key"))
+    assert(v.equals("value"))
+    inObjStream.close()
+  }
+
+  test("verify ShuffleRead of none exists Shuffle_0_0_1") {
+    val blockId = ShuffleBlockId(0, 0, 1)
+    val persistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler
+    val buf = persistentMemoryHandler.getPartitionManagedBuffer(blockId.name)
+
+    val inStream = buf.createInputStream()
+    val wrappedStream = serializerManager.wrapStream(blockId, inStream)
+    val inObjStream = serializer.newInstance().deserializeStream(wrappedStream)
+    try{
+      val k = inObjStream.readObject().asInstanceOf[String]
+      val v = inObjStream.readObject().asInstanceOf[String]
+    } catch {
+      case ex: java.io.EOFException =>
+        logInfo(s"Expected Error: $ex")
+    }
+    inObjStream.close()
   }
 }
