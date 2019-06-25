@@ -16,13 +16,12 @@ public:
     remaining_dirty = 0;
     pos = 0;
     pos_dirty = 0;
-    buf_cleaned = false;
   }
 
   ~PmemBuffer() {
-    if (!buf_cleaned) {
+    if (buf_data != nullptr) {
       free(buf_data);
-      buf_cleaned = true;
+      buf_data = nullptr;
     }
   }
 
@@ -65,9 +64,9 @@ public:
     pos = 0;
     remaining_dirty = 0;
     pos_dirty = 0;
-    if (!buf_cleaned) {
+    if (buf_data != nullptr) {
       free(buf_data);
-      buf_cleaned = true;
+      buf_data = nullptr;
     }
   }
 
@@ -134,8 +133,7 @@ public:
 
 private:
   mutex buffer_mtx;
-  char* buf_data;
-  bool buf_cleaned;
+  char* buf_data = nullptr;
   int buf_data_capacity;
   int pos;
   int remaining;

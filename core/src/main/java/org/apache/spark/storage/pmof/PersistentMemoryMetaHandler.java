@@ -16,9 +16,9 @@ import java.io.*;
 
 public class PersistentMemoryMetaHandler {
 
-  private static String url;
-  private static String fileLockPath;
-  private static File file;
+  private final String url;
+  private final String fileLockPath;
+  private final File file;
 
   PersistentMemoryMetaHandler(String root_dir) {
     url = "jdbc:sqlite:" + root_dir + "/spark_shuffle_meta.db";
