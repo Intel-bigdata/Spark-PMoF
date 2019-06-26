@@ -91,6 +91,7 @@ private[spark] class PmemBlockObjectStream(
   }
 
   def maybeSpill(force: Boolean = false): Unit = {
+    if (!initialized) return
     if ((spill_throttle != -1 && bytesStream.asInstanceOf[PmemOutputStream].size >= spill_throttle) || force == true) {
       val start = System.nanoTime()
       objStream.flush()
