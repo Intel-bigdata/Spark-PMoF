@@ -19,3 +19,14 @@ install:
 
 clean:
 	rm -rf $(MAIN)
+
+test: clean_test 010-TestCasePersistentMemoryPool run_test
+
+010-TestCasePersistentMemoryPool:
+	$(CC) -std=c++11 010-TestCasePersistentMemoryPool.cpp -o 010-TestCasePersistentMemoryPool -lpthread -ljnipmdk
+
+clean_test:
+	rm -f 010-TestCasePersistentMemoryPool
+
+run_test:
+	./010-TestCasePersistentMemoryPool --success

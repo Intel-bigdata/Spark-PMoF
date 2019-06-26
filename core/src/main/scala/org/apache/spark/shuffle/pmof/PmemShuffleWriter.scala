@@ -117,7 +117,8 @@ private[spark] class PmemShuffleWriter[K, V, C](
     var output_str : String = ""
 
     for (i <- partitionSpilled) {
-      data_addr_map(i) = partitionBufferArray(i).getPartitionMeta().map{ info => (info._1, info._2)}
+      if (enable_rdma)
+        data_addr_map(i) = partitionBufferArray(i).getPartitionMeta().map{ info => (info._1, info._2)}
       partitionLengths(i) = partitionBufferArray(i).size
       output_str += "\tPartition " + i + ": " + partitionLengths(i) + ", records: " + partitionBufferArray(i).records + "\n"
     }

@@ -80,7 +80,6 @@ long PMPool::setReducePartition(
         int numMaps) {
     WriteRequest write_request(this, maxStage, 1, partitionNum, stageId, 1, 0, partitionId, size, data, clean);
     request_queue.enqueue((void*)&write_request);
-    
     return write_request.getResult();
 }
 
