@@ -1,0 +1,9 @@
+## [1.0.0] - 2016-06-28
+### Added
+- initial release
+- core includes java/scala codes, implemented a new shuffle class named PmemShuffleWriter and PmemShuffleReader to write shuffle data and external sort data to Persistent Memory and remote read using RDMA.
+- native codes include a wrapper of PMDK libpmemobj
+
+### Changed
+
+### Removed
