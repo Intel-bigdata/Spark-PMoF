@@ -1,5 +1,5 @@
 # PMoF plugin for Spark
-Spark-PMoF, PMoF plugin for Spark is a Spark Shuffle Plugin which aims to accelerate Shuffle operation with **AEP+RDMA**.
+Spark-PMoF (Persistent Memory over Fabric), PMoF plugin for spark, is a Spark Shuffle Plugin which enables persistent memory and high performance fabric technology like RDMA for Spark shuffle to improve Spark performance in shuffle intensive scneario. 
 
 ## Contents
 - [Introduction](#introduction)
@@ -30,3 +30,5 @@ spark.shuffle.manager org.apache.spark.shuffle.pmof.RdmaShuffleManager
 ```
 
 ## Contact
+Chendi Xue, chendi.xue@intel.com 
+Jian Zhang, jian.zhang@intel.com 
