@@ -95,7 +95,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
       }
     } else { // no aggregation
       while (records.hasNext) {     
-        // since we need to write same partition (key, value) togethor, do a partition index here
+        // since we need to write same partition (key, value) together, do a partition index here
         val elem = records.next()
         val partitionId: Int = partitioner.getPartition(elem._1)
         partitionBufferArray(partitionId).write(elem._1, elem._2)
@@ -105,13 +105,13 @@ private[spark] class PmemShuffleWriter[K, V, C](
       }
     }
 
-    var numSpilledPartitions = 0
+    var spilledPartition = 0
     val partitionSpilled: ArrayBuffer[Int] = ArrayBuffer[Int]()
-    while (numSpilledPartitions < numPartitions) {
-      if (partitionBufferArray(numSpilledPartitions).ifSpilled()) {
-        partitionSpilled.append(numSpilledPartitions)
+    while (spilledPartition < numPartitions) {
+      if (partitionBufferArray(spilledPartition).ifSpilled()) {
+        partitionSpilled.append(spilledPartition)
       }
-      numSpilledPartitions += 1
+      spilledPartition += 1
     }
     val data_addr_map = mutable.HashMap.empty[Int, Array[(Long, Int)]]
     var output_str : String = ""
