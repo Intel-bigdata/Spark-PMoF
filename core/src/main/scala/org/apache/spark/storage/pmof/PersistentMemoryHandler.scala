@@ -9,8 +9,11 @@ import org.apache.spark.{SparkConf, SparkEnv}
 import scala.collection.JavaConverters._
 import java.nio.file.{Files, Paths}
 import java.util.UUID
+import java.lang.management.ManagementFactory
 
 import org.apache.spark.network.buffer.ManagedBuffer
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 private[spark] class PersistentMemoryHandler(
     val root_dir: String,
@@ -43,6 +46,7 @@ private[spark] class PersistentMemoryHandler(
   
   val pmpool = new PersistentMemoryPool(device, maxStages, numMaps, poolSize)
   var rkey: Long = 0
+
 
   def getDevice(): String = {
     device
@@ -146,6 +150,12 @@ object PersistentMemoryHandler {
         val rdmaBuffer = eqService.regRmaBufferByAddress(null, offset, pmem_capacity)
         persistentMemoryHandler.rkey = rdmaBuffer.getRKey()
       }
+      val dev_core_map = conf.get("spark.shuffle.pmof.dev_core_set").split(";").map(_.trim).map(_.split(":")).map(arr => arr(0) -> arr(1)).toMap
+      val core_set = dev_core_map.get(persistentMemoryHandler.getDevice())
+      core_set match {
+        case Some(s) => Future {nativeTaskset(s)}
+        case None => {}
+      }
     }
     persistentMemoryHandler
   }
@@ -163,5 +173,14 @@ object PersistentMemoryHandler {
       persistentMemoryHandler = null
       stopped = true
     }
+  }
+
+  def nativeTaskset(core_set: String): Unit = {
+    Runtime.getRuntime.exec("taskset -cpa " + core_set + " " + getProcessId())
+  }
+
+  def getProcessId(): Int = {
+    val runtimeMXBean = ManagementFactory.getRuntimeMXBean()
+    runtimeMXBean.getName().split("@")(0).toInt
   }
 }
