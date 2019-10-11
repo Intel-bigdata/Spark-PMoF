@@ -90,20 +90,21 @@ private[spark] class PmemBlockObjectStream(
       bytesStream.flush()
       val bufSize = bytesStream.asInstanceOf[PmemOutputStream].size
       //logInfo(blockId.name + " do spill, size is " + bufSize)
+      if (bufSize > 0) {
+        recordsArray += recordsPerBlock
+        recordsPerBlock = 0
+        size += bufSize
 
-      recordsArray += recordsPerBlock
-      recordsPerBlock = 0
-      size += bufSize
-
-			if (blockId.isShuffle == true) {
-        val writeMetrics = taskMetrics.shuffleWriteMetrics
-        writeMetrics.incWriteTime(System.nanoTime() - start)
-        writeMetrics.incBytesWritten(bufSize)
-			} else {
-        taskMetrics.incDiskBytesSpilled(bufSize)
-			}
-      bytesStream.asInstanceOf[PmemOutputStream].reset()
-      spilled = true
+        if (blockId.isShuffle == true) {
+          val writeMetrics = taskMetrics.shuffleWriteMetrics
+          writeMetrics.incWriteTime(System.nanoTime() - start)
+          writeMetrics.incBytesWritten(bufSize)
+        } else {
+          taskMetrics.incDiskBytesSpilled(bufSize)
+        }
+        bytesStream.asInstanceOf[PmemOutputStream].reset()
+        spilled = true
+      }
     }
   }
 
