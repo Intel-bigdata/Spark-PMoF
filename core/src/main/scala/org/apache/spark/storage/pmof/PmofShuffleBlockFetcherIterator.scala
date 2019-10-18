@@ -19,6 +19,7 @@ package org.apache.spark.storage.pmof
 
 import java.io.{File, IOException, InputStream}
 import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 
 import javax.annotation.concurrent.GuardedBy
 import org.apache.spark.internal.Logging
@@ -104,13 +105,10 @@ final class RdmaShuffleBlockFetcherIterator(
   @volatile private[this] var currentResult: SuccessFetchResult = _
 
   /** Current bytes in flight from our requests */
-  private[this] var bytesInFlight = 0L
+  private[this] var bytesInFlight = new AtomicLong(0)
 
   /** Current number of requests in flight */
-  private[this] var reqsInFlight = 0
-
-  /** Current number of blocks in flight per host:port */
-  private[this] val numBlocksInFlightPerAddress = new mutable.HashMap[BlockManagerId, Int]()
+  private[this] var reqsInFlight = new AtomicInteger(0)
 
   private[this] val shuffleMetrics = context.taskMetrics().createTempShuffleReadMetrics()
 
@@ -170,13 +168,10 @@ final class RdmaShuffleBlockFetcherIterator(
   def sendRequest(rdmaRequest: RdmaRequest): Unit = {
     val shuffleBlockInfos = rdmaRequest.shuffleBlockInfos
     var blockNums= shuffleBlockInfos.size
-    bytesInFlight += rdmaRequest.reqSize
-    reqsInFlight += 1
+    bytesInFlight.addAndGet(rdmaRequest.reqSize)
+    reqsInFlight.incrementAndGet
     val blockManagerId = rdmaRequest.blockManagerId
     val shuffleBlockIdName = rdmaRequest.shuffleBlockIdName
-
-    numBlocksInFlightPerAddress(blockManagerId) =
-        numBlocksInFlightPerAddress.getOrElse(blockManagerId, 0) + 1
 
     val pmofTransferService = shuffleClient.asInstanceOf[PmofTransferService]
 
@@ -214,7 +209,7 @@ final class RdmaShuffleBlockFetcherIterator(
   }
 
   def isRemoteBlockFetchable(rdmaRequest: RdmaRequest): Boolean = {
-    reqsInFlight + 1 <= maxReqsInFlight && bytesInFlight + rdmaRequest.reqSize <= maxBytesInFlight
+    reqsInFlight.get + 1 <= maxReqsInFlight && bytesInFlight.get + rdmaRequest.reqSize <= maxBytesInFlight
   }
 
   def fetchRemoteBlocks(): Unit = {
@@ -362,8 +357,6 @@ final class RdmaShuffleBlockFetcherIterator(
       result match {
         case SuccessFetchResult(blockId, address, size, buf, isNetworkReqDone) =>
           if (address != blockManager.blockManagerId) {
-            if (numBlocksInFlightPerAddress.contains(address))
-              numBlocksInFlightPerAddress(address) = numBlocksInFlightPerAddress(address) - 1
             shuffleMetrics.incRemoteBytesRead(buf.size)
             if (buf.isInstanceOf[FileSegmentManagedBuffer]) {
               shuffleMetrics.incRemoteBytesReadToDisk(buf.size)
@@ -371,9 +364,9 @@ final class RdmaShuffleBlockFetcherIterator(
             shuffleMetrics.incRemoteBlocksFetched(1)
             logDebug("take remote block.")
           }
-          bytesInFlight -= size
+          bytesInFlight.addAndGet(-size)
           if (isNetworkReqDone) {
-            reqsInFlight -= 1
+            reqsInFlight.decrementAndGet
           }
 
           val in = try {
@@ -400,11 +393,6 @@ final class RdmaShuffleBlockFetcherIterator(
 
     currentResult = result.asInstanceOf[SuccessFetchResult]
     (currentResult.blockId, new RDMABufferReleasingInputStream(input, this))
-  }
-
-  def isRemoteAddressMaxedOut(remoteAddress: BlockManagerId, request: FetchRequest): Boolean = {
-    numBlocksInFlightPerAddress.getOrElse(remoteAddress, 0) + request.blocks.size >
-      maxBlocksInFlightPerAddress
   }
 
   private def throwFetchFailedException(blockId: BlockId, address: BlockManagerId, e: Throwable) = {

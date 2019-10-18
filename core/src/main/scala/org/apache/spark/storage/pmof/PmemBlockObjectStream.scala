@@ -61,8 +61,8 @@ private[spark] class PmemBlockObjectStream(
   var inputStream: InputStream = _
 
   override def write(key: Any, value: Any): Unit = {
-    objStream.writeObject(key)
-    objStream.writeObject(value)
+    objStream.writeKey(key)
+    objStream.writeValue(value)
     records += 1
     recordsPerBlock += 1
 		if (blockId.isShuffle == true) {
