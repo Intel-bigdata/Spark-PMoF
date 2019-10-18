@@ -12,7 +12,8 @@ public class PmemBuffer {
     private native int nativeGetPmemBufferRemaining(long pmBuffer);
     private native long nativeGetPmemBufferDataAddr(long pmBuffer);
     private native long nativeDeletePmemBuffer(long pmBuffer);
-
+		
+		private boolean closed = false;
     long pmBuffer;
     PmemBuffer() {
       pmBuffer = nativeNewPmemBuffer();
@@ -53,7 +54,10 @@ public class PmemBuffer {
       return nativeGetPmemBufferDataAddr(pmBuffer);
     }
 
-    void close() {
-      nativeDeletePmemBuffer(pmBuffer);
+    synchronized void close() {
+			if (!closed) {
+      	nativeDeletePmemBuffer(pmBuffer);
+				closed = true;
+			}
     }
 }

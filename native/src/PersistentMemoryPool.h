@@ -33,13 +33,12 @@
 
 using namespace std;
 
+#include <mutex>
+#include <thread>
+
 class PMPool {
 public:
     PMEMobjpool *pmpool;
-
-    std::thread worker;
-    WorkQueue<void*> request_queue;
-    bool stop;
 
     TOID(struct StageArrayRoot) stageArrayRoot;
     int maxStage;
@@ -65,7 +64,7 @@ public:
     long deleteMapPartition(int stageId, int mapId, int partitionId);
     long deleteReducePartition(int stageId, int mapId, int partitionId);
 private:
-    void process();
+		std::mutex mtx;
 };
 
 #endif

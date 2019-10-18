@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
+#include <assert.h>
 
 /******  Request ******/
 TOID(struct PartitionArrayItem) Request::getPartitionBlock() {
@@ -151,11 +152,6 @@ void WriteRequest::exec() {
 }
 
 long WriteRequest::getResult() {
-    while (!processed) {
-        usleep(5);
-    }
-    //cv.wait(lck, [&]{return processed;});
-    //fprintf(stderr, "get Result for %d_%d_%d\n", stageId, mapId, partitionId);
     return (long)data_addr;
 }
 
@@ -201,22 +197,18 @@ void WriteRequest::setPartition() {
         D_RW(partitionArrayItem)->last_block = *partitionBlock;
 
         data_addr = (char*)pmemobj_direct(D_RW(*partitionBlock)->data);
-        //printf("setPartition data_addr: %p\n", data_addr);
         pmemobj_tx_add_range_direct((const void *)data_addr, size);
 
         memcpy(data_addr, data, size);
     } TX_ONCOMMIT {
         committed = true;
-        block_cv.notify_all();
     } TX_ONABORT {
         fprintf(stderr, "set Partition of %d_%d_%d failed, type is %d, partitionNum is %d, maxStage is %d, maxMap is %d. Error: %s\n", stageId, mapId, partitionId, typeId, partitionNum, maxStage, maxMap, pmemobj_errormsg());
         exit(-1);
     } TX_END
-
-    block_cv.wait(block_lck, [&]{return committed;});
-
-    processed = true;
-    //cv.notify_all();
+		if (!committed) {
+			assert(0 == "content not committed.");
+		}
 }
 
 /******  ReadRequest ******/
@@ -240,14 +232,11 @@ void ReadRequest::getPartition() {
     char* data_addr;
     while(!TOID_IS_NULL(partitionBlock)) {
         data_addr = (char*)pmemobj_direct(D_RO(partitionBlock)->data);
-        //printf("getPartition data_addr: %p\n", data_addr);
 
         memcpy(mb->buf + off, data_addr, D_RO(partitionBlock)->data_size);
         off += D_RO(partitionBlock)->data_size;
         partitionBlock = D_RO(partitionBlock)->next_block;
     }
-
-    //printf("getPartition length is %d\n", data_length);
 }
 
 /******  MetaRequest ******/
@@ -299,9 +288,6 @@ void DeleteRequest::exec() {
 }
 
 long DeleteRequest::getResult() {
-    while (!processed) {
-        usleep(5);
-    }
     return ret;
 }
 
@@ -326,13 +312,8 @@ void DeleteRequest::deletePartition() {
         D_RW(partitionArrayItem)->numBlocks = 0;
     } TX_ONCOMMIT {
         committed = true;
-        block_cv.notify_all();
     } TX_ONABORT {
         fprintf(stderr, "delete Partition of %d_%d_%d failed, type is %d. Error: %s\n", stageId, mapId, partitionId, typeId, pmemobj_errormsg());
         exit(-1);
     } TX_END
-
-    block_cv.wait(block_lck, [&]{return committed;});
-
-    processed = true;
 }
