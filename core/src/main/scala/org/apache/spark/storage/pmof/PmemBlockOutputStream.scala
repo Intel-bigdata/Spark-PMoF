@@ -4,11 +4,11 @@ import org.apache.spark.storage._
 import org.apache.spark.serializer._
 import org.apache.spark.executor.TaskMetrics
 import org.apache.spark.internal.Logging
-
-import org.apache.spark.SparkConf
+import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.util.Utils
-import java.io._
-import java.io.{InputStream, OutputStream}
+import java.io.{File, OutputStream}
+
+import org.apache.spark.util.configuration.pmof.PmofConf
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -26,39 +26,36 @@ object PmemBlockId {
   }
 }
 
-private[spark] class PmemBlockObjectStream(
-    serializerManager: SerializerManager,
-    serializerInstance: SerializerInstance,
+private[spark] class PmemBlockOutputStream(
     taskMetrics: TaskMetrics,
     blockId: BlockId,
+    serializerManager: SerializerManager,
+    serializer: Serializer,
     conf: SparkConf,
+    pmofConf: PmofConf,
     numMaps: Int = 0,
     numPartitions: Int = 1
 ) extends DiskBlockObjectWriter(new File(Utils.getConfiguredLocalDirs(conf).toList(0) + "/null"), null, null, 0, true, null, null) with Logging {
 
   var size: Int = 0
   var records: Int = 0
-
   var recordsPerBlock: Int = 0
   val recordsArray: ArrayBuffer[Int] = ArrayBuffer()
   var spilled: Boolean = false
   var partitionMeta: Array[(Long, Int, Int)] = _
-
   val root_dir = Utils.getConfiguredLocalDirs(conf).toList(0)
-  val path_list = conf.get("spark.shuffle.pmof.pmem_list").split(",").map(_.trim).toList
-  val maxPoolSize: Long = conf.getLong("spark.shuffle.pmof.pmpool_size", defaultValue = 1073741824)
-  val maxStages: Int = conf.getInt("spark.shuffle.pmof.max_stage_num", defaultValue = 1000)
-  val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(conf, root_dir, path_list, blockId.name, maxPoolSize, maxStages, numMaps)
-  val spill_throttle = 4194304
+
+  val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(pmofConf,
+    root_dir, pmofConf.path_list, blockId.name, pmofConf.maxPoolSize, pmofConf.maxStages, numMaps)
+
   //disable metadata updating by default
   //persistentMemoryWriter.updateShuffleMeta(blockId.name)
-  logDebug(blockId.name)
 
-  val bytesStream: OutputStream = new PmemOutputStream(
+  val pmemOutputStream: PmemOutputStream = new PmemOutputStream(
     persistentMemoryWriter, numPartitions, blockId.name, numMaps)
-  val wrappedStream: OutputStream = serializerManager.wrapStream(blockId, bytesStream)
-  val objStream: SerializationStream = serializerInstance.serializeStream(wrappedStream)
-  var inputStream: InputStream = _
+  val serInstance = serializer.newInstance()
+  var wrappedStream: OutputStream = serializerManager.wrapStream(blockId, pmemOutputStream)
+  var objStream: SerializationStream = serInstance.serializeStream(wrappedStream)
 
   override def write(key: Any, value: Any): Unit = {
     objStream.writeKey(key)
@@ -72,11 +69,9 @@ private[spark] class PmemBlockObjectStream(
   }
 
   override def close() {
-    bytesStream.close()
-    logDebug("Serialize stream closed.")
-    if (inputStream != null)
-      inputStream.close()
-    logDebug("PersistentMemoryHandlerPartition: stream closed.")
+    pmemOutputStream.close()
+    wrappedStream = null
+    objStream = null
   }
 
   override def flush() {
@@ -84,11 +79,11 @@ private[spark] class PmemBlockObjectStream(
   }
 
   def maybeSpill(force: Boolean = false): Unit = {
-    if ((spill_throttle != -1 && bytesStream.asInstanceOf[PmemOutputStream].size >= spill_throttle) || force == true) {
+    if ((pmofConf.spill_throttle != -1 && pmemOutputStream.asInstanceOf[PmemOutputStream].size >= pmofConf.spill_throttle) || force == true) {
       val start = System.nanoTime()
       objStream.flush()
-      bytesStream.flush()
-      val bufSize = bytesStream.asInstanceOf[PmemOutputStream].size
+      pmemOutputStream.flush()
+      val bufSize = pmemOutputStream.size
       //logInfo(blockId.name + " do spill, size is " + bufSize)
       if (bufSize > 0) {
         recordsArray += recordsPerBlock
@@ -102,7 +97,7 @@ private[spark] class PmemBlockObjectStream(
         } else {
           taskMetrics.incDiskBytesSpilled(bufSize)
         }
-        bytesStream.asInstanceOf[PmemOutputStream].reset()
+        pmemOutputStream.reset()
         spilled = true
       }
     }
@@ -128,10 +123,6 @@ private[spark] class PmemBlockObjectStream(
     persistentMemoryWriter.rkey
   }
 
-  /*def getAllBytes(): Array[Byte] = {
-    persistentMemoryWriter.getPartition(blockId.name)
-  }*/
-
   def getTotalRecords(): Long = {
     records    
   }
@@ -140,11 +131,7 @@ private[spark] class PmemBlockObjectStream(
     size
   }
 
-  def getInputStream(): InputStream = {
-    if (inputStream == null) {
-      inputStream = new PmemInputStream(persistentMemoryWriter, blockId.name)
-    }
-    inputStream
+  def getPersistentMemoryHandler: PersistentMemoryHandler = {
+    persistentMemoryWriter
   }
-  
 }

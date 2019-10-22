@@ -4,7 +4,7 @@ import org.apache.spark._
 import org.apache.spark.internal.Logging
 import org.apache.spark.shuffle.IndexShuffleBlockResolver
 import org.apache.spark.storage.{BlockManager, ShuffleBlockId}
-import org.apache.spark.storage.pmof.{PmemBlockObjectStream, PersistentMemoryHandler}
+import org.apache.spark.storage.pmof.{PmemBlockOutputStream, PersistentMemoryHandler}
 import org.apache.spark.network.buffer.ManagedBuffer
 
 private[spark] class PmemShuffleBlockResolver(
@@ -12,7 +12,7 @@ private[spark] class PmemShuffleBlockResolver(
     _blockManager: BlockManager = null)
   extends IndexShuffleBlockResolver(conf, _blockManager) with Logging {
   // create ShuffleHandler here, so multiple executors can share
-  var partitionBufferArray: Array[PmemBlockObjectStream] = _
+  var partitionBufferArray: Array[PmemBlockOutputStream] = _
 
   override def getBlockData(blockId: ShuffleBlockId): ManagedBuffer = {
     // return BlockId corresponding ManagedBuffer

@@ -4,25 +4,22 @@ import java.nio.ByteBuffer
 import java.util
 
 import com.intel.hpnl.core._
-import org.apache.spark.SparkConf
 import org.apache.spark.internal.Logging
 import org.apache.spark.shuffle.pmof.PmofShuffleManager
+import org.apache.spark.util.configuration.pmof.PmofConf
 
-class Server(conf: SparkConf, val shuffleManager: PmofShuffleManager, address: String, var port: Int) {
+class Server(pmofConf: PmofConf, val shuffleManager: PmofShuffleManager, address: String, var port: Int) {
   if (port == 0) {
     port = Utils.getPort
   }
-  final val SINGLE_BUFFER_SIZE: Int = PmofTransferService.CHUNKSIZE
-  final val BUFFER_NUM: Int = conf.getInt("spark.shuffle.pmof.server_buffer_nums", 256)
-  final val workers = conf.getInt("spark.shuffle.pmof.server_pool_size", 1)
 
-  final val eqService = new EqService(workers, BUFFER_NUM, true).init()
-  final val cqService = new CqService(eqService).init()
+  private[this] final val eqService = new EqService(pmofConf.serverWorkerNums, pmofConf.serverBufferNums, true).init()
+  private[this] final val cqService = new CqService(eqService).init()
 
-  val conList = new util.ArrayList[Connection]()
+  private[this] final val conList = new util.ArrayList[Connection]()
 
   def init(): Unit = {
-    eqService.initBufferPool(BUFFER_NUM, SINGLE_BUFFER_SIZE, BUFFER_NUM * 2)
+    eqService.initBufferPool(pmofConf.serverBufferNums, pmofConf.networkBufferSize, pmofConf.serverBufferNums * 2)
     val recvHandler = new ServerRecvHandler(this)
     val connectedHandler = new ServerConnectedHandler(this)
     eqService.setConnectedCallback(connectedHandler)
@@ -62,17 +59,17 @@ class ServerRecvHandler(server: Server) extends Handler with Logging {
   }
 
   override def handle(con: Connection, bufferId: Int, blockBufferSize: Int): Unit = synchronized {
-    val buffer: HpnlBuffer = con.getRecvBuffer(bufferId)
-    val message: ByteBuffer = buffer.get(blockBufferSize)
-    val seq = buffer.getSeq
-    val msgType = buffer.getType
+    val hpnlBuffer: HpnlBuffer = con.getRecvBuffer(bufferId)
+    val byteBuffer: ByteBuffer = hpnlBuffer.get(blockBufferSize)
+    val seq = hpnlBuffer.getSeq
+    val msgType = hpnlBuffer.getType
     val metadataResolver = server.shuffleManager.metadataResolver
-    if (msgType == 0.toByte) {
-      metadataResolver.addShuffleBlockInfo(message)
+    if (msgType == 0.toByte) { // get block info message from executor, then save the info to memory
+      metadataResolver.saveShuffleBlockInfo(byteBuffer)
       sendMetadata(con, byteBufferTmp, 0.toByte, seq, isDeferred = false)
-    } else {
-      val bufferArray = metadataResolver.serializeShuffleBlockInfo(message)
-      for (buffer <- bufferArray) {
+    } else { // lookup block info from memory, then send the info to executor
+      val blockInfoArray = metadataResolver.serializeShuffleBlockInfo(byteBuffer)
+      for (buffer <- blockInfoArray) {
         sendMetadata(con, buffer, 1.toByte, seq, isDeferred = false)
       }
     }

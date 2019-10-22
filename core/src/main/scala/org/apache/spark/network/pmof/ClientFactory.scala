@@ -5,25 +5,17 @@ import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 
 import com.intel.hpnl.core._
-import org.apache.spark.SparkConf
 import org.apache.spark.shuffle.pmof.PmofShuffleManager
+import org.apache.spark.util.configuration.pmof.PmofConf
 
-import scala.collection.mutable.ArrayBuffer
-
-class ClientFactory(conf: SparkConf) {
-  final val SINGLE_BUFFER_SIZE: Int = PmofTransferService.CHUNKSIZE
-  final val BUFFER_NUM: Int = conf.getInt("spark.shuffle.pmof.client_buffer_nums", 16)
-  final val workers = conf.getInt("spark.shuffle.pmof.server_pool_size", 1)
-
-  final val eqService = new EqService(workers, BUFFER_NUM, false).init()
-  final val cqService = new CqService(eqService).init()
-
-  final val conArray: ArrayBuffer[Connection] = ArrayBuffer()
-  final val clientMap = new ConcurrentHashMap[InetSocketAddress, Client]()
-  final val conMap = new ConcurrentHashMap[Connection, Client]()
+class ClientFactory(pmofConf: PmofConf) {
+  final val eqService = new EqService(pmofConf.clientWorkerNums, pmofConf.clientBufferNums, false).init()
+  private[this] final val cqService = new CqService(eqService).init()
+  private[this] final val clientMap = new ConcurrentHashMap[InetSocketAddress, Client]()
+  private[this] final val conMap = new ConcurrentHashMap[Connection, Client]()
 
   def init(): Unit = {
-    eqService.initBufferPool(BUFFER_NUM, SINGLE_BUFFER_SIZE, BUFFER_NUM * 2)
+    eqService.initBufferPool(pmofConf.clientBufferNums, pmofConf.networkBufferSize, pmofConf.clientBufferNums * 2)
     val clientRecvHandler = new ClientRecvHandler
     val clientReadHandler = new ClientReadHandler
     eqService.setRecvCallback(clientRecvHandler)
@@ -62,16 +54,16 @@ class ClientFactory(conf: SparkConf) {
 
   class ClientRecvHandler() extends Handler {
     override def handle(con: Connection, rdmaBufferId: Int, blockBufferSize: Int): Unit = {
-      val buffer: HpnlBuffer = con.getRecvBuffer(rdmaBufferId)
-      val rpcMessage: ByteBuffer = buffer.get(blockBufferSize)
-      val seq = buffer.getSeq
-      val msgType = buffer.getType
+      val hpnlBuffer: HpnlBuffer = con.getRecvBuffer(rdmaBufferId)
+      val byteBuffer: ByteBuffer = hpnlBuffer.get(blockBufferSize)
+      val seq = hpnlBuffer.getSeq
+      val msgType = hpnlBuffer.getType
       val callback = conMap.get(con).outstandingReceiveFetches.get(seq)
-      if (msgType == 0.toByte) {
+      if (msgType == 0.toByte) { // get ACK from driver, which means the block info has been saved to driver memory
         callback.onSuccess(null)
-      } else {
+      } else { // get block info from driver, and deserialize the info to scala object
         val metadataResolver = conMap.get(con).shuffleManager.metadataResolver
-        val blockInfoArray = metadataResolver.deserializeShuffleBlockInfo(rpcMessage)
+        val blockInfoArray = metadataResolver.deserializeShuffleBlockInfo(byteBuffer)
         callback.onSuccess(blockInfoArray)
       }
     }

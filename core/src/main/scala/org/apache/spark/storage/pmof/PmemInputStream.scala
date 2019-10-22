@@ -1,14 +1,12 @@
 package org.apache.spark.storage.pmof
 
 import java.io.InputStream
-import org.apache.spark.storage.pmof.PmemBuffer
 import org.apache.spark.internal.Logging
 import scala.util.control.Breaks._
 
 class PmemInputStream(
   persistentMemoryHandler: PersistentMemoryHandler,
-  blockId: String
-  ) extends InputStream with Logging {
+  blockId: String) extends InputStream with Logging {
   val buf = new PmemBuffer()
   var index: Int = 0
   var remaining: Int = 0
@@ -60,8 +58,8 @@ class PmemInputStream(
     } }
   }
 
-  def getByteBufferDirectAddr(): Long = {
-    buf.getDirectAddr()
+  def getByteBufferDirectAddr: Long = {
+    buf.getDirectAddr
   }
 
   override def available(): Int = {

@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.network.pmof.PmofTransferService
-import org.apache.spark.{SparkConf, SparkEnv}
+import org.apache.spark.SparkEnv
 
 import scala.collection.JavaConverters._
 import java.nio.file.{Files, Paths}
@@ -12,6 +12,8 @@ import java.util.UUID
 import java.lang.management.ManagementFactory
 
 import org.apache.spark.network.buffer.ManagedBuffer
+import org.apache.spark.util.configuration.pmof.PmofConf
+
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -137,21 +139,18 @@ private[spark] class PersistentMemoryHandler(
 object PersistentMemoryHandler {
   private var persistentMemoryHandler: PersistentMemoryHandler = _
   private var stopped: Boolean = false
-  def getPersistentMemoryHandler(conf: SparkConf, root_dir: String, path_arg: List[String], shuffleBlockId: String, pmPoolSize: Long, maxStages: Int, maxMaps: Int): PersistentMemoryHandler = synchronized {
+  def getPersistentMemoryHandler(pmofConf: PmofConf, root_dir: String, path_arg: List[String], shuffleBlockId: String, pmPoolSize: Long, maxStages: Int, maxMaps: Int): PersistentMemoryHandler = synchronized {
     if (persistentMemoryHandler == null) {
       persistentMemoryHandler = new PersistentMemoryHandler(root_dir, path_arg, shuffleBlockId, maxStages, maxMaps, pmPoolSize)
       persistentMemoryHandler.log("Use persistentMemoryHandler Object: " + this)
-      val enable_rdma: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_rdma", defaultValue = true)
-      if (enable_rdma) {
-        val pmem_capacity: Long = conf.getLong("spark.shuffle.pmof.pmem_capacity", defaultValue = 264239054848L)
+      if (pmofConf.enableRdma) {
         val blockManager = SparkEnv.get.blockManager
-        val eqService = PmofTransferService.getTransferServiceInstance(blockManager).server.getEqService
+        val eqService = PmofTransferService.getTransferServiceInstance(pmofConf, blockManager).server.getEqService
         val offset: Long = persistentMemoryHandler.getRootAddr
-        val rdmaBuffer = eqService.regRmaBufferByAddress(null, offset, pmem_capacity)
+        val rdmaBuffer = eqService.regRmaBufferByAddress(null, offset, pmofConf.pmemCapacity)
         persistentMemoryHandler.rkey = rdmaBuffer.getRKey()
       }
-      val dev_core_map = conf.get("spark.shuffle.pmof.dev_core_set").split(";").map(_.trim).map(_.split(":")).map(arr => arr(0) -> arr(1)).toMap
-      val core_set = dev_core_map.get(persistentMemoryHandler.getDevice())
+      val core_set = pmofConf.pmemCoreMap.get(persistentMemoryHandler.getDevice())
       core_set match {
         case Some(s) => Future {nativeTaskset(s)}
         case None => {}

@@ -17,14 +17,12 @@
 package org.apache.spark.shuffle.pmof
 
 import scala.collection.mutable.ArrayBuffer
-
 import org.mockito.Mockito._
 import org.mockito.MockitoAnnotations
 import org.scalatest.Matchers
 import org.scalatest.BeforeAndAfterEach
-
 import org.apache.spark._
-import org.apache.spark.executor.{TaskMetrics, ShuffleWriteMetrics}
+import org.apache.spark.executor.{ShuffleWriteMetrics, TaskMetrics}
 import org.apache.spark.memory.MemoryTestingUtils
 import org.apache.spark.serializer._
 import org.apache.spark.util.Utils
@@ -33,6 +31,7 @@ import org.apache.spark.storage.pmof._
 import org.apache.spark.shuffle.{BaseShuffleHandle, IndexShuffleBlockResolver}
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.pmof.PmemExternalSorter
+import org.apache.spark.util.configuration.pmof.PmofConf
 
 class PmemShuffleWriterSuite extends SparkFunSuite with SharedSparkContext with Matchers {
 
@@ -43,6 +42,7 @@ class PmemShuffleWriterSuite extends SparkFunSuite with SharedSparkContext with 
   private var shuffleBlockResolver: PmemShuffleBlockResolver = _
   private var serializer: KryoSerializer = _
   private var serializerManager: SerializerManager = _
+  private var pmofConf: PmofConf = _
   private var taskMetrics: TaskMetrics = _
   private var partitioner: Partitioner = _
 
@@ -55,6 +55,7 @@ class PmemShuffleWriterSuite extends SparkFunSuite with SharedSparkContext with 
     shuffleBlockResolver = new PmemShuffleBlockResolver(conf)
     serializer = new KryoSerializer(conf)
     serializerManager = new SerializerManager(serializer, conf)
+    pmofConf = new PmofConf(conf)
     taskMetrics = new TaskMetrics()
     partitioner = new Partitioner() {
       def numPartitions = 1
@@ -102,7 +103,8 @@ class PmemShuffleWriterSuite extends SparkFunSuite with SharedSparkContext with 
       shuffleHandle,
       mapId = 2,
       context,
-      conf)
+      conf,
+      pmofConf)
     writer.write(records.toIterator)
     writer.stop(success = true)
     val buf = shuffleBlockResolver.getBlockData(blockId).asInstanceOf[PmemManagedBuffer]

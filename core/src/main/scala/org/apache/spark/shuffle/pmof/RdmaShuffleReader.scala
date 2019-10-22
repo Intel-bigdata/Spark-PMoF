@@ -10,30 +10,31 @@ import org.apache.spark.storage.pmof._
 import org.apache.spark.util.CompletionIterator
 import org.apache.spark.util.collection.ExternalSorter
 import org.apache.spark.util.collection.pmof.PmemExternalSorter
+import org.apache.spark.util.configuration.pmof.PmofConf
 
 /**
   * Fetches and reads the partitions in range [startPartition, endPartition) from a shuffle by
   * requesting them from other nodes' block stores.
   */
-private[spark] class RdmaShuffleReader[K, C](
-          handle: BaseShuffleHandle[K, _, C],
-          startPartition: Int,
-          endPartition: Int,
-          context: TaskContext,
-          serializerManager: SerializerManager = SparkEnv.get.serializerManager,
-          blockManager: BlockManager = SparkEnv.get.blockManager,
-          mapOutputTracker: MapOutputTracker = SparkEnv.get.mapOutputTracker)
+private[spark] class RdmaShuffleReader[K, C](handle: BaseShuffleHandle[K, _, C],
+                                             startPartition: Int,
+                                             endPartition: Int,
+                                             context: TaskContext,
+                                             pmofConf: PmofConf,
+                                             serializerManager: SerializerManager = SparkEnv.get.serializerManager,
+                                             blockManager: BlockManager = SparkEnv.get.blockManager,
+                                             mapOutputTracker: MapOutputTracker = SparkEnv.get.mapOutputTracker)
   extends ShuffleReader[K, C] with Logging {
 
-  private val dep = handle.dependency
-  val serializerInstance: SerializerInstance = dep.serializer.newInstance()
-  val enable_pmem: Boolean = SparkEnv.get.conf.getBoolean("spark.shuffle.pmof.enable_pmem", defaultValue = true)
+  private[this] val dep = handle.dependency
+  private[this] val serializerInstance: SerializerInstance = dep.serializer.newInstance()
+  private[this] val enable_pmem: Boolean = SparkEnv.get.conf.getBoolean("spark.shuffle.pmof.enable_pmem", defaultValue = true)
 
   /** Read the combined key-values for this reduce task */
   override def read(): Iterator[Product2[K, C]] = {
     val wrappedStreams: RdmaShuffleBlockFetcherIterator = new RdmaShuffleBlockFetcherIterator(
       context,
-      PmofTransferService.getTransferServiceInstance(blockManager),
+      PmofTransferService.getTransferServiceInstance(pmofConf, blockManager),
       blockManager,
       mapOutputTracker.getMapSizesByExecutorId(handle.shuffleId, startPartition, endPartition),
       serializerManager.wrapStream,
@@ -86,7 +87,7 @@ private[spark] class RdmaShuffleReader[K, C](
     dep.keyOrdering match {
       case Some(keyOrd: Ordering[K]) =>
         if (enable_pmem) {
-          val sorter = new PmemExternalSorter[K, C, C](context, handle, ordering = Some(keyOrd), serializer = dep.serializer)
+          val sorter = new PmemExternalSorter[K, C, C](context, handle, pmofConf, ordering = Some(keyOrd), serializer = dep.serializer)
           sorter.insertAll(aggregatedIter)
           CompletionIterator[Product2[K, C], Iterator[Product2[K, C]]](sorter.iterator, sorter.stop())
         } else {
