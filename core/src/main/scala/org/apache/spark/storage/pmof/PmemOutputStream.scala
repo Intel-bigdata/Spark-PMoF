@@ -35,6 +35,7 @@ class PmemOutputStream(
   override def flush(): Unit = {
     if (size() > 0) {
       persistentMemoryWriter.setPartition(numPartitions, blockId, byteBuffer, size(), set_clean, numMaps)
+      reset()
     }
     if (set_clean) {
       set_clean = false
