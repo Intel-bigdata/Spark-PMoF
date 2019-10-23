@@ -1,6 +1,5 @@
 package org.apache.spark.util.collection.pmof
 
-import java.io.InputStream
 import java.util.Comparator
 
 import scala.collection.mutable
@@ -11,30 +10,26 @@ import org.apache.spark.serializer._
 import org.apache.spark.shuffle.BaseShuffleHandle
 import org.apache.spark.util.collection._
 import org.apache.spark.storage.pmof._
-import com.esotericsoftware.kryo.KryoException
-import org.apache.commons.lang3.exception.ExceptionUtils
+import org.apache.spark.util.configuration.pmof.PmofConf
 
 private[spark] class PmemExternalSorter[K, V, C](
     context: TaskContext,
     handle: BaseShuffleHandle[K, _, C],
+    pmofConf: PmofConf,
     aggregator: Option[Aggregator[K, V, C]] = None,
     partitioner: Option[Partitioner] = None,
     ordering: Option[Ordering[K]] = None,
     serializer: Serializer = SparkEnv.get.serializer)
-  extends ExternalSorter[K, V, C](context, aggregator, partitioner, ordering, serializer)
-  with Logging {
-  var partitionBufferArray = ArrayBuffer[PmemBlockObjectStream]()
-  var mapSideCombine = false
-  private val dep = handle.dependency
-  private val serializerManager = SparkEnv.get.serializerManager
-  private val serInstance = serializer.newInstance()
-  private val numPartitions = partitioner.map(_.numPartitions).getOrElse(1)
-  private val shouldPartition = numPartitions > 1
+  extends ExternalSorter[K, V, C](context, aggregator, partitioner, ordering, serializer) with Logging {
+  private[this] val pmemBlockOutputStreamArray: ArrayBuffer[PmemBlockOutputStream] = ArrayBuffer[PmemBlockOutputStream]()
+  private[this] var mapStage = false
+  private[this] val dep = handle.dependency
+  private[this] val numPartitions = partitioner.map(_.numPartitions).getOrElse(1)
+  private[this] val shouldPartition = numPartitions > 1
+
   private def getPartition(key: K): Int = {
     if (shouldPartition) partitioner.get.getPartition(key) else 0
   }
-  private val inMemoryCollectionSizeThreshold: Long = 
-    SparkEnv.get.conf.getLong("spark.shuffle.spill.pmof.MemoryThreshold", 5 * 1024 * 1024)
 
   private val keyComparator: Comparator[K] = ordering.getOrElse(new Comparator[K] {
     override def compare(a: K, b: K): Int = {
@@ -52,25 +47,27 @@ private[spark] class PmemExternalSorter[K, V, C](
     }
   }
 
-  def setPartitionByteBufferArray(writerArray: Array[PmemBlockObjectStream] = null): Unit = {
-    for (i <- 0 until writerArray.length) {
-      partitionBufferArray += writerArray(i)
+  def setPartitionByteBufferArray(writerArray: Array[PmemBlockOutputStream] = null): Unit = {
+    for (i <- writerArray.indices) {
+      pmemBlockOutputStreamArray += writerArray(i)
     }
-    mapSideCombine = true
+    mapStage = true
   }
 
-  def getPartitionByteBufferArray(stageId: Int, partitionId: Int): PmemBlockObjectStream = {
-    if (mapSideCombine) {
-      partitionBufferArray(partitionId)
+  def getPartitionByteBufferArray(stageId: Int, partitionId: Int): PmemBlockOutputStream = {
+    if (mapStage) {
+      pmemBlockOutputStreamArray(partitionId)
     } else {
-      partitionBufferArray += new PmemBlockObjectStream(serializerManager,
-        serInstance,
+      pmemBlockOutputStreamArray += new PmemBlockOutputStream(
         context.taskMetrics(),
         PmemBlockId.getTempBlockId(stageId),
+        SparkEnv.get.serializerManager,
+        serializer,
         SparkEnv.get.conf,
+        pmofConf,
         1,
         numPartitions)
-      partitionBufferArray(partitionBufferArray.length - 1)
+      pmemBlockOutputStreamArray(pmemBlockOutputStreamArray.length - 1)
     }
   }
 
@@ -84,11 +81,9 @@ private[spark] class PmemExternalSorter[K, V, C](
   override protected[this] def maybeSpill(collection: WritablePartitionedPairCollection[K, C], currentMemory: Long): Boolean = {
     var shouldSpill = false
 
-    if (elementsRead % 32 == 0 && currentMemory >= inMemoryCollectionSizeThreshold) {
-      shouldSpill = currentMemory >= inMemoryCollectionSizeThreshold
-      //logInfo("maybeSpill")
+    if (elementsRead % 32 == 0 && currentMemory >= pmofConf.inMemoryCollectionSizeThreshold) {
+      shouldSpill = currentMemory >= pmofConf.inMemoryCollectionSizeThreshold
     }
-    // Actually spill
     if (shouldSpill) {
       spill(collection)
     }
@@ -101,10 +96,10 @@ private[spark] class PmemExternalSorter[K, V, C](
   }
 
   private[this] def spillMemoryIteratorToPmem(inMemoryIterator: WritablePartitionedIterator): Unit = {
-    var buffer: PmemBlockObjectStream = null
+    var buffer: PmemBlockOutputStream = null
     var cur_partitionId = -1
     while (inMemoryIterator.hasNext) {
-      var partitionId = inMemoryIterator.nextPartition()
+      val partitionId = inMemoryIterator.nextPartition()
       if (cur_partitionId != partitionId) {
         if (cur_partitionId != -1) {
           buffer.maybeSpill(true)
@@ -118,11 +113,13 @@ private[spark] class PmemExternalSorter[K, V, C](
       val elem = if (inMemoryIterator.hasNext) inMemoryIterator.writeNext(buffer) else null
       //elementsPerPartition(partitionId) += 1
     }
-    buffer.maybeSpill(true)
+    if (buffer != null) {
+      buffer.maybeSpill(true)
+    }
   }
 
   override def stop(): Unit = {
-    partitionBufferArray.foreach(_.close())
+    pmemBlockOutputStreamArray.foreach(_.close())
   }
 
   /**
@@ -164,21 +161,22 @@ private[spark] class PmemExternalSorter[K, V, C](
   def getCollection(variableName: String): WritablePartitionedPairCollection[K, C] = {
     import java.lang.reflect._
     // use reflection to get private map or buffer
-    var privateField: Field = this.getClass().getSuperclass().getDeclaredField(variableName)
+    val privateField: Field = this.getClass().getSuperclass().getDeclaredField(variableName)
     privateField.setAccessible(true)
-    var fieldValue = privateField.get(this)
+    val fieldValue = privateField.get(this)
     fieldValue.asInstanceOf[WritablePartitionedPairCollection[K, C]]
   }
 
   override def partitionedIterator: Iterator[(Int, Iterator[Product2[K, C]])] = {
     val usingMap = aggregator.isDefined
     val collection: WritablePartitionedPairCollection[K, C] = if (usingMap) getCollection("map") else getCollection("buffer")
-    if (partitionBufferArray.isEmpty) {
+    if (pmemBlockOutputStreamArray.isEmpty) {
       // Special case: if we have only in-memory data, we don't need to merge streams, and perhaps
       // we don't even need to sort by anything other than partition ID
-      if (!ordering.isDefined) {
+      if (ordering.isEmpty) {
         // The user hasn't requested sorted keys, so only sort by partition ID, not key
-        groupByPartition(destructiveIterator(collection.partitionedDestructiveSortedIterator(None)))
+        groupByPartition(destructiveIterator(
+          collection.partitionedDestructiveSortedIterator(None)))
       } else {
         // We do need to sort by both partition ID and key
         groupByPartition(destructiveIterator(
@@ -194,7 +192,7 @@ private[spark] class PmemExternalSorter[K, V, C](
   def merge(inMemory: Iterator[((Int, K), C)]): Iterator[(Int, Iterator[Product2[K, C]])] = {
     // this function is used to merge spilled data with inMemory records
     val inMemBuffered = inMemory.buffered
-    val readers = partitionBufferArray.map(partitionBuffer => {new SpillReader(partitionBuffer)})
+    val readers: ArrayBuffer[SpillReader] = pmemBlockOutputStreamArray.map(pmemBlockOutputStream => {new SpillReader(pmemBlockOutputStream)})
     (0 until numPartitions).iterator.map { partitionId =>
       val inMemIterator = new IteratorForPartition(partitionId, inMemBuffered)
       val iterators = readers.map(_.readPartitionIter(partitionId)) ++ Seq(inMemIterator)
@@ -226,7 +224,7 @@ private[spark] class PmemExternalSorter[K, V, C](
     })
     heap.enqueue(bufferedIters: _*)  // Will contain only the iterators with hasNext = true
     new Iterator[Product2[K, C]] {
-      override def hasNext: Boolean = !heap.isEmpty
+      override def hasNext: Boolean = heap.nonEmpty
 
       override def next(): Product2[K, C] = {
         if (!hasNext) {
@@ -303,7 +301,7 @@ private[spark] class PmemExternalSorter[K, V, C](
     } else {
       // We have a total ordering, so the objects with the same key are sequential.
       new Iterator[Product2[K, C]] {
-        val sorted = mergeSort(iterators, comparator).buffered
+        val sorted: BufferedIterator[Product2[K, C]] = mergeSort(iterators, comparator).buffered
 
         override def hasNext: Boolean = sorted.hasNext
 
@@ -324,28 +322,21 @@ private[spark] class PmemExternalSorter[K, V, C](
     }
   }
 
-  class SpillReader(writeBuffer: PmemBlockObjectStream) {
+  class SpillReader(pmemBlockOutputStream: PmemBlockOutputStream) {
     // Each spill reader is relate to one partition
     // which is different from spark original codes (relate to one spill file)
-    val blockId = writeBuffer.getBlockId()
-    var indexInBatch: Int = 0
-    var partitionMetaIndex: Int = 0
-
-    var inStream: InputStream = _
-    var inObjStream: DeserializationStream = _
+    val pmemBlockInputStream = new PmemBlockInputStream[K, C](pmemBlockOutputStream, serializer)
     var nextItem: (K, C) = _
-    var total_records: Long = 0
 
-    loadStream()
     def readPartitionIter(partitionId: Int): Iterator[Product2[K, C]] = new Iterator[Product2[K, C]] {
       override def hasNext: Boolean = {
         if (nextItem == null) {
-          nextItem = readNextItem()
+          nextItem = pmemBlockInputStream.readNextItem()
           if (nextItem == null) {
             return false
           }
         }
-        return getPartition(nextItem._1) == partitionId
+        getPartition(nextItem._1) == partitionId
       }
 
       override def next(): Product2[K, C] = {
@@ -356,39 +347,6 @@ private[spark] class PmemExternalSorter[K, V, C](
         nextItem = null
         item
       }
-    }
-
-    private def readNextItem(): (K, C) = {
-      if (inObjStream == null) {
-        if (inStream != null) {
-          inStream.close()
-          inStream.asInstanceOf[PmemInputStream].deleteBlock()
-        }
-        return null
-      }
-      try{
-        val k = inObjStream.readObject().asInstanceOf[K]
-        val c = inObjStream.readObject().asInstanceOf[C]
-        indexInBatch += 1
-        if (indexInBatch == total_records) {
-          inObjStream = null
-        }
-        (k, c)
-      } catch {
-        case ex: KryoException => {
-          logError("Kyro deserialization failed, loaded records count is " + indexInBatch + ", error backtrace: " + ExceptionUtils.getStackTrace(ex))
-        }
-        logError(ExceptionUtils.getStackTrace(ex))
-        sys.exit(0)
-      }
-    }
-
-    def loadStream(): Unit = {
-      total_records = writeBuffer.getTotalRecords()
-      inStream = writeBuffer.getInputStream()
-      val wrappedStream = serializerManager.wrapStream(blockId, inStream)
-      inObjStream = serInstance.deserializeStream(wrappedStream)
-      indexInBatch = 0
     }
   }
 }

@@ -70,6 +70,6 @@ class PmemManagedBuffer(pmHandler: PersistentMemoryHandler, blockId: String) ext
     val data_length = size().toInt
     val in = createInputStream()
     in.asInstanceOf[PmemInputStream].load(data_length)
-    Unpooled.wrappedBuffer(in.asInstanceOf[PmemInputStream].getByteBufferDirectAddr(), data_length, false)
+    Unpooled.wrappedBuffer(in.asInstanceOf[PmemInputStream].getByteBufferDirectAddr, data_length, false)
   }
 }

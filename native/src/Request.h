@@ -4,6 +4,8 @@
 #include <mutex>
 #include <condition_variable>
 #include <libpmemobj.h>
+#include <future>
+#include <functional>
 
 #define TOID_ARRAY_TYPE(x) TOID(x)
 #define TOID_ARRAY(x) TOID_ARRAY_TYPE(TOID(x))
@@ -119,25 +121,13 @@ public:
       typeId(typeId),
       mapId(mapId),
       partitionId(partitionId),
-      processed(false),
-      committed(false),
-      lck(mtx), block_lck(block_mtx) {
-      }
+      committed(false) {}
     ~Request(){}
     virtual void exec() = 0;
     virtual long getResult() = 0;
 protected:
-    // add lock to make this request blocked
-    std::mutex mtx;
-    std::condition_variable cv;
-    bool processed;
-    std::unique_lock<std::mutex> lck;
-
     // add lock to make func blocked
-    std::mutex block_mtx;
-    std::condition_variable block_cv;
     bool committed;
-    std::unique_lock<std::mutex> block_lck;
 
     int stageId;
     int typeId;

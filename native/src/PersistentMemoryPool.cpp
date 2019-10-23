@@ -10,14 +10,13 @@
 PMPool::PMPool(const char* dev, int maxStage, int maxMap, long size):
     maxStage(maxStage),
     maxMap(maxMap),
-    stop(false),
-    dev(dev),
-    worker(&PMPool::process, this) {
+    dev(dev) {
 
   const char *pool_layout_name = "pmem_spark_shuffle";
-  // if this is a fsdax device
-  // we need to create 
-  // if this is a devdax device
+
+  /* force-disable SDS feature during pool creation*/
+  int sds_write_value = 0;
+  pmemobj_ctl_set(NULL, "sds.at_create", &sds_write_value);
 
   pmpool = pmemobj_open(dev, pool_layout_name);
   if (pmpool == NULL) {
@@ -32,28 +31,11 @@ PMPool::PMPool(const char* dev, int maxStage, int maxMap, long size):
 }
 
 PMPool::~PMPool() {
-    while(request_queue.size() > 0) {
-        fprintf(stderr, "%s request queue size is %ld\n", dev, request_queue.size());
-        sleep(1);
-    }
-    fprintf(stderr, "%s request queue size is %ld\n", dev, request_queue.size());
-    stop = true;
-    worker.join();
     pmemobj_close(pmpool);
 }
 
 long PMPool::getRootAddr() {
     return (long)pmpool;
-}
-
-void PMPool::process() {
-    Request *cur_req;
-    while(!stop) {
-        cur_req = (Request*)request_queue.dequeue();
-        if (cur_req != nullptr) {
-            cur_req->exec();
-        }
-    }
 }
 
 long PMPool::setMapPartition(
@@ -66,7 +48,8 @@ long PMPool::setMapPartition(
         bool clean,
         int numMaps) {
     WriteRequest write_request(this, maxStage, numMaps, partitionNum, stageId, 0, mapId, partitionId, size, data, clean);
-    request_queue.enqueue((void*)&write_request);
+		std::lock_guard<std::mutex> lk(mtx);
+    write_request.exec();
     return write_request.getResult();
 }
 
@@ -79,7 +62,8 @@ long PMPool::setReducePartition(
         bool clean,
         int numMaps) {
     WriteRequest write_request(this, maxStage, 1, partitionNum, stageId, 1, 0, partitionId, size, data, clean);
-    request_queue.enqueue((void*)&write_request);
+		std::lock_guard<std::mutex> lk(mtx);
+		write_request.exec();
     return write_request.getResult();
 }
 
@@ -89,6 +73,7 @@ long PMPool::getMapPartition(
         int mapId,
         int partitionId ) {
     ReadRequest read_request(this, mb, stageId, 0, mapId, partitionId);
+		std::lock_guard<std::mutex> lk(mtx);
     read_request.exec();
     return read_request.getResult();
 }
@@ -99,6 +84,7 @@ long PMPool::getReducePartition(
         int mapId,
         int partitionId ) {
     ReadRequest read_request(this, mb, stageId, 1, mapId, partitionId);
+		std::lock_guard<std::mutex> lk(mtx);
     read_request.exec();
     read_request.getResult();
     return 0;
@@ -106,18 +92,21 @@ long PMPool::getReducePartition(
 
 long PMPool::getMapPartitionBlockInfo(BlockInfo *blockInfo, int stageId, int mapId, int partitionId) {
     MetaRequest meta_request(this, blockInfo, stageId, 0, mapId, partitionId);
+		std::lock_guard<std::mutex> lk(mtx);
     meta_request.exec();
     return meta_request.getResult();
 }
 
 long PMPool::getReducePartitionBlockInfo(BlockInfo *blockInfo, int stageId, int mapId, int partitionId) {
     MetaRequest meta_request(this, blockInfo, stageId, 1, mapId, partitionId);
+		std::lock_guard<std::mutex> lk(mtx);
     meta_request.exec();
     return meta_request.getResult();
 }
 
 long PMPool::getMapPartitionSize(int stageId, int mapId, int partitionId) {
     SizeRequest size_request(this, stageId, 0, mapId, partitionId);
+		std::lock_guard<std::mutex> lk(mtx);
     size_request.exec();
     return size_request.getResult();
 }
@@ -130,13 +119,15 @@ long PMPool::getReducePartitionSize(int stageId, int mapId, int partitionId) {
 
 long PMPool::deleteMapPartition(int stageId, int mapId, int partitionId) {
     DeleteRequest delete_request(this, stageId, 0, mapId, partitionId);
-    request_queue.enqueue((void*)&delete_request);
+		std::lock_guard<std::mutex> lk(mtx);
+		delete_request.exec();
     return delete_request.getResult();
 }
 
 long PMPool::deleteReducePartition(int stageId, int mapId, int partitionId) {
     DeleteRequest delete_request(this, stageId, 1, mapId, partitionId);
-    request_queue.enqueue((void*)&delete_request);
+		std::lock_guard<std::mutex> lk(mtx);
+		delete_request.exec();
     return delete_request.getResult();
 }
 

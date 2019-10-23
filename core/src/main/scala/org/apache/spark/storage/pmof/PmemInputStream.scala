@@ -1,20 +1,17 @@
 package org.apache.spark.storage.pmof
 
 import java.io.InputStream
-import org.apache.spark.storage.pmof.PmemBuffer
 import org.apache.spark.internal.Logging
 import scala.util.control.Breaks._
 
 class PmemInputStream(
   persistentMemoryHandler: PersistentMemoryHandler,
-  blockId: String
-  ) extends InputStream with Logging {
+  blockId: String) extends InputStream with Logging {
   val buf = new PmemBuffer()
   var index: Int = 0
   var remaining: Int = 0
   var available_bytes: Int = persistentMemoryHandler.getPartitionSize(blockId).toInt
   val blockInfo: Array[(Long, Int)] = persistentMemoryHandler.getPartitionBlockInfo(blockId)
-  var is_closed = false
 
   def loadNextStream(): Int = {
     if (index >= blockInfo.length)
@@ -61,8 +58,8 @@ class PmemInputStream(
     } }
   }
 
-  def getByteBufferDirectAddr(): Long = {
-    buf.getDirectAddr()
+  def getByteBufferDirectAddr: Long = {
+    buf.getDirectAddr
   }
 
   override def available(): Int = {
@@ -70,10 +67,8 @@ class PmemInputStream(
   }
 
   override def close(): Unit = {
-    if (!is_closed) {
-      buf.close()
-      is_closed = true
-    }
+    buf.close()
+    //deleteBlock
   }
 
   def deleteBlock(): Unit = {

@@ -25,30 +25,26 @@ import org.apache.spark.shuffle.{BaseShuffleHandle, IndexShuffleBlockResolver, S
 import org.apache.spark.storage.{BlockManagerId, ShuffleBlockId}
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.ExternalSorter
+import org.apache.spark.util.configuration.pmof.PmofConf
 
-private[spark] class BaseShuffleWriter[K, V, C](
-                                                 shuffleBlockResolver: IndexShuffleBlockResolver,
-                                                 metadataResolver: MetadataResolver,
-                                                 handle: BaseShuffleHandle[K, V, C],
-                                                 mapId: Int,
-                                                 context: TaskContext,
-                                                 enable_rdma: Boolean)
+private[spark] class BaseShuffleWriter[K, V, C](shuffleBlockResolver: IndexShuffleBlockResolver,
+                                                metadataResolver: MetadataResolver,
+                                                handle: BaseShuffleHandle[K, V, C],
+                                                mapId: Int,
+                                                context: TaskContext,
+                                                pmofConf: PmofConf)
   extends ShuffleWriter[K, V] with Logging {
 
   private val dep = handle.dependency
 
   private val blockManager = SparkEnv.get.blockManager
-
+  private val writeMetrics = context.taskMetrics().shuffleWriteMetrics
   private var sorter: ExternalSorter[K, V, _] = _
-
   // Are we in the process of stopping? Because map tasks can call stop() with success = true
   // and then call stop() with success = false if they get an exception, we want to make sure
   // we don't try deleting files, etc twice.
   private var stopping = false
-
   private var mapStatus: MapStatus = _
-
-  private val writeMetrics = context.taskMetrics().shuffleWriteMetrics
 
   /** Write a bunch of records to this task's output */
   override def write(records: Iterator[Product2[K, V]]): Unit = {
@@ -76,11 +72,11 @@ private[spark] class BaseShuffleWriter[K, V, C](
       shuffleBlockResolver.writeIndexFileAndCommit(dep.shuffleId, mapId, partitionLengths, tmp)
 
       val shuffleServerId = blockManager.shuffleServerId
-      if (enable_rdma) {
-        metadataResolver.commitBlockInfo(dep.shuffleId, mapId, partitionLengths)
+      if (pmofConf.enableRdma) {
+        metadataResolver.pushFileBlockInfo(dep.shuffleId, mapId, partitionLengths)
         val blockManagerId: BlockManagerId =
-        BlockManagerId(shuffleServerId.executorId, PmofTransferService.shuffleNodesMap(shuffleServerId.host),
-          PmofTransferService.getTransferServiceInstance(blockManager).port, shuffleServerId.topologyInfo)
+          BlockManagerId(shuffleServerId.executorId, PmofTransferService.shuffleNodesMap(shuffleServerId.host),
+            PmofTransferService.getTransferServiceInstance(pmofConf, blockManager).port, shuffleServerId.topologyInfo)
         mapStatus = MapStatus(blockManagerId, partitionLengths)
       } else {
         mapStatus = MapStatus(shuffleServerId, partitionLengths)
@@ -112,19 +108,6 @@ private[spark] class BaseShuffleWriter[K, V, C](
         writeMetrics.incWriteTime(System.nanoTime - startTime)
         sorter = null
       }
-    }
-  }
-}
-
-private[spark] object BaseShuffleWriter {
-  def shouldBypassMergeSort(conf: SparkConf, dep: ShuffleDependency[_, _, _]): Boolean = {
-    // We cannot bypass sorting if we need to do map-side aggregation.
-    if (dep.mapSideCombine) {
-      require(dep.aggregator.isDefined, "Map-side combine without Aggregator specified!")
-      false
-    } else {
-      val bypassMergeThreshold: Int = conf.getInt("spark.shuffle.sort.bypassMergeThreshold", 200)
-      dep.partitioner.numPartitions <= bypassMergeThreshold
     }
   }
 }

@@ -8,16 +8,16 @@ import org.apache.spark.network.BlockDataManager
 import org.apache.spark.network.shuffle.{BlockFetchingListener, TempFileManager}
 import org.apache.spark.shuffle.pmof.{MetadataResolver, PmofShuffleManager}
 import org.apache.spark.storage.{BlockId, BlockManager, ShuffleBlockId}
-import org.apache.spark.{SparkConf, SparkEnv}
+import org.apache.spark.util.configuration.pmof.PmofConf
 
 import scala.collection.mutable
 
-class PmofTransferService(conf: SparkConf, val shuffleManager: PmofShuffleManager,
+class PmofTransferService(val pmofConf: PmofConf, val shuffleManager: PmofShuffleManager,
                           val hostname: String, var port: Int) extends TransferService {
+  private[this] final val metadataResolver: MetadataResolver = this.shuffleManager.metadataResolver
   final var server: Server = _
-  final private var clientFactory: ClientFactory = _
-  private var nextReqId: AtomicLong = _
-  final val metadataResolver: MetadataResolver = this.shuffleManager.metadataResolver
+  private[this] final var clientFactory: ClientFactory = _
+  private[this] var nextReqId: AtomicLong = _
 
   override def fetchBlocks(host: String,
                            port: Int,
@@ -33,12 +33,12 @@ class PmofTransferService(conf: SparkConf, val shuffleManager: PmofShuffleManage
   }
 
   def fetchBlockInfo(blockIds: Array[BlockId], receivedCallback: ReceivedCallback): Unit = {
-    val shuffleBlockIds = blockIds.map(blockId=>blockId.asInstanceOf[ShuffleBlockId])
+    val shuffleBlockIds = blockIds.map(blockId => blockId.asInstanceOf[ShuffleBlockId])
     metadataResolver.fetchBlockInfo(shuffleBlockIds, receivedCallback)
   }
 
-  def syncBlocksInfo(host: String, port: Int, byteBuffer: ByteBuffer, msgType: Byte,
-                     callback: ReceivedCallback): Unit = {
+  def pushBlockInfo(host: String, port: Int, byteBuffer: ByteBuffer, msgType: Byte,
+                    callback: ReceivedCallback): Unit = {
     clientFactory.createClient(shuffleManager, host, port).
       send(byteBuffer, nextReqId.getAndIncrement(), msgType, callback, isDeferred = false)
   }
@@ -59,8 +59,8 @@ class PmofTransferService(conf: SparkConf, val shuffleManager: PmofShuffleManage
   }
 
   def init(): Unit = {
-    this.server = new Server(conf, shuffleManager, hostname, port)
-    this.clientFactory = new ClientFactory(conf)
+    this.server = new Server(pmofConf, shuffleManager, hostname, port)
+    this.clientFactory = new ClientFactory(pmofConf)
     this.server.init()
     this.server.start()
     this.clientFactory.init()
@@ -73,30 +73,24 @@ class PmofTransferService(conf: SparkConf, val shuffleManager: PmofShuffleManage
 }
 
 object PmofTransferService {
-  final val env: SparkEnv = SparkEnv.get
-  final val conf: SparkConf = env.conf
-  final val CHUNKSIZE: Int = conf.getInt("spark.shuffle.pmof.chunk_size", 4096*3)
-  final val driverHost: String = conf.get("spark.driver.rhost", defaultValue = "172.168.0.43")
-  final val driverPort: Int = conf.getInt("spark.driver.rport", defaultValue = 61000)
-  final val shuffleNodes: Array[Array[String]] =
-    conf.get("spark.shuffle.pmof.node", defaultValue = "").split(",").map(_.split("-"))
   final val shuffleNodesMap: mutable.Map[String, String] = new mutable.HashMap[String, String]()
-  for (array <- shuffleNodes) {
-    shuffleNodesMap.put(array(0), array(1))
-  }
-  private val initialized = new AtomicBoolean(false)
-  private var transferService: PmofTransferService = _
-  def getTransferServiceInstance(blockManager: BlockManager, shuffleManager: PmofShuffleManager = null,
+  private[this] final val initialized = new AtomicBoolean(false)
+  private[this] var transferService: PmofTransferService = _
+
+  def getTransferServiceInstance(pmofConf: PmofConf, blockManager: BlockManager, shuffleManager: PmofShuffleManager = null,
                                  isDriver: Boolean = false): PmofTransferService = {
     if (!initialized.get()) {
       PmofTransferService.this.synchronized {
         if (initialized.get()) return transferService
         if (isDriver) {
           transferService =
-            new PmofTransferService(conf, shuffleManager, driverHost, driverPort)
+            new PmofTransferService(pmofConf, shuffleManager, pmofConf.driverHost, pmofConf.driverPort)
         } else {
+          for (array <- pmofConf.shuffleNodes) {
+            shuffleNodesMap.put(array(0), array(1))
+          }
           transferService =
-            new PmofTransferService(conf, shuffleManager, shuffleNodesMap(blockManager.shuffleServerId.host), 0)
+            new PmofTransferService(pmofConf, shuffleManager, shuffleNodesMap(blockManager.shuffleServerId.host), 0)
         }
         transferService.init()
         initialized.set(true)
