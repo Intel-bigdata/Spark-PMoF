@@ -52,42 +52,13 @@ TEST_CASE( "PmemBuffer operations", "[PmemBuffer]" ) {
   }
 }
 
-TEST_CASE( "PersistentMemoryPool operations", "[PersistentMemory]" ) {
-  PMPool pmpool("/dev/dax0.0", 100, 100, 0/*devdax size should be 0*/);
-
+TEST_CASE("PersistentMemoryPool operations", "[PersistentMemory]") {
+  PMPool<string> pmpool("/dev/dax0.0", 0);
   char data[LENGTH] = {};
   memset(data, 'a', LENGTH);
-
-  SECTION( "write data to PersistentMemory" ) {
-    long addr = pmpool.setMapPartition(1000, 1, 0, 0, LENGTH, data, true, 100);
-    long size = pmpool.getMapPartitionSize(1, 0, 0);
-    REQUIRE(size == LENGTH);
-  }
-
-  SECTION( "read data from PersistentMemory" ) {
-    MemoryBlock mb;
-    long addr = pmpool.getMapPartition(&mb, 1, 0, 0);
-    REQUIRE(mb.buf != nullptr);
-    mb.buf[LENGTH] = 0;
-    REQUIRE(strcmp(mb.buf, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") == 0);
-  }
-
-  SECTION( "get existing partition info from PersistentMemory" ) {
-    BlockInfo bi;
-    pmpool.getMapPartitionBlockInfo(&bi, 1, 0, 0);
-    REQUIRE(bi.data != nullptr);
-    REQUIRE(bi.data[1] == LENGTH);
-  }
-
-  SECTION( "get existing partition info with two blocks from PersistentMemory" ) {
-    long addr_1 = pmpool.setMapPartition(1000, 2, 0, 0, LENGTH, data, true, 100);
-    long addr_2 = pmpool.setMapPartition(1000, 2, 0, 0, LENGTH, data, false, 100);
-    BlockInfo bi;
-    pmpool.getMapPartitionBlockInfo(&bi, 2, 0, 0);
-    REQUIRE(bi.data != nullptr);
-    REQUIRE(bi.data[0] == addr_1);
-    REQUIRE(bi.data[1] == LENGTH);
-    REQUIRE(bi.data[2] == addr_2);
-    REQUIRE(bi.data[3] == LENGTH);
-  }
+  MemoryBlock block;
+  pmpool.setBlock("a", LENGTH, data, true);
+  pmpool.getBlock(&block, "a");
+  REQUIRE(block.len == LENGTH);
+  REQUIRE(pmpool.getBlockSize("a") == LENGTH);
 }

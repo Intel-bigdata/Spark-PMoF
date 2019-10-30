@@ -40,8 +40,7 @@ class PmemShuffleWriterWithSortSuite extends SparkFunSuite with SharedSparkConte
   val blockId = new ShuffleBlockId(shuffleId, 2, 0)
 
   private var shuffleBlockResolver: PmemShuffleBlockResolver = _
-  private var serializer: KryoSerializer = _
-  private var serializerManager: SerializerManager = _
+  private var serializer: JavaSerializer = _
   private var pmofConf: PmofConf = _
   private var taskMetrics: TaskMetrics = _
   private var partitioner: Partitioner = _
@@ -51,10 +50,9 @@ class PmemShuffleWriterWithSortSuite extends SparkFunSuite with SharedSparkConte
     MockitoAnnotations.initMocks(this)
     conf.set("spark.shuffle.pmof.enable_rdma", "false")
     conf.set("spark.shuffle.pmof.enable_pmem", "true")
-    conf.set("spark.shuffle.pmof.pmem_list", "/dev/dax0.0,/dev/dax1.0")
+    conf.set("spark.shuffle.pmof.pmem_list", "/dev/dax0.0")
     shuffleBlockResolver = new PmemShuffleBlockResolver(conf)
-    serializer = new KryoSerializer(conf)
-    serializerManager = new SerializerManager(serializer, conf)
+    serializer = new JavaSerializer(conf)
     pmofConf = new PmofConf(conf)
     taskMetrics = new TaskMetrics()
     partitioner = new Partitioner() {
@@ -73,8 +71,7 @@ class PmemShuffleWriterWithSortSuite extends SparkFunSuite with SharedSparkConte
 
   def verify(buf: PmemManagedBuffer, expected: List[(Int, Int)]): Unit = {
     val inStream = buf.createInputStream()
-    val wrappedStream = serializerManager.wrapStream(blockId, inStream)
-    val inObjStream = serializer.newInstance().deserializeStream(wrappedStream)
+    val inObjStream = serializer.newInstance().deserializeStream(inStream)
     for (kv <- expected) {
       val k = inObjStream.readObject().asInstanceOf[Int]
       val v = inObjStream.readObject().asInstanceOf[Int]

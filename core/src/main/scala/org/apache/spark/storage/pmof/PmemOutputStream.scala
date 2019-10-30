@@ -21,8 +21,6 @@ class PmemOutputStream(
   val buf: ByteBuf = PooledByteBufAllocator.DEFAULT.directBuffer(length, length)
   val byteBuffer: ByteBuffer = buf.nioBuffer(0, length)
 
-  logDebug(blockId)
-
   override def write(bytes: Array[Byte], off: Int, len: Int): Unit = {
     byteBuffer.put(bytes, off, len)
     bufferRemainingSize += len
@@ -35,7 +33,7 @@ class PmemOutputStream(
 
   override def flush(): Unit = {
     if (bufferRemainingSize > 0) {
-      persistentMemoryWriter.setPartition(numPartitions, blockId, byteBuffer, bufferRemainingSize, set_clean, numMaps)
+      persistentMemoryWriter.setPartition(numPartitions, blockId, byteBuffer, bufferRemainingSize, set_clean)
       bufferFlushedSize += bufferRemainingSize
       bufferRemainingSize = 0
     }

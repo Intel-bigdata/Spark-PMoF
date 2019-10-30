@@ -46,7 +46,7 @@ private[spark] class PmemBlockOutputStream(
   val root_dir = Utils.getConfiguredLocalDirs(conf).toList(0)
 
   val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(pmofConf,
-    root_dir, pmofConf.path_list, blockId.name, pmofConf.maxPoolSize, pmofConf.maxStages, pmofConf.maxMaps)
+    root_dir, pmofConf.path_list, blockId.name, pmofConf.maxPoolSize)
 
   //disable metadata updating by default
   //persistentMemoryWriter.updateShuffleMeta(blockId.name)
@@ -54,8 +54,7 @@ private[spark] class PmemBlockOutputStream(
   val pmemOutputStream: PmemOutputStream = new PmemOutputStream(
     persistentMemoryWriter, numPartitions, blockId.name, numMaps)
   val serInstance = serializer.newInstance()
-  var wrappedStream: OutputStream = serializerManager.wrapStream(blockId, pmemOutputStream)
-  var objStream: SerializationStream = serInstance.serializeStream(wrappedStream)
+  var objStream: SerializationStream = serInstance.serializeStream(pmemOutputStream)
 
   override def write(key: Any, value: Any): Unit = {
     objStream.writeKey(key)
@@ -70,18 +69,19 @@ private[spark] class PmemBlockOutputStream(
 
   override def close() {
     pmemOutputStream.close()
-    wrappedStream = null
     objStream = null
   }
 
   override def flush() {
-    maybeSpill(true)
+    objStream.flush()
   }
 
   def maybeSpill(force: Boolean = false): Unit = {
+    if (force == true) {
+      flush()
+    }
     if ((pmofConf.spill_throttle != -1 && pmemOutputStream.remainingSize >= pmofConf.spill_throttle) || force == true) {
       val start = System.nanoTime()
-      objStream.flush()
       pmemOutputStream.flush()
       val bufSize = pmemOutputStream.flushedSize
       if (bufSize > 0) {

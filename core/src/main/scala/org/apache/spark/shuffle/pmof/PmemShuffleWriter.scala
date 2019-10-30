@@ -118,8 +118,6 @@ private[spark] class PmemShuffleWriter[K, V, C](shuffleBlockResolver: PmemShuffl
       PmemBlockOutputStreamArray(i).close()
     }
 
-    logDebug("shuffle_" + dep.shuffleId + "_" + mapId + ": \n" + output_str)
-
     val shuffleServerId = blockManager.shuffleServerId
     if (pmofConf.enableRdma) {
       val rkey = PmemBlockOutputStreamArray(0).getRkey()

@@ -4,159 +4,101 @@
 #include <mutex>
 #include <condition_variable>
 #include <libpmemobj.h>
-#include <future>
-#include <functional>
+#include <cstdlib>
 
-#define TOID_ARRAY_TYPE(x) TOID(x)
-#define TOID_ARRAY(x) TOID_ARRAY_TYPE(TOID(x))
-#define TYPENUM 2
+#define BLOCK_BUCKETS_NUM 1048576
+#define BLOCKS_NUM 1024
+using namespace std;
 
 POBJ_LAYOUT_BEGIN(PersistentMemoryStruct);
-POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct StageArrayRoot);
-POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct StageArray);
-POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct StageArrayItem);
-POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct TypeArray);
-POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct TypeArrayItem);
-POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct MapArray);
-POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct MapArrayItem);
-POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct PartitionArray);
-POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct PartitionArrayItem);
-POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct PartitionBlock);
+POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct HashMapRoot);
+POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct BlockBuckets);
+POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct BlockBucketItem);
+POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct BlockBucket);
+POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct Block);
+POBJ_LAYOUT_TOID(PersistentMemoryStruct, struct BlockPartition);
 POBJ_LAYOUT_END(PersistentMemoryStruct);
 
-struct StageArrayRoot {
-    TOID(struct StageArray) stageArray;
+struct HashMapRoot {
+    TOID(struct BlockBuckets) blockBuckets;
 };
 
-struct StageArray {
+struct BlockBuckets {
+    //size of BLOCK_BUCKETS_NUM
     int size;
-    TOID(struct StageArray) nextStageArray;
-    TOID(struct StageArrayItem) items[];
+    TOID(struct BlockBucketItem) items[];
 };
 
-struct StageArrayItem {
-  TOID(struct TypeArray) typeArray;
+struct BlockBucketItem {
+    TOID(struct BlockBucket) blockBucket;
 };
 
-struct TypeArray {
+struct BlockBucket {
+    //size of BLOCKS_NUM
     int size;
-    TOID(struct TypeArrayItem) items[];
+    TOID(struct Block) items[];
 };
 
-struct TypeArrayItem {
-    TOID(struct MapArray) mapArray;
-};
-
-struct MapArray {
-    int size;
-    TOID(struct MapArrayItem) items[];
-};
-
-struct MapArrayItem {
-    TOID(struct PartitionArray) partitionArray;
-};
-
-struct PartitionArray {
-    int size;
-    int numPartitions;
-    TOID(struct PartitionArray) nextPartitionArray;
-    TOID(struct PartitionArrayItem) items[];
-};
-
-struct PartitionArrayItem {
-    TOID(struct PartitionBlock) first_block;
-    TOID(struct PartitionBlock) last_block;
-    long partition_size;
+struct Block {
+    size_t key;
+    size_t size;
     int numBlocks;
+    TOID(struct BlockPartition) firstBlockPartition;
+    TOID(struct BlockPartition) lastBlockPartition;
+    TOID(struct Block) nextBlock; //if collision happened
 };
 
-struct PartitionBlock {
-    TOID(struct PartitionBlock) next_block;
+struct BlockPartition {
+    TOID(struct BlockPartition) nextBlockPartition;
     long data_size;
     PMEMoid data;
 };
 
 struct MemoryBlock {
-  char* buf = nullptr;
-  int len;
-  MemoryBlock() {
-  }
-
-  ~MemoryBlock() {
-    if (buf != nullptr) {
-      delete[] buf;
+    char* buf;
+    long len;
+    MemoryBlock() {
     }
-  }
-  
-  MemoryBlock& operator=(const MemoryBlock&) {
-    return *this;
-  }
-  MemoryBlock(const MemoryBlock& src){ /* do not create copies */ }
+
+    ~MemoryBlock() {
+        delete[] buf;
+    }
 };
 
 struct BlockInfo {
-  long* data = nullptr;
-  BlockInfo() {
-  }
-
-  ~BlockInfo() {
-    if (data != nullptr) {
-      delete[] data;
+    long* data;
+    long len;
+    BlockInfo() {
     }
-  }
-  
-  BlockInfo& operator=(const BlockInfo&) {
-    return *this;
-  }
-  BlockInfo(const BlockInfo& src){ /* do not create copies */ }
+
+    ~BlockInfo() {
+        delete data;
+    }
 };
 
-using namespace std;
-class PMPool;
+template <typename T> class PMPool;
 class Request {
 public:
-    Request(PMPool* pmpool_ptr, int stageId, int typeId, int mapId, int partitionId):
+    Request(PMPool<string>* pmpool_ptr, size_t key):
       pmpool_ptr(pmpool_ptr),
-      stageId(stageId),
-      typeId(typeId),
-      mapId(mapId),
-      partitionId(partitionId),
+      key(key),
       committed(false) {}
-    ~Request(){}
-    virtual void exec() = 0;
-    virtual long getResult() = 0;
+    virtual ~Request() {}
+    virtual void exec() {}
 protected:
-    // add lock to make func blocked
+    PMPool<string>* pmpool_ptr;
+    size_t key;
     bool committed;
 
-    int stageId;
-    int typeId;
-    int mapId;
-    int partitionId;
-    PMPool* pmpool_ptr;
-
-    TOID(struct PartitionArrayItem) getOrCreatePartitionBlock(int maxStage, int maxMap, int partitionNum);
-    TOID(struct PartitionArrayItem) getPartitionBlock();
+    TOID(struct Block) *getAndCreateBlock();
+    TOID(struct Block) getBlock();
+    void freeBlock(TOID(struct Block) block);
 };
 
 class WriteRequest : Request {
 public:
-    char* data_addr; //Pmem Block Addr
-    WriteRequest(PMPool* pmpool_ptr,
-        int maxStage,
-        int maxMap,
-        int partitionNum,
-        int stageId, 
-        int typeId,
-        int mapId, 
-        int partitionId,
-        long size,
-        char* data,
-        bool set_clean):
-    Request(pmpool_ptr, stageId, typeId, mapId, partitionId),
-    maxStage(maxStage),
-    maxMap(maxMap),
-    partitionNum(partitionNum),
+    WriteRequest(PMPool<string>* pmpool_ptr, size_t key, long size, char* data, bool set_clean):
+    Request(pmpool_ptr, key),
     size(size),
     data(data),
     data_addr(nullptr),
@@ -164,89 +106,55 @@ public:
     }
     ~WriteRequest(){}
     void exec();
-    long getResult();
 private:
-    int maxStage;
-    int maxMap;
-    int partitionNum;
-
     long size;
     char *data;
+    char* data_addr; //Pmem Block Addr
     bool set_clean;
-
-    void setPartition();
+    void setBlock();
 };
 
 class ReadRequest : Request {
 public:
-    ReadRequest(PMPool* pmpool_ptr,
-        MemoryBlock *mb,
-        int stageId, 
-        int typeId,
-        int mapId, 
-        int partitionId):
-    Request(pmpool_ptr, stageId, typeId, mapId, partitionId), mb(mb){
-    }
+    ReadRequest(PMPool<string>* pmpool_ptr, MemoryBlock *mb, size_t key):
+    Request(pmpool_ptr, key), mb(mb){}
     ~ReadRequest(){}
     void exec();
-    long getResult();
 private:
-    MemoryBlock *mb = nullptr;
-    long data_length = -1;
-    void getPartition();
+    MemoryBlock *mb;
+    void readBlock();
 };
 
 class MetaRequest : Request {
 public:
-    MetaRequest(PMPool* pmpool_ptr,
-        BlockInfo* block_info,
-        int stageId, 
-        int typeId,
-        int mapId, 
-        int partitionId):
-    Request(pmpool_ptr, stageId, typeId, mapId, partitionId), block_info(block_info){
-    }
+    MetaRequest(PMPool<string>* pmpool_ptr, BlockInfo* block_info, size_t key):
+    Request(pmpool_ptr, key), block_info(block_info){}
     ~MetaRequest(){}
     void exec();
-    long getResult();
 private:
-    BlockInfo* block_info = nullptr;
-    long array_length = -1;
-    void getPartitionBlockInfo();
+    BlockInfo* block_info;
+    void getBlockIndex();
 };
 
 class SizeRequest: Request {
 public:
-    SizeRequest(PMPool* pmpool_ptr,
-        int stageId, 
-        int typeId,
-        int mapId, 
-        int partitionId):
-    Request(pmpool_ptr, stageId, typeId, mapId, partitionId){
-    }
+    SizeRequest(PMPool<string>* pmpool_ptr, long* data_length, size_t key):
+    Request(pmpool_ptr, key), data_length(data_length) {}
     ~SizeRequest(){}
     void exec();
-    long getResult();
 private:
-    long data_length = -1;
-    void getPartitionSize();
+    long* data_length;
+    void getBlockSize();
 };
 
 class DeleteRequest: Request {
 public:
-    DeleteRequest(PMPool* pmpool_ptr,
-        int stageId, 
-        int typeId,
-        int mapId, 
-        int partitionId):
-    Request(pmpool_ptr, stageId, typeId, mapId, partitionId){
-    }
+    DeleteRequest(PMPool<string>* pmpool_ptr, size_t key):
+    Request(pmpool_ptr, key){}
     ~DeleteRequest(){}
     void exec();
-    long getResult();
 private:
-    long ret = -1;
-    void deletePartition();
+    void deleteBlock();
 };
 
 #endif

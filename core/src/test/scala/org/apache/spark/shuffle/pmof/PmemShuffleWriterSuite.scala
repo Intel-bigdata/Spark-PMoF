@@ -16,21 +16,18 @@
  */
 package org.apache.spark.shuffle.pmof
 
-import scala.collection.mutable.ArrayBuffer
 import org.mockito.Mockito._
-import org.mockito.MockitoAnnotations
+import org.mockito.{Mock, MockitoAnnotations}
+import org.mockito.Answers.RETURNS_SMART_NULLS
 import org.scalatest.Matchers
-import org.scalatest.BeforeAndAfterEach
 import org.apache.spark._
 import org.apache.spark.executor.{ShuffleWriteMetrics, TaskMetrics}
 import org.apache.spark.memory.MemoryTestingUtils
 import org.apache.spark.serializer._
-import org.apache.spark.util.Utils
 import org.apache.spark.storage._
 import org.apache.spark.storage.pmof._
 import org.apache.spark.shuffle.{BaseShuffleHandle, IndexShuffleBlockResolver}
 import org.apache.spark.util.Utils
-import org.apache.spark.util.collection.pmof.PmemExternalSorter
 import org.apache.spark.util.configuration.pmof.PmofConf
 
 class PmemShuffleWriterSuite extends SparkFunSuite with SharedSparkContext with Matchers {
@@ -40,23 +37,23 @@ class PmemShuffleWriterSuite extends SparkFunSuite with SharedSparkContext with 
   val blockId = new ShuffleBlockId(shuffleId, 2, 0)
 
   private var shuffleBlockResolver: PmemShuffleBlockResolver = _
-  private var serializer: KryoSerializer = _
-  private var serializerManager: SerializerManager = _
+  private var serializer: JavaSerializer = _
   private var pmofConf: PmofConf = _
   private var taskMetrics: TaskMetrics = _
   private var partitioner: Partitioner = _
+  @Mock(answer = RETURNS_SMART_NULLS) private var taskContext: TaskContext = _
 
   override def beforeEach(): Unit = {
     super.beforeEach()
     MockitoAnnotations.initMocks(this)
     conf.set("spark.shuffle.pmof.enable_rdma", "false")
     conf.set("spark.shuffle.pmof.enable_pmem", "true")
-    conf.set("spark.shuffle.pmof.pmem_list", "/dev/dax0.0,/dev/dax1.0")
+    conf.set("spark.shuffle.pmof.pmem_list", "/dev/dax0.0")
     shuffleBlockResolver = new PmemShuffleBlockResolver(conf)
-    serializer = new KryoSerializer(conf)
-    serializerManager = new SerializerManager(serializer, conf)
+    serializer = new JavaSerializer(conf)
     pmofConf = new PmofConf(conf)
     taskMetrics = new TaskMetrics()
+    when(taskContext.taskMetrics()).thenReturn(taskMetrics)
     partitioner = new Partitioner() {
       def numPartitions = 1
       def getPartition(key: Any) = Utils.nonNegativeMod(key.hashCode, numPartitions)
@@ -73,8 +70,7 @@ class PmemShuffleWriterSuite extends SparkFunSuite with SharedSparkContext with 
 
   def verify(buf: PmemManagedBuffer, expected: List[(Int, Int)]): Unit = {
     val inStream = buf.createInputStream()
-    val wrappedStream = serializerManager.wrapStream(blockId, inStream)
-    val inObjStream = serializer.newInstance().deserializeStream(wrappedStream)
+    val inObjStream = serializer.newInstance().deserializeStream(inStream)
     for (kv <- expected) {
       val k = inObjStream.readObject().asInstanceOf[Int]
       val v = inObjStream.readObject().asInstanceOf[Int]
@@ -86,7 +82,6 @@ class PmemShuffleWriterSuite extends SparkFunSuite with SharedSparkContext with 
   }
 
   test("write with some records") {
-    val context = MemoryTestingUtils.fakeTaskContext(sc.env)
     val records = List[(Int, Int)]((6, 5), (2, 3), (4, 4), (1, 2))
     val shuffleHandle: BaseShuffleHandle[Int, Int, Int] = {
       val dependency = mock(classOf[ShuffleDependency[Int, Int, Int]])
@@ -102,7 +97,7 @@ class PmemShuffleWriterSuite extends SparkFunSuite with SharedSparkContext with 
       null,
       shuffleHandle,
       mapId = 2,
-      context,
+      taskContext,
       conf,
       pmofConf)
     writer.write(records.toIterator)
