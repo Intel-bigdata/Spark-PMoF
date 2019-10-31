@@ -35,6 +35,8 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
     assert(handle.isInstanceOf[BaseShuffleHandle[_, _, _]])
 
     val env: SparkEnv = SparkEnv.get
+    val blockManager = SparkEnv.get.blockManager
+    val serializerManager = SparkEnv.get.serializerManager
     val numMaps = handle.asInstanceOf[BaseShuffleHandle[_, _, _]].numMaps
 
     metadataResolver = new MetadataResolver(pmofConf)
@@ -45,10 +47,10 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
     }
 
     if (pmofConf.enablePmem) {
-      new PmemShuffleWriter(shuffleBlockResolver.asInstanceOf[PmemShuffleBlockResolver], metadataResolver,
+      new PmemShuffleWriter(shuffleBlockResolver.asInstanceOf[PmemShuffleBlockResolver], metadataResolver, blockManager, serializerManager, 
         handle.asInstanceOf[BaseShuffleHandle[K, V, _]], mapId, context, env.conf, pmofConf)
     } else {
-      new BaseShuffleWriter(shuffleBlockResolver.asInstanceOf[IndexShuffleBlockResolver], metadataResolver,
+      new BaseShuffleWriter(shuffleBlockResolver.asInstanceOf[IndexShuffleBlockResolver], metadataResolver, blockManager, serializerManager, 
         handle.asInstanceOf[BaseShuffleHandle[K, V, _]], mapId, context, pmofConf)
     }
   }

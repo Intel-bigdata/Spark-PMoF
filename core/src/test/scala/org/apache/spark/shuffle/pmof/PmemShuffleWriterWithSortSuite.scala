@@ -16,21 +16,18 @@
  */
 package org.apache.spark.shuffle.pmof
 
-import scala.collection.mutable.ArrayBuffer
 import org.mockito.Mockito._
-import org.mockito.MockitoAnnotations
+import org.mockito.{Mock, MockitoAnnotations}
+import org.mockito.Answers.RETURNS_SMART_NULLS
 import org.scalatest.Matchers
-import org.scalatest.BeforeAndAfterEach
 import org.apache.spark._
 import org.apache.spark.executor.{ShuffleWriteMetrics, TaskMetrics}
 import org.apache.spark.memory.MemoryTestingUtils
 import org.apache.spark.serializer._
-import org.apache.spark.util.Utils
 import org.apache.spark.storage._
 import org.apache.spark.storage.pmof._
 import org.apache.spark.shuffle.{BaseShuffleHandle, IndexShuffleBlockResolver}
 import org.apache.spark.util.Utils
-import org.apache.spark.util.collection.pmof.PmemExternalSorter
 import org.apache.spark.util.configuration.pmof.PmofConf
 
 class PmemShuffleWriterWithSortSuite extends SparkFunSuite with SharedSparkContext with Matchers {
@@ -44,6 +41,9 @@ class PmemShuffleWriterWithSortSuite extends SparkFunSuite with SharedSparkConte
   private var pmofConf: PmofConf = _
   private var taskMetrics: TaskMetrics = _
   private var partitioner: Partitioner = _
+  private var serializerManager: SerializerManager = _
+  private var shuffleServerId: BlockManagerId = _
+  @Mock(answer = RETURNS_SMART_NULLS) private var blockManager: BlockManager = _
 
   override def beforeEach(): Unit = {
     super.beforeEach()
@@ -55,6 +55,10 @@ class PmemShuffleWriterWithSortSuite extends SparkFunSuite with SharedSparkConte
     serializer = new JavaSerializer(conf)
     pmofConf = new PmofConf(conf)
     taskMetrics = new TaskMetrics()
+    serializerManager = new SerializerManager(serializer, conf)
+    shuffleServerId = new BlockManagerId("", "", 0, "")
+    when(blockManager.shuffleServerId).thenReturn(shuffleServerId)
+
     partitioner = new Partitioner() {
       def numPartitions = 1
       def getPartition(key: Any) = Utils.nonNegativeMod(key.hashCode, numPartitions)
@@ -84,7 +88,8 @@ class PmemShuffleWriterWithSortSuite extends SparkFunSuite with SharedSparkConte
 
   test("write with some records with mapSideCombine") {
     val context = MemoryTestingUtils.fakeTaskContext(sc.env)
-    val records = List[(Int, Int)]((6, 5), (2, 3), (4, 4), (1, 2))
+    def records: Iterator[(Int, Int)] =
+      Iterator((1, 1), (5, 5)) ++ (0 until 100000).iterator.map(x => (2, 2))
     val agg = new Aggregator[Int, Int, Int](i => i, (i, j) => i + j, (i, j) => i + j)
     val ord = implicitly[Ordering[Int]]
     val shuffleHandle: BaseShuffleHandle[Int, Int, Int] = {
@@ -100,6 +105,8 @@ class PmemShuffleWriterWithSortSuite extends SparkFunSuite with SharedSparkConte
     val writer = new PmemShuffleWriter[Int, Int, Int](
       shuffleBlockResolver,
       null,
+      blockManager,
+      serializerManager,
       shuffleHandle,
       mapId = 2,
       context,
@@ -108,7 +115,17 @@ class PmemShuffleWriterWithSortSuite extends SparkFunSuite with SharedSparkConte
     writer.write(records.toIterator)
     writer.stop(success = true)
     val buf = shuffleBlockResolver.getBlockData(blockId).asInstanceOf[PmemManagedBuffer]
-    val expected = List[(Int, Int)]((1, 2), (2, 3), (4, 4), (6, 5))
-    verify(buf, expected)
+    val expected: Iterator[(Int, Int)] = Iterator((1, 1), (2, 200000), (5, 5))
+    val inStream = buf.createInputStream()
+    val inObjStream = serializer.newInstance().deserializeStream(inStream)
+    while (expected.hasNext) {
+      val k = inObjStream.readObject().asInstanceOf[Int]
+      val v = inObjStream.readObject().asInstanceOf[Int]
+      val record = expected.next()
+      assert(k.equals(record._1))
+      assert(v.equals(record._2))
+      println(k + " " + v + " " + " " + record._1 + " " + record._2)
+    }
+    inObjStream.close()
   }
 }

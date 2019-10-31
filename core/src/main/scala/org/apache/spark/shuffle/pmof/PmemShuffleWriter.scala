@@ -26,12 +26,16 @@ import org.apache.spark.storage._
 import org.apache.spark.util.collection.pmof.PmemExternalSorter
 import org.apache.spark.storage.pmof._
 import org.apache.spark.util.configuration.pmof.PmofConf
+import org.apache.spark.serializer.SerializerManager
+import org.apache.spark.storage.BlockManager
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 private[spark] class PmemShuffleWriter[K, V, C](shuffleBlockResolver: PmemShuffleBlockResolver,
                                                 metadataResolver: MetadataResolver,
+                                                blockManager: BlockManager,
+                                                serializerManager: SerializerManager,
                                                 handle: BaseShuffleHandle[K, V, C],
                                                 mapId: Int,
                                                 context: TaskContext,
@@ -39,7 +43,6 @@ private[spark] class PmemShuffleWriter[K, V, C](shuffleBlockResolver: PmemShuffl
                                                 pmofConf: PmofConf)
   extends ShuffleWriter[K, V] with Logging {
   private[this] val dep = handle.dependency
-  private[this] val blockManager = SparkEnv.get.blockManager
   private[this] var mapStatus: MapStatus = _
   private[this] val stageId = dep.shuffleId
   private[this] val partitioner = dep.partitioner
@@ -66,7 +69,7 @@ private[spark] class PmemShuffleWriter[K, V, C](shuffleBlockResolver: PmemShuffl
       new PmemBlockOutputStream(
         context.taskMetrics(),
         ShuffleBlockId(stageId, mapId, partitionId),
-        SparkEnv.get.serializerManager,
+        serializerManager,
         dep.serializer,
         conf,
         pmofConf,
