@@ -26,9 +26,13 @@ import org.apache.spark.storage.{BlockManagerId, ShuffleBlockId}
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.ExternalSorter
 import org.apache.spark.util.configuration.pmof.PmofConf
+import org.apache.spark.serializer.SerializerManager
+import org.apache.spark.storage.BlockManager
 
 private[spark] class BaseShuffleWriter[K, V, C](shuffleBlockResolver: IndexShuffleBlockResolver,
                                                 metadataResolver: MetadataResolver,
+                                                blockManager: BlockManager,
+                                                serializerManager: SerializerManager,
                                                 handle: BaseShuffleHandle[K, V, C],
                                                 mapId: Int,
                                                 context: TaskContext,
@@ -37,7 +41,6 @@ private[spark] class BaseShuffleWriter[K, V, C](shuffleBlockResolver: IndexShuff
 
   private val dep = handle.dependency
 
-  private val blockManager = SparkEnv.get.blockManager
   private val writeMetrics = context.taskMetrics().shuffleWriteMetrics
   private var sorter: ExternalSorter[K, V, _] = _
   // Are we in the process of stopping? Because map tasks can call stop() with success = true

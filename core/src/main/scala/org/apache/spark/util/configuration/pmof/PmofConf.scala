@@ -5,7 +5,7 @@ import org.apache.spark.SparkConf
 class PmofConf(conf: SparkConf) {
   val enableRdma: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_rdma", defaultValue = true)
   val enablePmem: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_pmem", defaultValue = true)
-  val path_list: List[String] = conf.get("spark.shuffle.pmof.pmem_list").split(",").map(_.trim).toList
+  val path_list: List[String] = conf.get("spark.shuffle.pmof.pmem_list", defaultValue = "/dev/dax0.0").split(",").map(_.trim).toList
   val maxPoolSize: Long = conf.getLong("spark.shuffle.pmof.pmpool_size", defaultValue = 1073741824)
   val maxStages: Int = conf.getInt("spark.shuffle.pmof.max_stage_num", defaultValue = 1000)
   val maxMaps: Int = conf.getInt("spark.shuffle.pmof.max_map_num", defaultValue = 1000)
@@ -26,5 +26,5 @@ class PmofConf(conf: SparkConf) {
   val metadataCompress: Boolean = conf.getBoolean("spark.shuffle.pmof.metadata_compress", defaultValue = false)
   val shuffleBlockSize: Int = conf.getInt("spark.shuffle.pmof.shuffle_block_size", defaultValue = 2048)
   val pmemCapacity: Long = conf.getLong("spark.shuffle.pmof.pmem_capacity", defaultValue = 264239054848L)
-  val pmemCoreMap = conf.get("spark.shuffle.pmof.dev_core_set").split(";").map(_.trim).map(_.split(":")).map(arr => arr(0) -> arr(1)).toMap
+  val pmemCoreMap = conf.get("spark.shuffle.pmof.dev_core_set", defaultValue = "/dev/dax0.0:0-17,36-53").split(";").map(_.trim).map(_.split(":")).map(arr => arr(0) -> arr(1)).toMap
 }

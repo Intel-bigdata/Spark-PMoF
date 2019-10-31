@@ -1,7 +1,5 @@
 package org.apache.spark.storage.pmof
 
-import java.io.InputStream
-
 import com.esotericsoftware.kryo.KryoException
 import org.apache.spark.SparkEnv
 import org.apache.spark.serializer.{DeserializationStream, Serializer, SerializerInstance, SerializerManager}
@@ -13,8 +11,7 @@ class PmemBlockInputStream[K, C](pmemBlockOutputStream: PmemBlockOutputStream, s
   val serInstance: SerializerInstance = serializer.newInstance()
   val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler
   var pmemInputStream: PmemInputStream = new PmemInputStream(persistentMemoryWriter, blockId.name)
-  var wrappedStream: InputStream = serializerManager.wrapStream(blockId, pmemInputStream)
-  var inObjStream: DeserializationStream = serInstance.deserializeStream(wrappedStream)
+  var inObjStream: DeserializationStream = serInstance.deserializeStream(pmemInputStream)
 
   var total_records: Long = 0
   var indexInBatch: Int = 0
@@ -49,7 +46,6 @@ class PmemBlockInputStream[K, C](pmemBlockOutputStream: PmemBlockOutputStream, s
 
   def close(): Unit = {
     pmemInputStream.close
-    wrappedStream = null
     inObjStream = null
   }
 }

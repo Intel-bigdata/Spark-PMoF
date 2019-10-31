@@ -5,11 +5,12 @@
  * 
  */
 package org.apache.spark.storage.pmof;
+
 import java.util.Arrays;
 import java.util.concurrent.*;
 import org.apache.commons.cli.*;
 import sun.misc.Unsafe;
-import static java.lang.Math.toIntExact;
+import java.nio.ByteBuffer;
 
 class ArgParser {
 
@@ -43,7 +44,6 @@ class ArgParser {
             formatter.printHelp("utility-name", options);
             System.exit(1);
         }
-
     }
 
     public String get(String key) {
@@ -67,17 +67,17 @@ class Monitor {
 
 	void run () {
         long last_committed_bytes = 0;
-	int elapse_sec = 0;
+	    int elapse_sec = 0;
         while(alive) {
             System.out.println("Second " + elapse_sec + "(MB/s): " + (this.committedBytes - last_committed_bytes) / 1024 / 1024);
-	    last_committed_bytes = this.committedBytes;
-	    elapse_sec += 1;
-	    try {
-	        Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                System.exit(1);
-	    }
-	}
+            last_committed_bytes = this.committedBytes;
+            elapse_sec += 1;
+            try {
+                Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    System.exit(1);
+            }
+        }
     }
 
     synchronized void incCommittedJobs(long size) {
@@ -91,16 +91,6 @@ class Monitor {
 
     void stop() {
         this.alive = false;
-        /*while(this.submittedJobs > 0) {
-            System.out.println("still remain inflight io: " + this.submittedJobs);
-  	    try {
-	          Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                System.exit(1);
-	          }
-        }
-        System.out.println("inflight io: " + this.submittedJobs);
-        */
         this.monitor_thread.shutdown();
     }
 
@@ -113,12 +103,10 @@ public class PersistentMemoryPool{
     static {
         System.loadLibrary("jnipmdk");
     }
-        private static native long nativeOpenDevice(String path, int maxStage, int maxMap, long size);
-        private static native int nativeSetMapPartition(long deviceHandler, int numPartitions, int stageId, int mapId, int partitionId, long size, byte[] data, boolean set_clean);
-        private static native int nativeSetReducePartition(long deviceHandler, int numPartitions, int stageId, int partutionId, long size, byte[] data, boolean set_clean);
-        private static native byte[] nativeGetMapPartition(long deviceHandler, int stageId, int mapId, int partutionId);
-        private static native long[] nativeGetMapPartitionBlockInfo(long deviceHandler, int stageId, int mapId, int partitionId);
-        private static native int nativeCloseDevice(long deviceHandler);
+
+    private static native long nativeOpenDevice(String path, long size);
+    private static native void nativeSetBlock(long deviceHandler, String key, ByteBuffer byteBuffer, int dataSize, boolean set_clean);
+    private static native int nativeCloseDevice(long deviceHandler);
 
     String device;
     int thread_num;
@@ -130,12 +118,9 @@ public class PersistentMemoryPool{
     Monitor monitor;
     int block_size;
 
-
-    PersistentMemoryPool() {
-    }
+    PersistentMemoryPool() {}
 
     class Writer implements Callable<Integer> {
-
       int i = 0, j = 0;
       int i_multi = 0;
       int k;
@@ -157,10 +142,14 @@ public class PersistentMemoryPool{
       public Integer call() throws Exception {
         //System.out.println("Enter write thread");
         System.out.println("Start set partition "+k);
-	      while (monitor.alive() == true) {
+        ByteBuffer byteBuffer = ByteBuffer.allocateDirect(PersistentMemoryPool.this.block_size);
+        for (int i = 0; i < PersistentMemoryPool.this.block_size; i++) {
+            byteBuffer.put((byte)10);
+        }
+        while (monitor.alive() == true) {
             if (i_multi == 100) {
-              i_multi = 0;
-              i++;
+                i_multi = 0;
+                i++;
             }
             if (i > 9999) {
                 i = 0;
@@ -170,21 +159,10 @@ public class PersistentMemoryPool{
                 break;
             }
             PersistentMemoryPool.this.monitor.incSubmittedJobs(PersistentMemoryPool.this.block_size);
-            nativeSetMapPartition(PersistentMemoryPool.this.writerHandler, 10000, k, j, i, PersistentMemoryPool.this.block_size, PersistentMemoryPool.this.bytes, false);
+
+            nativeSetBlock(PersistentMemoryPool.this.writerHandler, "shuffle_" + k + "_" + j + "_" + i, byteBuffer, PersistentMemoryPool.this.block_size, false);
             i_multi += 1;
             PersistentMemoryPool.this.monitor.incCommittedJobs(PersistentMemoryPool.this.block_size);
- 
-            /*long[] block_info = nativeGetMapPartitionBlockInfo(PersistentMemoryPool.this.writerHandler, k, j, i);
-            //System.out.println("Start to get partition block info for "+k+"_"+j+"_"+i+", numBlocks: "+block_info.length/2);
-            int index = 0;
-            while (index+1 < block_info.length) {
-              PersistentMemoryPool.this.monitor.incSubmittedJobs(block_info[index+1]);
-              byte[] data = new byte[toIntExact(block_info[index+1])];
-              UNSAFE.copyMemory(null, block_info[index], data, Unsafe.ARRAY_BYTE_BASE_OFFSET, block_info[index+1]);
-              PersistentMemoryPool.this.monitor.incCommittedJobs(block_info[index+1]);
-              i_multi += 1;
-              index += 2;
-            }*/
         }
         return 0;
       }
@@ -194,20 +172,17 @@ public class PersistentMemoryPool{
         this.monitor = monitor;
         this.block_size = block_size;
         this.bs = block_size / 1024;
-        int bs_mb = bs / 1024;
         this.bytes = data;
         this.thread_num = threads;
-        //long size = 107374182400L;
         long size = 0;
 
-        this.writerHandler = nativeOpenDevice(dev, 50, 10, size);
+        this.writerHandler = nativeOpenDevice(dev, size);
         System.out.println("Thread Num: " + this.thread_num + ", block_size: " + bs + "KB, Device: " + dev);
         
 	      this.executor = Executors.newFixedThreadPool(this.thread_num);
         for (int k = 0; k < this.thread_num; k++) {
             this.executor.submit(new Writer(k));
         }
-	    
     }
 
     public void stop() {

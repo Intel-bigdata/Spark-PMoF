@@ -1,5 +1,5 @@
 #include "PersistentMemoryPool.h"
-#include <string>
+#include <functional>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,127 +7,104 @@
 #include <fcntl.h>
 #include <fstream>
 
-PMPool::PMPool(const char* dev, int maxStage, int maxMap, long size):
-    maxStage(maxStage),
-    maxMap(maxMap),
+template<typename T>
+PMPool<T>::PMPool(const char* dev, long size):
     dev(dev) {
 
-  const char *pool_layout_name = "pmem_spark_shuffle";
+  const char *pool_layout_name = "pmempool_sso";
 
-  /* force-disable SDS feature during pool creation*/
   int sds_write_value = 0;
   pmemobj_ctl_set(NULL, "sds.at_create", &sds_write_value);
 
   pmpool = pmemobj_open(dev, pool_layout_name);
   if (pmpool == NULL) {
+      cerr << "Failed to open pool, try to create pool" << endl; 
       pmpool = pmemobj_create(dev, pool_layout_name, size, S_IRUSR | S_IWUSR);
   }
   if (pmpool == NULL) {
-      cerr << "Failed to create pool, kill process, errmsg: devname is " << dev << ", size is " << size << ", " << pmemobj_errormsg() << endl; 
+      cerr << "Failed to create pool, kill process, errmsg: " << pmemobj_errormsg() << endl; 
       exit(-1);
   }
 
-  stageArrayRoot = POBJ_ROOT(pmpool, struct StageArrayRoot);
+  hashMapRoot = POBJ_ROOT(pmpool, struct HashMapRoot);
 }
 
-PMPool::~PMPool() {
+template<typename T>
+PMPool<T>::~PMPool() {
     pmemobj_close(pmpool);
 }
 
-long PMPool::getRootAddr() {
+template<typename T>
+long PMPool<T>::getRootAddr() {
     return (long)pmpool;
 }
 
-long PMPool::setMapPartition(
-        int partitionNum,
-        int stageId, 
-        int mapId, 
-        int partitionId,
-        long size,
-        char* data,
-        bool clean,
-        int numMaps) {
-    WriteRequest write_request(this, maxStage, numMaps, partitionNum, stageId, 0, mapId, partitionId, size, data, clean);
-		std::lock_guard<std::mutex> lk(mtx);
+template<typename T>
+void PMPool<T>::setBlock(T key, long size, char* data, bool clean) {
+    size_t key_i = hash_fn(key);
+    setBlock(key_i, size, data, clean);
+}
+
+template<typename T>
+void PMPool<T>::setBlock(size_t key, long size, char* data, bool clean) {
+    WriteRequest write_request(this, key, size, data, clean);
+    lock_guard<mutex> lk(mtx);
     write_request.exec();
-    return write_request.getResult();
 }
 
-long PMPool::setReducePartition(
-        int partitionNum,
-        int stageId, 
-        int partitionId,
-        long size,
-        char* data,
-        bool clean,
-        int numMaps) {
-    WriteRequest write_request(this, maxStage, 1, partitionNum, stageId, 1, 0, partitionId, size, data, clean);
-		std::lock_guard<std::mutex> lk(mtx);
-		write_request.exec();
-    return write_request.getResult();
+template<typename T>
+void PMPool<T>::getBlock(MemoryBlock* mb, T key) {
+    size_t key_i = hash_fn(key);
+    getBlock(mb, key_i);
 }
 
-long PMPool::getMapPartition(
-        MemoryBlock* mb,
-        int stageId,
-        int mapId,
-        int partitionId ) {
-    ReadRequest read_request(this, mb, stageId, 0, mapId, partitionId);
-		std::lock_guard<std::mutex> lk(mtx);
+template<typename T>
+void PMPool<T>::getBlock(MemoryBlock* mb, size_t key) {
+    ReadRequest read_request(this, mb, key);
+    lock_guard<mutex> lk(mtx);
     read_request.exec();
-    return read_request.getResult();
 }
     
-long PMPool::getReducePartition(
-        MemoryBlock* mb,
-        int stageId,
-        int mapId,
-        int partitionId ) {
-    ReadRequest read_request(this, mb, stageId, 1, mapId, partitionId);
-		std::lock_guard<std::mutex> lk(mtx);
-    read_request.exec();
-    read_request.getResult();
-    return 0;
+template<typename T>
+void PMPool<T>::getBlockIndex(BlockInfo *blockInfo, T key) {
+    size_t key_i = hash_fn(key);
+    getBlockIndex(blockInfo, key_i);
 }
 
-long PMPool::getMapPartitionBlockInfo(BlockInfo *blockInfo, int stageId, int mapId, int partitionId) {
-    MetaRequest meta_request(this, blockInfo, stageId, 0, mapId, partitionId);
-		std::lock_guard<std::mutex> lk(mtx);
+template<typename T>
+void PMPool<T>::getBlockIndex(BlockInfo *blockInfo, size_t key) {
+    MetaRequest meta_request(this, blockInfo, key);
+    lock_guard<mutex> lk(mtx);
     meta_request.exec();
-    return meta_request.getResult();
 }
 
-long PMPool::getReducePartitionBlockInfo(BlockInfo *blockInfo, int stageId, int mapId, int partitionId) {
-    MetaRequest meta_request(this, blockInfo, stageId, 1, mapId, partitionId);
-		std::lock_guard<std::mutex> lk(mtx);
-    meta_request.exec();
-    return meta_request.getResult();
+template<typename T>
+long PMPool<T>::getBlockSize(T key) {
+    size_t key_i = hash_fn(key);
+    return getBlockSize(key_i);
 }
 
-long PMPool::getMapPartitionSize(int stageId, int mapId, int partitionId) {
-    SizeRequest size_request(this, stageId, 0, mapId, partitionId);
-		std::lock_guard<std::mutex> lk(mtx);
+template<typename T>
+long PMPool<T>::getBlockSize(size_t key) {
+    long data_length;
+    SizeRequest size_request(this, &data_length, key);
+    lock_guard<mutex> lk(mtx);
     size_request.exec();
-    return size_request.getResult();
+    return data_length;
 }
 
-long PMPool::getReducePartitionSize(int stageId, int mapId, int partitionId) {
-    SizeRequest size_request(this, stageId, 1, mapId, partitionId);
-    size_request.exec();
-    return size_request.getResult();
+template<typename T>
+void PMPool<T>::deleteBlock(T key) {
+    size_t key_i = hash_fn(key);
+    deleteBlock(key_i);
 }
 
-long PMPool::deleteMapPartition(int stageId, int mapId, int partitionId) {
-    DeleteRequest delete_request(this, stageId, 0, mapId, partitionId);
-		std::lock_guard<std::mutex> lk(mtx);
-		delete_request.exec();
-    return delete_request.getResult();
+template<typename T>
+void PMPool<T>::deleteBlock(size_t key) {
+    DeleteRequest delete_request(this, key);
+    lock_guard<mutex> lk(mtx);
+    delete_request.exec();
+
 }
 
-long PMPool::deleteReducePartition(int stageId, int mapId, int partitionId) {
-    DeleteRequest delete_request(this, stageId, 1, mapId, partitionId);
-		std::lock_guard<std::mutex> lk(mtx);
-		delete_request.exec();
-    return delete_request.getResult();
-}
-
+template class PMPool<string>;
