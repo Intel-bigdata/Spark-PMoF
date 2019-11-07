@@ -107,9 +107,9 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
     */
   @volatile private[this] var currentResult: SuccessFetchResult = _
   /** Current bytes in flight from our requests */
-  private[this] var bytesInFlight = new AtomicLong(0)
+  private[this] val bytesInFlight = new AtomicLong(0)
   /** Current number of requests in flight */
-  private[this] var reqsInFlight = new AtomicInteger(0)
+  private[this] val reqsInFlight = new AtomicInteger(0)
   /**
     * Whether the iterator is still active. If isZombie is true, the callback interface will no
     * longer place fetched blocks into [[results]].

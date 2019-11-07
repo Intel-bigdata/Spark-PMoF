@@ -22,7 +22,7 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
   override def registerShuffle[K, V, C](shuffleId: Int, numMaps: Int, dependency: ShuffleDependency[K, V, C]): ShuffleHandle = {
     val env: SparkEnv = SparkEnv.get
 
-    metadataResolver = new MetadataResolver(pmofConf)
+    metadataResolver = MetadataResolver.getMetadataResolver(pmofConf)
 
     if (pmofConf.enableRdma) {
       PmofTransferService.getTransferServiceInstance(pmofConf: PmofConf, env.blockManager, this, isDriver = true)
@@ -39,7 +39,7 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
     val serializerManager = SparkEnv.get.serializerManager
     val numMaps = handle.asInstanceOf[BaseShuffleHandle[_, _, _]].numMaps
 
-    metadataResolver = new MetadataResolver(pmofConf)
+    metadataResolver = MetadataResolver.getMetadataResolver(pmofConf)
     numMapsForShuffle.putIfAbsent(handle.shuffleId, numMaps)
 
     if (pmofConf.enableRdma) {

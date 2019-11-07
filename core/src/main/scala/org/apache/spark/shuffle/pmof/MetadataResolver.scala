@@ -3,6 +3,7 @@ package org.apache.spark.shuffle.pmof
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.{ConcurrentHashMap, CountDownLatch}
 import java.util.zip.{Deflater, DeflaterOutputStream, Inflater, InflaterInputStream}
 
@@ -29,9 +30,9 @@ import scala.util.control.{Breaks, ControlThrowable}
 class MetadataResolver(pmofConf: PmofConf) {
   private[this] val blockManager = SparkEnv.get.blockManager
   private[this] val blockMap: ConcurrentHashMap[String, ShuffleBuffer] = new ConcurrentHashMap[String, ShuffleBuffer]()
+  private[this] val blockInfoMap = mutable.HashMap.empty[String, ArrayBuffer[ShuffleBlockInfo]]
   private[this] val info_serialize_stream = new Kryo()
   private[this] val shuffleBlockInfoSerializer = new ShuffleBlockInfoSerializer
-  private[this] val shuffleBlockMap = new ConcurrentHashMap[String, ArrayBuffer[ShuffleBlockInfo]]()
 
   info_serialize_stream.register(classOf[ShuffleBlockInfo], shuffleBlockInfoSerializer)
 
@@ -198,13 +199,12 @@ class MetadataResolver(pmofConf: PmofConf) {
       do {
         if (input.available() > 0) {
           val shuffleBlockInfo = info_serialize_stream.readObject(input, classOf[ShuffleBlockInfo])
-          if (shuffleBlockMap.containsKey(shuffleBlockInfo.getShuffleBlockId)) {
-            shuffleBlockMap.get(shuffleBlockInfo.getShuffleBlockId)
-              .append(shuffleBlockInfo)
+          if (blockInfoMap.contains(shuffleBlockInfo.getShuffleBlockId)) {
+            blockInfoMap(shuffleBlockInfo.getShuffleBlockId).append(shuffleBlockInfo)
           } else {
             val blockInfoArray = new ArrayBuffer[ShuffleBlockInfo]()
             blockInfoArray.append(shuffleBlockInfo)
-            shuffleBlockMap.put(shuffleBlockInfo.getShuffleBlockId, blockInfoArray)
+            blockInfoMap.put(shuffleBlockInfo.getShuffleBlockId, blockInfoArray)
           }
         } else {
           input.close()
@@ -239,8 +239,8 @@ class MetadataResolver(pmofConf: PmofConf) {
             psbi = csbi
             pre = cur
           }
-          if (shuffleBlockMap.containsKey(csbi)) {
-            val blockInfoArray = shuffleBlockMap.get(csbi)
+          if (blockInfoMap.contains(csbi)) {
+            val blockInfoArray = blockInfoMap(csbi)
             val startPos = output.position()
             val loop = Breaks
             loop.breakable {
@@ -304,6 +304,24 @@ class MetadataResolver(pmofConf: PmofConf) {
   def closeBlocks(): Unit = {
     for ((_, v) <- blockMap.asScala) {
       v.close()
+    }
+  }
+}
+
+object MetadataResolver {
+  private[this] final val initialized = new AtomicBoolean(false)
+  private[this] var metadataResolver: MetadataResolver = _
+
+  def getMetadataResolver(pmofConf: PmofConf): MetadataResolver = {
+    if (!initialized.get()) {
+      MetadataResolver.this.synchronized {
+        if (initialized.get()) return metadataResolver
+        metadataResolver = new MetadataResolver(pmofConf)
+        initialized.set(true)
+        metadataResolver
+      }
+    } else {
+      metadataResolver
     }
   }
 }
