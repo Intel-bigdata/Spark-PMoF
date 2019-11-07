@@ -1,18 +1,13 @@
 package org.apache.spark.storage.pmof
 
-import java.io.IOException
 import java.io.InputStream
 import java.nio.ByteBuffer
 import sun.misc.Cleaner
 import io.netty.buffer.Unpooled
-import io.netty.buffer.ByteBuf
-import scala.collection.mutable.ArrayBuffer
-import scala.util.control.Breaks._
 import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.network.buffer.ManagedBuffer
-import org.apache.spark.storage.pmof.{PersistentMemoryPool, PmemInputStream}
 
 class PmemManagedBuffer(pmHandler: PersistentMemoryHandler, blockId: String) extends ManagedBuffer with Logging {
   var inputStream: InputStream = _
@@ -29,10 +24,10 @@ class PmemManagedBuffer(pmHandler: PersistentMemoryHandler, blockId: String) ext
 
   override def nioByteBuffer(): ByteBuffer = {
     // TODO: This function should be Deprecated by spark in near future.
-    var data_length = size().toInt
-    var in = createInputStream()
-    byteBuffer = ByteBuffer.allocateDirect(data_length);
-    var data = Array.ofDim[Byte](data_length)
+    val data_length = size().toInt
+    val in = createInputStream()
+    byteBuffer = ByteBuffer.allocateDirect(data_length)
+    val data = Array.ofDim[Byte](data_length)
     in.read(data)
     byteBuffer.put(data)
     byteBuffer.flip()
@@ -54,10 +49,10 @@ class PmemManagedBuffer(pmHandler: PersistentMemoryHandler, blockId: String) ext
   override def release(): ManagedBuffer = {
     if (refCount.decrementAndGet() == 0) {
       if (byteBuffer != null) {
-        val cleanerField: java.lang.reflect.Field = byteBuffer.getClass.getDeclaredField("cleaner");
-        cleanerField.setAccessible(true);
+        val cleanerField: java.lang.reflect.Field = byteBuffer.getClass.getDeclaredField("cleaner")
+        cleanerField.setAccessible(true)
         val cleaner: Cleaner = cleanerField.get(byteBuffer).asInstanceOf[Cleaner]
-        cleaner.clean();
+        cleaner.clean()
       }
       if (inputStream != null) {
         inputStream.close()
