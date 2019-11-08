@@ -68,11 +68,5 @@ class PmemInputStream(
 
   override def close(): Unit = {
     buf.close()
-    //deleteBlock
-  }
-
-  def deleteBlock(): Unit = {
-    // FIXME: DELETE PMEM PARTITON HERE
-    persistentMemoryHandler.deletePartition(blockId)
   }
 }

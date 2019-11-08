@@ -8,7 +8,6 @@ public class PersistentMemoryPool {
     }
     private static native long nativeOpenDevice(String path, long size);
     private static native void nativeSetBlock(long deviceHandler, String key, ByteBuffer byteBuffer, int size, boolean clean);
-    private static native byte[] nativeGetBlock(long deviceHandler, String key);
     private static native long[] nativeGetBlockIndex(long deviceHandler, String key);
     private static native long nativeGetBlockSize(long deviceHandler, String key);
     private static native void nativeDeleteBlock(long deviceHandler, String key);
@@ -30,10 +29,6 @@ public class PersistentMemoryPool {
       nativeSetBlock(this.deviceHandler, key, byteBuffer, size, set_clean);
     }
 
-    public byte[] getPartition(String key) {
-      return nativeGetBlock(this.deviceHandler, key);
-    }
-
     public long[] getPartitionBlockInfo(String key) {
       return nativeGetBlockIndex(this.deviceHandler, key);
     }
@@ -52,11 +47,5 @@ public class PersistentMemoryPool {
 
     public void close() {
       nativeCloseDevice(this.deviceHandler);
-      try {
-        System.out.println("Use pmempool to delete device:" + device);
-        Runtime.getRuntime().exec("pmempool rm " + device);
-      } catch (Exception e) {
-        System.err.println("delete " + device + "failed: " + e.getMessage());
-      }
     }
 }

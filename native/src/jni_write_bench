@@ -1,3 +1,0 @@
-#!/usr/bin/sh
-#javac -cp .:/usr/share/java/apache-commons-cli.jar ./org/apache/spark/storage/pmof/PersistentMemoryPool.java
-java -ea -cp .:/usr/share/java/apache-commons-cli.jar -Djava.library.path=./ org.apache.spark.storage.pmof.PersistentMemoryPool $@
