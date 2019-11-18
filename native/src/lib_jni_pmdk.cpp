@@ -1,73 +1,65 @@
 #include "lib_jni_pmdk.h"
 #include "PmemBuffer.h"
-#include "PersistentMemoryPool.h"
+#include "pmemkv.h"
 
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeOpenDevice
   (JNIEnv *env, jclass obj, jstring path, jlong size) {
-    const char *CStr = env->GetStringUTFChars(path, 0);
-    PMPool<string>* pmpool = new PMPool<string>(CStr, size);
-    env->ReleaseStringUTFChars(path, CStr);
-    return (long)pmpool;
+  const char *CStr = env->GetStringUTFChars(path, 0);
+  pmemkv* kv= new pmemkv(CStr);
+  env->ReleaseStringUTFChars(path, CStr);
+  return (long)kv;
 }
 
 JNIEXPORT void JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeSetBlock
-  (JNIEnv *env, jclass obj, jlong pmpool, jstring key, jobject byteBuffer, jint dataSize, jboolean set_clean) {
-    jbyte* buf = (jbyte*)(*env).GetDirectBufferAddress(byteBuffer);
-    if (buf == nullptr) {
-      return;
-    }
-    const char* CStr = env->GetStringUTFChars(key, 0);
-    string key_str(CStr);
-    static_cast<PMPool<string>*>((void*)pmpool)->setBlock(key_str, dataSize, (char*)buf, set_clean);
-}
-
-JNIEXPORT jbyteArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetBlock
-  (JNIEnv *env, jclass obj, jlong pmpool, jstring key) {
-    MemoryBlock mb;
-    const char *CStr = env->GetStringUTFChars(key, 0);
-    string key_str(CStr);
-    static_cast<PMPool<string>*>((void*)pmpool)->getBlock(&mb, key_str);
-    jbyteArray data = env->NewByteArray(mb.len);
-    env->SetByteArrayRegion(data, 0, mb.len, (jbyte*)(mb.buf));
-    return data;
+  (JNIEnv *env, jclass obj, jlong kv, jstring key, jobject byteBuffer, jint dataSize, jboolean set_clean) {
+  jbyte* buf = (jbyte*)(*env).GetDirectBufferAddress(byteBuffer);
+  if (buf == nullptr) {
+    return;
+  }
+  const char* CStr = env->GetStringUTFChars(key, 0);
+  string key_str(CStr);
+  pmemkv *pmkv = static_cast<pmemkv*>((void*)kv);
+  pmkv->put(key_str, (char*)buf, dataSize);
 }
 
 JNIEXPORT jlongArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetBlockIndex
-  (JNIEnv *env, jclass obj, jlong pmpool, jstring key) {
-    BlockInfo blockInfo;
-    const char *CStr = env->GetStringUTFChars(key, 0);
-    string key_str(CStr);
-    static_cast<PMPool<string>*>((void*)pmpool)->getBlockIndex(&blockInfo, key_str);
-    if (blockInfo.len == 0) {
-      return env->NewLongArray(0);
-    }
-    jlongArray data = env->NewLongArray(blockInfo.len);
-    env->SetLongArrayRegion(data, 0, blockInfo.len, (jlong*)(blockInfo.data));
-    return data;
+  (JNIEnv *env, jclass obj, jlong kv, jstring key) {
+  const char *CStr = env->GetStringUTFChars(key, 0);
+  string key_str(CStr);
+  pmemkv *pmkv = static_cast<pmemkv*>((void*)kv);
+  uint64_t size = 0;
+  pmkv->get_meta_size(key_str, &size);
+  struct memory_meta* mm = (struct memory_meta*)std::malloc(sizeof(struct memory_meta));
+  mm->meta = (uint64_t*)std::malloc(size*2*sizeof(uint64_t));
+  pmkv->get_meta(key_str, mm);
+  jlongArray data = env->NewLongArray(mm->length);
+  env->SetLongArrayRegion(data, 0, mm->length, (jlong*)mm->meta);
+  std::free(mm->meta);
+  std::free(mm);
+  return data;
 }
 
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetBlockSize
-  (JNIEnv *env, jclass obj, jlong pmpool, jstring key) {
-    const char *CStr = env->GetStringUTFChars(key, 0);
-    string key_str(CStr);
-    return static_cast<PMPool<string>*>((void*)pmpool)->getBlockSize(key_str);
-  }
-
-JNIEXPORT void JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeDeleteBlock
-  (JNIEnv *env, jclass obj, jlong pmpool, jstring key) {
-    const char *CStr = env->GetStringUTFChars(key, 0);
-    string key_str(CStr);
-    static_cast<PMPool<string>*>((void*)pmpool)->deleteBlock(key_str);
+  (JNIEnv *env, jclass obj, jlong kv, jstring key) {
+  const char *CStr = env->GetStringUTFChars(key, 0);
+  string key_str(CStr);
+  pmemkv *pmkv = static_cast<pmemkv*>((void*)kv);
+  uint64_t value_size;
+  pmkv->get_value_size(key_str, &value_size);
+  return value_size;
   }
 
 JNIEXPORT jint JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeCloseDevice
-  (JNIEnv *env, jclass obj, jlong pmpool) {
-    delete static_cast<PMPool<string>*>((void*)pmpool);
+  (JNIEnv *env, jclass obj, jlong kv) {
+  pmemkv *pmkv = static_cast<pmemkv*>((void*)kv);
+  pmkv->free_all();
+  delete pmkv;
 }
 
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetRoot
-  (JNIEnv *env, jclass obj, jlong pmpool) {
-  return static_cast<PMPool<string>*>((void*)pmpool)->getRootAddr();
+  (JNIEnv *env, jclass obj, jlong kv) {
+  pmemkv *pmkv = static_cast<pmemkv*>((void*)kv);
+  return pmkv->get_root();
 }
 
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeNewPmemBuffer

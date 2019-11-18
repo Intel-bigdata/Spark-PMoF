@@ -57,7 +57,10 @@ private[spark] class PersistentMemoryHandler(
     var res_array: Array[Long] = pmpool.getPartitionBlockInfo(blockId)
     var i = -2
     var blockInfo = Array.ofDim[(Long, Int)]((res_array.length)/2)
-    blockInfo.map{ x => i += 2; (res_array(i), res_array(i+1).toInt)}
+    blockInfo.map{
+      x => i += 2;
+      (res_array(i), res_array(i+1).toInt)
+    }
   }
 
   def getPartitionSize(blockId: String): Long = {
@@ -66,10 +69,6 @@ private[spark] class PersistentMemoryHandler(
   
   def setPartition(numPartitions: Int, blockId: String, byteBuffer: ByteBuffer, size: Int, clean: Boolean): Unit = {
     pmpool.setPartition(blockId, byteBuffer, size, clean)
-  }
-
-  def getPartition(blockId: String): Array[Byte] = {
-    pmpool.getPartition(blockId)
   }
 
   def deletePartition(blockId: String): Unit = {
@@ -96,7 +95,7 @@ private[spark] class PersistentMemoryHandler(
 
 object PersistentMemoryHandler {
   private var persistentMemoryHandler: PersistentMemoryHandler = _
-  private var stopped: Boolean = false
+  private var stopped: Boolean = _
   def getPersistentMemoryHandler(pmofConf: PmofConf, root_dir: String, path_arg: List[String], shuffleBlockId: String, pmPoolSize: Long): PersistentMemoryHandler = synchronized {
     if (persistentMemoryHandler == null) {
       persistentMemoryHandler = new PersistentMemoryHandler(root_dir, path_arg, shuffleBlockId, pmPoolSize)
@@ -113,6 +112,7 @@ object PersistentMemoryHandler {
         case Some(s) => Future {nativeTaskset(s)}
         case None => {}
       }
+      stopped = false
     }
     persistentMemoryHandler
   }

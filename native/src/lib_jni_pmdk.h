@@ -25,14 +25,6 @@ JNIEXPORT void JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_n
 
 /*
  * Class:     lib_jni_pmdk
- * Method:    nativeGetBlock
- * Signature: (JLjava/lang/String;)[B
- */
-JNIEXPORT jbyteArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetBlock
-  (JNIEnv *, jclass, jlong, jstring);
-
-/*
- * Class:     lib_jni_pmdk
  * Method:    nativeCloseDevice
  * Signature: (J)I
  */
@@ -53,14 +45,6 @@ JNIEXPORT jlongArray JNICALL Java_org_apache_spark_storage_pmof_PersistentMemory
  * Signature: (JLjava/lang/String;)J
  */
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeGetBlockSize
-  (JNIEnv *, jclass, jlong, jstring);
-
-/*
- * Class:     lib_jni_pmdk
- * Method:    nativeDeleteBlock
- * Signature: (JLjava/lang/String;)J
- */
-JNIEXPORT void JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_nativeDeleteBlock
   (JNIEnv *, jclass, jlong, jstring);
 
 /*
