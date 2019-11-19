@@ -67,6 +67,11 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeNewP
   return (long)(new PmemBuffer());
 }
 
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeNewPmemBufferBySize
+  (JNIEnv *env, jobject obj, jlong len) {
+  return (long)(new PmemBuffer(len));
+}
+
 JNIEXPORT void JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeLoadPmemBuffer
   (JNIEnv *env, jobject obj, jlong pmBuffer, jlong addr, jint len) {
   ((PmemBuffer*)pmBuffer)->load((char*)addr, len);

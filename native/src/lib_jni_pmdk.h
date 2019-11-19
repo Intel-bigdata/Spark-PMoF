@@ -63,6 +63,9 @@ JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PersistentMemoryPool_
 JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeNewPmemBuffer
   (JNIEnv *, jobject);
 
+JNIEXPORT jlong JNICALL Java_org_apache_spark_storage_pmof_PmemBuffer_nativeNewPmemBufferBySize
+  (JNIEnv *, jobject, jlong);
+
 /*
  * Class:     lib_jni_pmdk
  * Method:    nativeLoadPmemBuffer

@@ -7,18 +7,19 @@ import scala.util.control.Breaks._
 class PmemInputStream(
   persistentMemoryHandler: PersistentMemoryHandler,
   blockId: String) extends InputStream with Logging {
-  val buf = new PmemBuffer()
   var index: Int = 0
   var remaining: Int = 0
-  var available_bytes: Int = persistentMemoryHandler.getPartitionSize(blockId).toInt
   val blockInfo: Array[(Long, Int)] = persistentMemoryHandler.getPartitionBlockInfo(blockId)
+  var available_bytes: Int = persistentMemoryHandler.getPartitionSize(blockId).toInt
+  val buf = new PmemBuffer(available_bytes)
+
+  load(available_bytes)
 
   def loadNextStream(): Int = {
     if (index >= blockInfo.length)
       return 0
     val data_length = blockInfo(index)._2
     val data_addr = blockInfo(index)._1
-
     buf.load(data_addr, data_length)
 
     index += 1
@@ -38,7 +39,6 @@ class PmemInputStream(
   }
 
   override def read(bytes: Array[Byte], off: Int, len: Int): Int = {
-    load(len)
     if (remaining == 0) {
       return -1
     }
