@@ -5,6 +5,7 @@ public class PmemBuffer {
         System.load("/usr/local/lib/libjnipmdk.so");
     }
     private native long nativeNewPmemBuffer();
+    private native long nativeNewPmemBufferBySize(long len);
     private native int nativeLoadPmemBuffer(long pmBuffer, long addr, int len);
     private native int nativeReadBytesFromPmemBuffer(long pmBuffer, byte[] bytes, int off, int len);
     private native int nativeWriteBytesToPmemBuffer(long pmBuffer, byte[] bytes, int off, int len);
@@ -17,6 +18,10 @@ public class PmemBuffer {
     long pmBuffer;
     PmemBuffer() {
       pmBuffer = nativeNewPmemBuffer();
+    }
+
+    PmemBuffer(long len) {
+      pmBuffer = nativeNewPmemBufferBySize(len);
     }
 
     void load(long addr, int len) {

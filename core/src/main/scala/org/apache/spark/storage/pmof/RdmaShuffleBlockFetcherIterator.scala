@@ -101,6 +101,10 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
     * [[numBlocksProcessed]] == [[numBlocksToFetch]].
     */
   private[this] var numBlocksProcessed = 0
+
+  private[this] val numRemoteBlockToFetch = new AtomicInteger(0)
+  private[this] val numRemoteBlockProcessing = new AtomicInteger(0)
+  private[this] val numRemoteBlockProcessed = new AtomicInteger(0)
   /**
     * Current [[FetchResult]] being processed. We track this so we can release the current buffer
     * in case of a runtime exception when processing the current buffer.
@@ -174,6 +178,7 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
     }
 
     numBlocksToFetch += blockIds.length
+    numRemoteBlockToFetch.addAndGet(blockIds.length)
 
     val rdmaTransferService = shuffleClient.asInstanceOf[PmofTransferService]
     rdmaTransferService.fetchBlockInfo(blockIds, receivedCallback)
@@ -295,11 +300,14 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
             }
             shuffleMetrics.incRemoteBlocksFetched(1)
             logDebug("take remote block.")
+            numRemoteBlockProcessed.incrementAndGet()
           }
           bytesInFlight.addAndGet(-size)
           if (isNetworkReqDone) {
             reqsInFlight.decrementAndGet
           }
+
+          logDebug("numRemoteBlockToFetch " + numRemoteBlockToFetch + " numRemoteBlockProcessing " + numRemoteBlockProcessing + " numRemoteBlockProcessed " + numRemoteBlockProcessed)
 
           val in = try {
             buf.createInputStream()
@@ -342,12 +350,14 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
   }
 
   def sendRequest(rdmaRequest: RdmaRequest): Unit = {
+    numRemoteBlockProcessing.incrementAndGet()
     val shuffleBlockInfos = rdmaRequest.shuffleBlockInfos
     var blockNums = shuffleBlockInfos.size
     bytesInFlight.addAndGet(rdmaRequest.reqSize)
     reqsInFlight.incrementAndGet
     val blockManagerId = rdmaRequest.blockManagerId
     val shuffleBlockIdName = rdmaRequest.shuffleBlockIdName
+    println("shuffle block name " + shuffleBlockIdName)
 
     val pmofTransferService = shuffleClient.asInstanceOf[PmofTransferService]
 

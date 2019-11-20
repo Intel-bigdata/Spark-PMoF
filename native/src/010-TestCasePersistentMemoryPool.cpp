@@ -8,12 +8,12 @@
 #define LENGTH 50
 #define TOTAL_SIZE 10737418240
 
+const char* expect_string = "hello world intel...";
+
 uint64_t timestamp_now() {
   return std::chrono::high_resolution_clock::now().time_since_epoch() /
          std::chrono::milliseconds(1);
 }
-
-const char* expect_string = "hello world intel...";
 
 int test_multithread_put(uint64_t index, pmemkv* kv) {
   std::string key = std::to_string(index);
@@ -132,11 +132,11 @@ TEST_CASE("pmemkv operations", "[pmemkv]") {
     threads.clear();
   }
 
-  SECTION("pmemkv benchmark") {
+  SECTION("pmemkv put benchmark") {
     pmemkv* kv = new pmemkv("/dev/dax0.0");
 
     std::vector<uint64_t> benchmarks;
-    benchmarks.push_back(2*1024*1024);
+    benchmarks.push_back(4*1024*1024);
     //benchmarks.push_back(1*1024*1024);
     //benchmarks.push_back(512*1024);
     //benchmarks.push_back(256*1024);
@@ -157,9 +157,39 @@ TEST_CASE("pmemkv operations", "[pmemkv]") {
         kv->put(key, tmp, benchmark);
       } 
       uint64_t end = timestamp_now();
-      std::cout << benchmark << " bytes test, consumes " << (end-start)/1000.0 << "s, throughput is " << TOTAL_SIZE/1024/1024/((end-start)/1000.0) << "MB/s" << std::endl;
+      std::cout << "pmemkv put test: " << benchmark << " bytes test, consumes " << (end-start)/1000.0 << "s, throughput is " << TOTAL_SIZE/1024/1024/((end-start)/1000.0) << "MB/s" << std::endl;
       std::free(tmp);
     }
+    kv->free_all();
+    delete kv;
+  }
+
+  SECTION("pmemkv get benchmark") {
+    pmemkv* kv = new pmemkv("/dev/dax0.0");
+
+    std::vector<uint64_t> benchmarks;
+    benchmarks.push_back(4*1024*1024);
+    for (auto benchmark : benchmarks) {
+      char* tmp = (char*)std::malloc(benchmark);
+      memset(tmp, '0', benchmark);
+      size_t count = TOTAL_SIZE/benchmark;
+      uint64_t start = timestamp_now();
+      for (size_t i = 0; i < count; i++) {
+        std::string key = std::to_string(1);
+        kv->put(key, tmp, benchmark);
+      }
+      uint64_t end = timestamp_now();
+      std::free(tmp);
+    }
+
+    struct memory_block* mb = (struct memory_block*)std::malloc(sizeof(struct memory_block));
+    mb->data = (char*)std::malloc(TOTAL_SIZE);
+    mb->size = TOTAL_SIZE;
+    std::string key = std::to_string(1);
+    uint64_t start = timestamp_now();
+    kv->get(key, mb);
+    uint64_t end = timestamp_now();
+    std::cout << "pmemkv get test: " << 1024*1024*4 << " bytes test, consumes " << (end-start)/1000.0 << "s, throughput is " << TOTAL_SIZE/1024/1024/((end-start)/1000.0) << "MB/s" << std::endl;
     kv->free_all();
     delete kv;
   }

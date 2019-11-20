@@ -17,6 +17,14 @@ public:
     pos = 0;
     pos_dirty = 0;
   }
+  explicit PmemBuffer(long initial_buf_data_capacity) {
+    buf_data_capacity = initial_buf_data_capacity;
+    buf_data = (char*)malloc(sizeof(char) * buf_data_capacity);
+    remaining = 0;
+    remaining_dirty = 0;
+    pos = 0;
+    pos_dirty = 0;
+  }
 
   ~PmemBuffer() {
     if (buf_data != nullptr) {
@@ -35,14 +43,16 @@ public:
     }
 
     if (remaining > 0) {
-    	buf_data_capacity = remaining + pmem_data_len;
-      char* tmp_buf_data = buf_data;
-      buf_data = (char*)malloc(sizeof(char) * buf_data_capacity);
-      if (buf_data != nullptr && tmp_buf_data != nullptr) {
-        memcpy(buf_data, tmp_buf_data + pos, remaining);
+      if (buf_data_capacity < remaining+pmem_data_len) {
+        buf_data_capacity = remaining + pmem_data_len;
+        char* tmp_buf_data = buf_data;
+        buf_data = (char*)malloc(sizeof(char) * buf_data_capacity);
+        if (buf_data != nullptr && tmp_buf_data != nullptr) {
+          memcpy(buf_data, tmp_buf_data + pos, remaining);
+        }
+        free(tmp_buf_data);
       }
-      free(tmp_buf_data);
-    	pos = remaining;
+      pos = remaining;
       memcpy(buf_data + pos, pmem_data_addr, pmem_data_len);
     } else if (remaining == 0) {
 			if (buf_data_capacity < pmem_data_len) {
