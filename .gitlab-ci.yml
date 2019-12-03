@@ -1,0 +1,6 @@
+before_script:
+  - whoami; docker info
+
+build_image:
+  script:
+    - docker build -f docker/ubuntu18/DockerFile --build-arg http_proxy="$http_proxy" --build-arg https_proxy="$http_proxy" --build-arg MAVEN_OPTS="$MAVEN_OPTS" .

@@ -17,5 +17,7 @@ RUN cd /; git clone https://github.com/pmem/pmdk.git
 RUN cd pmdk; git checkout -b 1.6 tags/1.6; make -j; make install -j;
 RUN cd /; git clone https://github.com/efficient/libcuckoo.git
 RUN cd libcuckoo; mkdir build; cd build; cmake -DCMAKE_INSTALL_PREFIX=/usr/local -DBUILD_EXAMPLES=1 -DBUILD_TESTS=1 ..; make -j; make install -j
-RUN cd /; git clone https://github.com/tanghaodong25/Spark-PMoF.git
-RUN cd Spark-PMoF; mvn install -DskipTests
+RUN mkdir /Spark-PMoF
+WORKDIR /Spark-PMoF
+COPY . .
+RUN mvn install -DskipTests
