@@ -13,9 +13,9 @@ $(MAIN):
 	$(CC) $(CFLAGS) $(INCLUDES) -o $(MAIN) lib_jni_pmdk.cpp $(LIBS)
 
 install:
-	cp -rf $(MAIN) /usr/lib/
-	cp -rf $(MAIN) /usr/lib64/
-	cp -rf $(MAIN) /usr/local/lib/
+	if [ -d "/usr/lib" ]; then cp -rf $(MAIN) /usr/lib/; fi
+	if [ -d "/usr/lib64" ]; then cp -rf $(MAIN) /usr/lib64/; fi
+	if [ -d "/usr/local/lib" ]; then cp -rf $(MAIN) /usr/local/lib/; fi
 
 clean:
 	rm -rf $(MAIN)

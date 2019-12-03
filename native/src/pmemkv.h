@@ -418,7 +418,7 @@ class pmemkv {
     const char* dev_path;
     struct base* bp;
     PMEMoid bo;
-    cuckoohash_map<uint64_t, block_meta_list*> index_map;
+    libcuckoo::cuckoohash_map<uint64_t, block_meta_list*> index_map;
     std::mutex mtx;
     std::atomic<uint64_t> bytes_allocated{0};
 };
