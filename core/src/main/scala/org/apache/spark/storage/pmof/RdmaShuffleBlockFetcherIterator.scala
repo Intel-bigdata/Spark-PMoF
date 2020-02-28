@@ -357,7 +357,6 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
     reqsInFlight.incrementAndGet
     val blockManagerId = rdmaRequest.blockManagerId
     val shuffleBlockIdName = rdmaRequest.shuffleBlockIdName
-    println("shuffle block name " + shuffleBlockIdName)
 
     val pmofTransferService = shuffleClient.asInstanceOf[PmofTransferService]
 
