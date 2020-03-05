@@ -6,17 +6,17 @@ import java.nio.ByteBuffer
 import io.netty.buffer.{ByteBuf, PooledByteBufAllocator}
 import org.apache.spark.internal.Logging
 
-class PmemOutputStream(
-  persistentMemoryWriter: PersistentMemoryHandler,
-  numPartitions: Int,
-  blockId: String,
-  numMaps: Int,
-  bufferSize: Int
-  ) extends OutputStream with Logging {
+class PmemOutputStream(persistentMemoryWriter: PersistentMemoryHandler,
+                       remotePersistentMemoryPool: RemotePersistentMemoryPool,
+                       numPartitions: Int,
+                       blockId: String,
+                       numMaps: Int
+                       bufferSize: Int
+                      ) extends OutputStream with Logging {
   var set_clean = true
   var is_closed = false
 
-  val length: Int = bufferSize
+  val length: Int = 1024 * 1024 * 6
   var bufferFlushedSize: Int = 0
   var bufferRemainingSize: Int = 0
   val buf: ByteBuf = NettyByteBufferPool.allocateNewBuffer(length)
@@ -34,7 +34,11 @@ class PmemOutputStream(
 
   override def flush(): Unit = {
     if (bufferRemainingSize > 0) {
-      persistentMemoryWriter.setPartition(numPartitions, blockId, byteBuffer, bufferRemainingSize, set_clean)
+      if (persistentMemoryWriter != null) {
+        persistentMemoryWriter.setPartition(numPartitions, blockId, byteBuffer, bufferRemainingSize, set_clean)
+      } else {
+        remotePersistentMemoryPool.put(blockId, byteBuffer, bufferRemainingSize)
+      }
       bufferFlushedSize += bufferRemainingSize
       bufferRemainingSize = 0
     }
@@ -48,7 +52,7 @@ class PmemOutputStream(
   }
 
   def remainingSize(): Int = {
-    bufferRemainingSize 
+    bufferRemainingSize
   }
 
   def reset(): Unit = {

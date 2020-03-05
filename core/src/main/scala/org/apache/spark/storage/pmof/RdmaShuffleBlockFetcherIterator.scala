@@ -28,6 +28,7 @@ import org.apache.spark.network.pmof._
 import org.apache.spark.network.shuffle.{ShuffleClient, TempFileManager}
 import org.apache.spark.shuffle.FetchFailedException
 import org.apache.spark.storage._
+import org.apache.spark.util.configuration.pmof.PmofConf
 import org.apache.spark.{SparkException, TaskContext}
 
 import scala.collection.mutable

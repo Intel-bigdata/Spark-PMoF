@@ -1,41 +1,43 @@
 package org.apache.spark.storage.pmof
 
-import org.apache.spark.storage._
-import org.apache.spark.serializer._
+import java.io.File
+
+import org.apache.spark.SparkConf
 import org.apache.spark.executor.TaskMetrics
 import org.apache.spark.internal.Logging
-import org.apache.spark.{SparkConf, SparkEnv}
+import org.apache.spark.serializer._
+import org.apache.spark.storage._
 import org.apache.spark.util.Utils
-import java.io.{File, OutputStream}
-
 import org.apache.spark.util.configuration.pmof.PmofConf
 
 import scala.collection.mutable.ArrayBuffer
 
-class PmemBlockId (stageId: Int, tmpId: Int) extends ShuffleBlockId(stageId, 0, tmpId) {
+class PmemBlockId(stageId: Int, tmpId: Int) extends ShuffleBlockId(stageId, 0, tmpId) {
   override def name: String = "reduce_spill_" + stageId + "_" + tmpId
+
   override def isShuffle: Boolean = false
 }
 
 object PmemBlockId {
   private var tempId: Int = 0
+
   def getTempBlockId(stageId: Int): PmemBlockId = synchronized {
     val cur_tempId = tempId
     tempId += 1
-    new PmemBlockId (stageId, cur_tempId)
+    new PmemBlockId(stageId, cur_tempId)
   }
 }
 
 private[spark] class PmemBlockOutputStream(
-    taskMetrics: TaskMetrics,
-    blockId: BlockId,
-    serializerManager: SerializerManager,
-    serializer: Serializer,
-    conf: SparkConf,
-    pmofConf: PmofConf,
-    numMaps: Int = 0,
-    numPartitions: Int = 1
-) extends DiskBlockObjectWriter(new File(Utils.getConfiguredLocalDirs(conf).toList(0) + "/null"), null, null, 0, true, null, null) with Logging {
+                                            taskMetrics: TaskMetrics,
+                                            blockId: BlockId,
+                                            serializerManager: SerializerManager,
+                                            serializer: Serializer,
+                                            conf: SparkConf,
+                                            pmofConf: PmofConf,
+                                            numMaps: Int = 0,
+                                            numPartitions: Int = 1
+                                          ) extends DiskBlockObjectWriter(new File(Utils.getConfiguredLocalDirs(conf).toList(0) + "/null"), null, null, 0, true, null, null) with Logging {
 
   var size: Int = 0
   var records: Int = 0
@@ -44,15 +46,21 @@ private[spark] class PmemBlockOutputStream(
   var spilled: Boolean = false
   var partitionMeta: Array[(Long, Int, Int)] = _
   val root_dir = Utils.getConfiguredLocalDirs(conf).toList(0)
+  var persistentMemoryWriter: PersistentMemoryHandler = _
+  var remotePersistentMemoryPool: RemotePersistentMemoryPool = _
 
-  val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler(pmofConf,
-    root_dir, pmofConf.path_list, blockId.name, pmofConf.maxPoolSize)
+  if (!pmofConf.enableRemotePmem) {
+    persistentMemoryWriter = PersistentMemoryHandler.getPersistentMemoryHandler(pmofConf,
+      root_dir, pmofConf.path_list, blockId.name, pmofConf.maxPoolSize)
+  } else {
+    remotePersistentMemoryPool = RemotePersistentMemoryPool.getInstance(pmofConf.rpmpHost, pmofConf.rpmpPort)
+  }
 
   //disable metadata updating by default
   //persistentMemoryWriter.updateShuffleMeta(blockId.name)
 
   val pmemOutputStream: PmemOutputStream = new PmemOutputStream(
-    persistentMemoryWriter, numPartitions, blockId.name, numMaps, (pmofConf.spill_throttle.toInt + 1024))
+    persistentMemoryWriter, remotePersistentMemoryPool, numPartitions, blockId.name, numMaps, (pmofConf.spill_throttle.toInt + 1024))
   val serInstance = serializer.newInstance()
   val bs = serializerManager.wrapStream(blockId, pmemOutputStream)
   var objStream: SerializationStream = serInstance.serializeStream(bs)
@@ -62,7 +70,7 @@ private[spark] class PmemBlockOutputStream(
     objStream.writeValue(value)
     records += 1
     recordsPerBlock += 1
-		if (blockId.isShuffle == true) {
+    if (blockId.isShuffle == true) {
       taskMetrics.shuffleWriteMetrics.incRecordsWritten(1)
     }
     maybeSpill()
@@ -114,7 +122,7 @@ private[spark] class PmemBlockOutputStream(
   def getPartitionMeta(): Array[(Long, Int, Int)] = {
     if (partitionMeta == null) {
       var i = -1
-      partitionMeta = persistentMemoryWriter.getPartitionBlockInfo(blockId.name).map{ x=> i+=1; (x._1, x._2, recordsArray(i))}
+      partitionMeta = persistentMemoryWriter.getPartitionBlockInfo(blockId.name).map { x => i += 1; (x._1, x._2, recordsArray(i)) }
     }
     partitionMeta
   }
@@ -128,7 +136,7 @@ private[spark] class PmemBlockOutputStream(
   }
 
   def getTotalRecords(): Long = {
-    records    
+    records
   }
 
   def getSize(): Long = {

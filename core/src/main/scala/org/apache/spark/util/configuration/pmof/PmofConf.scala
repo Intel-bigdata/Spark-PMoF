@@ -27,4 +27,7 @@ class PmofConf(conf: SparkConf) {
   val shuffleBlockSize: Int = conf.getInt("spark.shuffle.pmof.shuffle_block_size", defaultValue = 2048)
   val pmemCapacity: Long = conf.getLong("spark.shuffle.pmof.pmem_capacity", defaultValue = 264239054848L)
   val pmemCoreMap = conf.get("spark.shuffle.pmof.dev_core_set", defaultValue = "/dev/dax0.0:0-17,36-53").split(";").map(_.trim).map(_.split(":")).map(arr => arr(0) -> arr(1)).toMap
+  val enableRemotePmem: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_remote_pmem", defaultValue = false);
+  val rpmpHost: String = conf.get("spark.driver.rhost", defaultValue = "172.168.0.40")
+  val rpmpPort: String = conf.get("spark.driver.rport", defaultValue = "61010")
 }
