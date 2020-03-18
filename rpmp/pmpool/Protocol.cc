@@ -204,6 +204,7 @@ void Protocol::handle_recv_msg(Request *request) {
       rrc.address = addr;
       rrc.size = rc.size;
       rrc.con = rc.con;
+      networkServer_->get_dram_buffer(&rrc);
       RequestReply *requestReply = new RequestReply(rrc);
       rrc.ck->ptr = requestReply;
       enqueue_finalize_msg(requestReply);

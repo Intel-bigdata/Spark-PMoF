@@ -76,6 +76,7 @@ class AllocatorProxy {
       addr = allocators_[index % diskInfos_.size()]->allocate_and_write(
           size, content);
     }
+    return addr;
   }
 
   int write(uint64_t address, const char *content, uint64_t size) {
