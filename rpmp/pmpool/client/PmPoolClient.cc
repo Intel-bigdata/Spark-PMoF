@@ -24,7 +24,7 @@ PmPoolClient::PmPoolClient(const string &remote_address,
 
 PmPoolClient::~PmPoolClient() {}
 
-int PmPoolClient::init() { networkClient_->init(requestHandler_.get()); }
+int PmPoolClient::init() { return networkClient_->init(requestHandler_.get()); }
 
 void PmPoolClient::begin_tx() {
   std::unique_lock<std::mutex> lk(tx_mtx);

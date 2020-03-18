@@ -83,6 +83,7 @@ Java_com_intel_rpmp_PmPoolClient_alloc_1and_1write_1__Ljava_nio_ByteBuffer_2JJ(
   client->begin_tx();
   uint64_t address = client->write(raw_data, size);
   client->end_tx();
+  return address;
 }
 
 JNIEXPORT jlong JNICALL

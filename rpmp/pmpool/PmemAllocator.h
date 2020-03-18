@@ -374,6 +374,7 @@ class PmemObjAllocator : public Allocator {
   int free_meta() {
     std::lock_guard<std::mutex> l(mtx);
     index_map.clear();
+    return 0;
   }
 
  private:

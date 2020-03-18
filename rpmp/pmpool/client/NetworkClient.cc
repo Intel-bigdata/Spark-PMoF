@@ -212,6 +212,7 @@ int NetworkClient::init(RequestHandler *requestHandler) {
   }
 
   circularBuffer_ = make_shared<CircularBuffer>(1024 * 1024, 512, false, this);
+  return 0;
 }
 
 void NetworkClient::shutdown() { client_->shutdown(); }
