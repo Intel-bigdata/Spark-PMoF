@@ -169,6 +169,7 @@ class Protocol {
  public:
   Config *config_;
   Log *log_;
+  uint64_t num_requests_ = 0;
 
  private:
   NetworkServer *networkServer_;
