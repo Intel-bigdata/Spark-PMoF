@@ -190,6 +190,11 @@ void Protocol::enqueue_recv_msg(Request *request) {
 }
 
 void Protocol::handle_recv_msg(Request *request) {
+  num_requests_++;
+  if (num_requests_ % 10000 == 0) {
+    log_->get_file_log()->info("Protocol::handle_recv_msg handled requests number is {0}.", num_requests_);
+    log_->get_console_log()->info("Protocol::handle_recv_msg handled requests number is {0}.", num_requests_);
+  }
   RequestContext rc = request->get_rc();
   RequestReplyContext rrc;
   switch (rc.type) {
