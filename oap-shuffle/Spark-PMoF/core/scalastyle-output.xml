@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="5.0">
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/network/pmof/TransferService.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/storage/pmof/PmemBlockInputStream.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error column="6" line="30" source="org.scalastyle.scalariform.ReturnChecker" severity="warning" message="Avoid using return"/>
+  <error column="8" line="28" source="org.scalastyle.scalariform.SimplifyBooleanExpressionChecker" severity="warning" message="Boolean expression can be simplified"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/shuffle/pmof/MetadataResolver.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error line="135" source="org.scalastyle.file.FileLineLengthChecker" severity="warning" message="File line length exceeds 160 characters"/>
+  <error line="138" source="org.scalastyle.file.FileLineLengthChecker" severity="warning" message="File line length exceeds 160 characters"/>
+  <error column="59" line="123" source="org.scalastyle.scalariform.MagicNumberChecker" severity="warning" message="Magic Number"/>
+  <error column="10" line="211" source="org.scalastyle.scalariform.ReturnChecker" severity="warning" message="Avoid using return"/>
+  <error column="10" line="297" source="org.scalastyle.scalariform.ReturnChecker" severity="warning" message="Avoid using return"/>
+  <error column="31" line="318" source="org.scalastyle.scalariform.ReturnChecker" severity="warning" message="Avoid using return"/>
+  <error column="6" line="99" source="org.scalastyle.scalariform.MethodLengthChecker" severity="warning" message="Method is longer than 50 lines"/>
+  <error column="6" line="222" source="org.scalastyle.scalariform.MethodLengthChecker" severity="warning" message="Method is longer than 50 lines"/>
+  <error column="8" line="213" source="org.scalastyle.scalariform.WhileChecker" severity="warning" message="Avoid using while loops"/>
+  <error column="8" line="234" source="org.scalastyle.scalariform.WhileChecker" severity="warning" message="Avoid using while loops"/>
+  <error column="8" line="299" source="org.scalastyle.scalariform.WhileChecker" severity="warning" message="Avoid using while loops"/>
+  <error column="0" line="13" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="0" line="19" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/shuffle/pmof/PmemShuffleWriter.scala">
+  <error column="0" line="83" source="org.scalastyle.file.FileTabChecker" severity="warning" message="Line contains a tab"/>
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error column="8" line="141" source="org.scalastyle.scalariform.ReturnChecker" severity="warning" message="Avoid using return"/>
+  <error column="15" line="67" source="org.scalastyle.scalariform.CyclomaticComplexityChecker" severity="warning" message="Cyclomatic complexity of 11 exceeds max of 10"/>
+  <error column="15" line="67" source="org.scalastyle.scalariform.MethodLengthChecker" severity="warning" message="Method is longer than 50 lines"/>
+  <error column="6" line="90" source="org.scalastyle.scalariform.WhileChecker" severity="warning" message="Avoid using while loops"/>
+  <error column="4" line="103" source="org.scalastyle.scalariform.WhileChecker" severity="warning" message="Avoid using while loops"/>
+  <error column="0" line="20" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="0" line="25" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="0" line="27" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/network/pmof/Server.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error column="56" line="55" source="org.scalastyle.scalariform.MagicNumberChecker" severity="warning" message="Magic Number"/>
+  <error column="0" line="6" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/network/pmof/PmofTransferService.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error column="6" line="29" source="org.scalastyle.scalariform.ParameterNumberChecker" severity="warning" message="The number of parameters should not exceed 8"/>
+  <error column="31" line="84" source="org.scalastyle.scalariform.ReturnChecker" severity="warning" message="Avoid using return"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/shuffle/pmof/PmemShuffleBlockResolver.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error column="0" line="3" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/shuffle/pmof/RdmaShuffleReader.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error column="15" line="34" source="org.scalastyle.scalariform.MethodLengthChecker" severity="warning" message="Method is longer than 50 lines"/>
+  <error column="0" line="3" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="0" line="9" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/storage/pmof/RdmaShuffleBlockFetcherIterator.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error line="310" source="org.scalastyle.file.FileLineLengthChecker" severity="warning" message="File line length exceeds 160 characters"/>
+  <error line="413" source="org.scalastyle.file.FileLineLengthChecker" severity="warning" message="File line length exceeds 160 characters"/>
+  <error column="30" line="148" source="org.scalastyle.scalariform.ReturnChecker" severity="warning" message="Avoid using return"/>
+  <error column="10" line="207" source="org.scalastyle.scalariform.ReturnChecker" severity="warning" message="Avoid using return"/>
+  <error column="6" line="343" source="org.scalastyle.scalariform.ReturnChecker" severity="warning" message="Avoid using return"/>
+  <error column="15" line="275" source="org.scalastyle.scalariform.MethodLengthChecker" severity="warning" message="Method is longer than 50 lines"/>
+  <error column="4" line="194" source="org.scalastyle.scalariform.WhileChecker" severity="warning" message="Avoid using while loops"/>
+  <error column="4" line="222" source="org.scalastyle.scalariform.WhileChecker" severity="warning" message="Avoid using while loops"/>
+  <error column="4" line="288" source="org.scalastyle.scalariform.WhileChecker" severity="warning" message="Avoid using while loops"/>
+  <error column="14" line="413" source="org.scalastyle.scalariform.EmptyClassChecker" severity="warning" message="Redundant braces after class definition"/>
+  <error column="0" line="27" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="0" line="30" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="2" line="75" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="13" line="89" source="org.scalastyle.scalariform.MultipleStringLiteralsChecker" severity="warning" message="The string literal &quot;this&quot; appears 2 times in the file."/>
+  <error column="2" line="75" source="org.scalastyle.scalariform.ImportGroupingChecker" severity="warning" message="Imports should be grouped together"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/storage/pmof/PmemInputStream.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error column="6" line="20" source="org.scalastyle.scalariform.ReturnChecker" severity="warning" message="Avoid using return"/>
+  <error column="8" line="33" source="org.scalastyle.scalariform.ReturnChecker" severity="warning" message="Avoid using return"/>
+  <error column="6" line="43" source="org.scalastyle.scalariform.ReturnChecker" severity="warning" message="Avoid using return"/>
+  <error column="4" line="19" source="org.scalastyle.scalariform.IfBraceChecker" severity="warning" message="If block needs braces"/>
+  <error column="16" line="54" source="org.scalastyle.scalariform.WhileChecker" severity="warning" message="Avoid using while loops"/>
+  <error column="0" line="5" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/storage/pmof/PmemBlockOutputStream.scala">
+  <error column="0" line="64" source="org.scalastyle.file.FileTabChecker" severity="warning" message="Line contains a tab"/>
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error column="11" line="126" source="org.scalastyle.file.WhitespaceEndOfLineChecker" severity="warning" message="Whitespace at end of line"/>
+  <error column="6" line="64" source="org.scalastyle.scalariform.SimplifyBooleanExpressionChecker" severity="warning" message="Boolean expression can be simplified"/>
+  <error column="8" line="80" source="org.scalastyle.scalariform.SimplifyBooleanExpressionChecker" severity="warning" message="Boolean expression can be simplified"/>
+  <error column="12" line="92" source="org.scalastyle.scalariform.SimplifyBooleanExpressionChecker" severity="warning" message="Boolean expression can be simplified"/>
+  <error column="0" line="3" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="0" line="4" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/test/scala/org/apache/spark/shuffle/pmof/PmemShuffleWriterWithSortSuite.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error column="6" line="127" source="org.scalastyle.file.RegexChecker" severity="warning" message="Regular expression matched 'println'"/>
+  <error column="4" line="121" source="org.scalastyle.scalariform.WhileChecker" severity="warning" message="Avoid using while loops"/>
+  <error column="0" line="19" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="0" line="23" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="0" line="26" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="0" line="27" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="0" line="28" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="18" line="127" source="org.scalastyle.scalariform.MultipleStringLiteralsChecker" severity="warning" message="The string literal &quot; &quot; appears 4 times in the file."/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/network/pmof/ClientFactory.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error column="0" line="7" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/network/pmof/Callback.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/storage/pmof/PmemOutputStream.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error column="23" line="50" source="org.scalastyle.file.WhitespaceEndOfLineChecker" severity="warning" message="Whitespace at end of line"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/util/configuration/pmof/PmofConf.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error line="29" source="org.scalastyle.file.FileLineLengthChecker" severity="warning" message="File line length exceeds 160 characters"/>
+  <error column="88" line="9" source="org.scalastyle.scalariform.MagicNumberChecker" severity="warning" message="Magic Number"/>
+  <error column="86" line="10" source="org.scalastyle.scalariform.MagicNumberChecker" severity="warning" message="Magic Number"/>
+  <error column="82" line="11" source="org.scalastyle.scalariform.MagicNumberChecker" severity="warning" message="Magic Number"/>
+  <error column="94" line="12" source="org.scalastyle.scalariform.MagicNumberChecker" severity="warning" message="Magic Number"/>
+  <error column="73" line="17" source="org.scalastyle.scalariform.MagicNumberChecker" severity="warning" message="Magic Number"/>
+  <error column="83" line="18" source="org.scalastyle.scalariform.MagicNumberChecker" severity="warning" message="Magic Number"/>
+  <error column="83" line="20" source="org.scalastyle.scalariform.MagicNumberChecker" severity="warning" message="Magic Number"/>
+  <error column="98" line="27" source="org.scalastyle.scalariform.MagicNumberChecker" severity="warning" message="Magic Number"/>
+  <error column="91" line="28" source="org.scalastyle.scalariform.MagicNumberChecker" severity="warning" message="Magic Number"/>
+  <error column="109" line="8" source="org.scalastyle.scalariform.MultipleStringLiteralsChecker" severity="warning" message="The string literal &quot;,&quot; appears 2 times in the file."/>
+  <error column="37" line="19" source="org.scalastyle.scalariform.MultipleStringLiteralsChecker" severity="warning" message="The string literal &quot;spark.shuffle.pmof.server_pool_size&quot; appears 2 times in the file."/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/storage/pmof/PmemManagedBuffer.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error column="0" line="5" source="org.scalastyle.scalariform.IllegalImportsChecker" severity="warning" message="Import from illegal package"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/shuffle/pmof/BaseShuffleReader.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error column="15" line="101" source="org.scalastyle.scalariform.SimplifyBooleanExpressionChecker" severity="warning" message="Boolean expression can be simplified"/>
+  <error column="15" line="45" source="org.scalastyle.scalariform.MethodLengthChecker" severity="warning" message="Method is longer than 50 lines"/>
+  <error column="0" line="20" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/shuffle/pmof/PmofShuffleManager.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error column="139" line="50" source="org.scalastyle.file.WhitespaceEndOfLineChecker" severity="warning" message="Whitespace at end of line"/>
+  <error column="140" line="53" source="org.scalastyle.file.WhitespaceEndOfLineChecker" severity="warning" message="Whitespace at end of line"/>
+  <error line="58" source="org.scalastyle.file.FileLineLengthChecker" severity="warning" message="File line length exceeds 160 characters"/>
+  <error column="4" line="82" source="org.scalastyle.scalariform.IfBraceChecker" severity="warning" message="If block needs braces"/>
+  <error column="0" line="7" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/network/pmof/Client.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/shuffle/pmof/BaseShuffleWriter.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error column="8" line="98" source="org.scalastyle.scalariform.ReturnChecker" severity="warning" message="Avoid using return"/>
+  <error column="0" line="20" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/storage/pmof/PersistentMemoryHandler.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error column="32" line="62" source="org.scalastyle.scalariform.SpacesAfterPlusChecker" severity="warning" message="There should be a space after the plus (+) sign"/>
+  <error column="0" line="43" source="org.scalastyle.file.WhitespaceEndOfLineChecker" severity="warning" message="Whitespace at end of line"/>
+  <error column="0" line="69" source="org.scalastyle.file.WhitespaceEndOfLineChecker" severity="warning" message="Whitespace at end of line"/>
+  <error column="32" line="62" source="org.scalastyle.scalariform.SpacesBeforePlusChecker" severity="warning" message="There should be a space before the plus (+) sign"/>
+  <error line="99" source="org.scalastyle.file.FileLineLengthChecker" severity="warning" message="File line length exceeds 160 characters"/>
+  <error column="12" line="58" source="org.scalastyle.scalariform.MagicNumberChecker" severity="warning" message="Magic Number"/>
+  <error column="0" line="9" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/main/scala/org/apache/spark/util/collection/pmof/PmemExternalSorter.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error column="12" line="336" source="org.scalastyle.scalariform.ReturnChecker" severity="warning" message="Avoid using return"/>
+  <error column="6" line="249" source="org.scalastyle.scalariform.MethodLengthChecker" severity="warning" message="Method is longer than 50 lines"/>
+  <error column="4" line="101" source="org.scalastyle.scalariform.WhileChecker" severity="warning" message="Avoid using while loops"/>
+  <error column="10" line="279" source="org.scalastyle.scalariform.WhileChecker" severity="warning" message="Avoid using while loops"/>
+  <error column="12" line="283" source="org.scalastyle.scalariform.WhileChecker" severity="warning" message="Avoid using while loops"/>
+  <error column="10" line="315" source="org.scalastyle.scalariform.WhileChecker" severity="warning" message="Avoid using while loops"/>
+  <error column="0" line="7" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="0" line="9" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="0" line="11" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="0" line="12" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="4" line="162" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="90" line="76" source="org.scalastyle.scalariform.MultipleStringLiteralsChecker" severity="warning" message="The string literal &quot;map&quot; appears 2 times in the file."/>
+  <error column="116" line="76" source="org.scalastyle.scalariform.MultipleStringLiteralsChecker" severity="warning" message="The string literal &quot;buffer&quot; appears 2 times in the file."/>
+  <error column="4" line="162" source="org.scalastyle.scalariform.ImportGroupingChecker" severity="warning" message="Imports should be grouped together"/>
+ </file>
+ <file name="/root/chendi/Spark-PMoF/core/src/test/scala/org/apache/spark/shuffle/pmof/PmemShuffleWriterSuite.scala">
+  <error line="1" source="org.scalastyle.file.HeaderMatchesChecker" severity="warning" message="Header does not match expected text"/>
+  <error column="26" line="121" source="org.scalastyle.scalariform.MagicNumberChecker" severity="warning" message="Magic Number"/>
+  <error column="4" line="109" source="org.scalastyle.scalariform.WhileChecker" severity="warning" message="Avoid using while loops"/>
+  <error column="0" line="19" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="0" line="23" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="0" line="25" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="0" line="26" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+  <error column="0" line="27" source="org.scalastyle.scalariform.UnderscoreImportChecker" severity="warning" message="Avoid wildcard imports"/>
+ </file>
+</checkstyle>
