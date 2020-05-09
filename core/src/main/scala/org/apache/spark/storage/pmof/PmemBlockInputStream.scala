@@ -11,7 +11,8 @@ class PmemBlockInputStream[K, C](pmemBlockOutputStream: PmemBlockOutputStream, s
   val serInstance: SerializerInstance = serializer.newInstance()
   val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler
   var pmemInputStream: PmemInputStream = new PmemInputStream(persistentMemoryWriter, blockId.name)
-  var inObjStream: DeserializationStream = serInstance.deserializeStream(pmemInputStream)
+  val wrappedStream = serializerManager.wrapStream(blockId, pmemInputStream)
+  var inObjStream: DeserializationStream = serInstance.deserializeStream(wrappedStream)
 
   var total_records: Long = 0
   var indexInBatch: Int = 0
@@ -45,6 +46,7 @@ class PmemBlockInputStream[K, C](pmemBlockOutputStream: PmemBlockOutputStream, s
   }
 
   def close(): Unit = {
+    inObjStream.close
     pmemInputStream.close
     inObjStream = null
   }

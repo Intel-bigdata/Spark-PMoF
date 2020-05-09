@@ -15,12 +15,15 @@ public class PmemBuffer {
     private native long nativeDeletePmemBuffer(long pmBuffer);
 		
     private boolean closed = false;
+    private long len = 0;
     long pmBuffer;
     PmemBuffer() {
       pmBuffer = nativeNewPmemBuffer();
     }
 
     PmemBuffer(long len) {
+      this.len = len;
+      NettyByteBufferPool.unpooledInc(len);
       pmBuffer = nativeNewPmemBufferBySize(len);
     }
 
@@ -48,6 +51,7 @@ public class PmemBuffer {
     }
 
     void clean() {
+      NettyByteBufferPool.unpooledDec(len);
       nativeCleanPmemBuffer(pmBuffer);
     }
 
@@ -60,9 +64,10 @@ public class PmemBuffer {
     }
 
     synchronized void close() {
-        if (!closed) {
-            nativeDeletePmemBuffer(pmBuffer);
-            closed = true;
-        }
+      if (!closed) {
+        clean();
+        nativeDeletePmemBuffer(pmBuffer);
+        closed = true;
+      }
     }
 }
