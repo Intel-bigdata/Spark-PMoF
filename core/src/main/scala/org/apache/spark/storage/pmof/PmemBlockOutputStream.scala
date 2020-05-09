@@ -52,9 +52,10 @@ private[spark] class PmemBlockOutputStream(
   //persistentMemoryWriter.updateShuffleMeta(blockId.name)
 
   val pmemOutputStream: PmemOutputStream = new PmemOutputStream(
-    persistentMemoryWriter, numPartitions, blockId.name, numMaps)
+    persistentMemoryWriter, numPartitions, blockId.name, numMaps, (pmofConf.spill_throttle.toInt + 1024))
   val serInstance = serializer.newInstance()
-  var objStream: SerializationStream = serInstance.serializeStream(pmemOutputStream)
+  val bs = serializerManager.wrapStream(blockId, pmemOutputStream)
+  var objStream: SerializationStream = serInstance.serializeStream(bs)
 
   override def write(key: Any, value: Any): Unit = {
     objStream.writeKey(key)
@@ -68,12 +69,16 @@ private[spark] class PmemBlockOutputStream(
   }
 
   override def close() {
+    if (objStream != null) {
+      objStream.close()
+      objStream = null
+    }
     pmemOutputStream.close()
-    objStream = null
   }
 
   override def flush() {
     objStream.flush()
+    bs.flush()
   }
 
   def maybeSpill(force: Boolean = false): Unit = {

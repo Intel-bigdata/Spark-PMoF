@@ -10,15 +10,16 @@ class PmemOutputStream(
   persistentMemoryWriter: PersistentMemoryHandler,
   numPartitions: Int,
   blockId: String,
-  numMaps: Int
+  numMaps: Int,
+  bufferSize: Int
   ) extends OutputStream with Logging {
   var set_clean = true
   var is_closed = false
 
-  val length: Int = 1024*1024*6
+  val length: Int = bufferSize
   var bufferFlushedSize: Int = 0
   var bufferRemainingSize: Int = 0
-  val buf: ByteBuf = PooledByteBufAllocator.DEFAULT.directBuffer(length, length)
+  val buf: ByteBuf = NettyByteBufferPool.allocateNewBuffer(length)
   val byteBuffer: ByteBuffer = buf.nioBuffer(0, length)
 
   override def write(bytes: Array[Byte], off: Int, len: Int): Unit = {
@@ -60,7 +61,7 @@ class PmemOutputStream(
     if (!is_closed) {
       flush()
       reset()
-      buf.release()
+      NettyByteBufferPool.releaseBuffer(buf)      
       is_closed = true
     }
   }

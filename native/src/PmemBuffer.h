@@ -6,7 +6,7 @@
 #include <cstring>
 using namespace std;
 
-#define DEFAULT_BUFSIZE 4096*1024+512
+#define DEFAULT_BUFSIZE 2049 * 1024
 
 class PmemBuffer {
 public:
@@ -17,6 +17,7 @@ public:
     pos = 0;
     pos_dirty = 0;
   }
+
   explicit PmemBuffer(long initial_buf_data_capacity) {
     buf_data_capacity = initial_buf_data_capacity;
     buf_data = (char*)malloc(sizeof(char) * buf_data_capacity);
@@ -39,11 +40,11 @@ public:
     std::lock_guard<std::mutex> lock(buffer_mtx);
     if (buf_data_capacity == 0 && pmem_data_len > 0) {
     	buf_data_capacity = pmem_data_len;
-      buf_data = (char*)malloc(sizeof(char) * pmem_data_len);
+      buf_data = (char*)malloc(sizeof(char) * buf_data_capacity);
     }
 
     if (remaining > 0) {
-      if (buf_data_capacity < remaining+pmem_data_len) {
+      if (buf_data_capacity < remaining + pmem_data_len) {
         buf_data_capacity = remaining + pmem_data_len;
         char* tmp_buf_data = buf_data;
         buf_data = (char*)malloc(sizeof(char) * buf_data_capacity);
@@ -118,6 +119,10 @@ public:
     return read_len; 
   }
 
+  char* getDataAddr() {
+    return buf_data;
+  }
+
   int write(char* data, int len) {
     std::lock_guard<std::mutex> lock(buffer_mtx);
     if (buf_data_capacity == 0) {
@@ -149,9 +154,6 @@ public:
     return 0; 
   }
 
-  char* getDataAddr() {
-    return buf_data;
-  }
 
 private:
   mutex buffer_mtx;

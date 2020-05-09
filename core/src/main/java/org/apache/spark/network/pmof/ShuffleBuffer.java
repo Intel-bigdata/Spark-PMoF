@@ -4,6 +4,7 @@ import com.intel.hpnl.core.EqService;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
 import org.apache.spark.network.buffer.ManagedBuffer;
+import org.apache.spark.storage.pmof.NettyByteBufferPool;
 import org.apache.spark.unsafe.memory.MemoryBlock;
 import org.apache.spark.unsafe.memory.UnsafeMemoryAllocator;
 import sun.nio.ch.FileChannelImpl;
@@ -54,7 +55,7 @@ public class ShuffleBuffer extends ManagedBuffer {
             this.byteBuffer = convertToByteBuffer();
             this.byteBuffer.limit((int)length);
         } else {
-            this.buf = PooledByteBufAllocator.DEFAULT.directBuffer((int) this.length, (int)this.length);
+            this.buf = NettyByteBufferPool.allocateNewBuffer((int) this.length);
             this.address = this.buf.memoryAddress();
             this.byteBuffer = this.buf.nioBuffer(0, (int)length);
         }
@@ -135,7 +136,7 @@ public class ShuffleBuffer extends ManagedBuffer {
             }
         } else {
             if (this.supportNettyBuffer) {
-                this.buf.release();
+                NettyByteBufferPool.releaseBuffer(this.buf);
             } else {
                 unsafeAlloc.free(memoryBlock);
             }

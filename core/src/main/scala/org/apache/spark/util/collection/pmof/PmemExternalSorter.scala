@@ -103,9 +103,12 @@ private[spark] class PmemExternalSorter[K, V, C](
       if (cur_partitionId != partitionId) {
         if (cur_partitionId != -1) {
           buffer.maybeSpill(true)
+          buffer.close()
+          buffer = null
         }
         cur_partitionId = partitionId
         buffer = getPartitionByteBufferArray(dep.shuffleId, cur_partitionId)
+        logDebug(s"${dep.shuffleId}_${cur_partitionId} ${NettyByteBufferPool}")
       }
       require(partitionId >= 0 && partitionId < numPartitions,
         s"partition Id: ${partitionId} should be in the range [0, ${numPartitions})")
@@ -115,6 +118,8 @@ private[spark] class PmemExternalSorter[K, V, C](
     }
     if (buffer != null) {
       buffer.maybeSpill(true)
+      buffer.close()
+      buffer = null
     }
   }
 
