@@ -16,7 +16,7 @@ class PmemOutputStream(persistentMemoryWriter: PersistentMemoryHandler,
   var set_clean = true
   var is_closed = false
 
-  val length: Int = 1024 * 1024 * 6
+  val length: Int = bufferSize
   var bufferFlushedSize: Int = 0
   var bufferRemainingSize: Int = 0
   val buf: ByteBuf = NettyByteBufferPool.allocateNewBuffer(length)
