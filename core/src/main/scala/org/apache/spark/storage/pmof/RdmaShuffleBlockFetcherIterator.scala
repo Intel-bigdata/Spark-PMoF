@@ -25,7 +25,8 @@ import javax.annotation.concurrent.GuardedBy
 import org.apache.spark.internal.Logging
 import org.apache.spark.network.buffer.{FileSegmentManagedBuffer, ManagedBuffer}
 import org.apache.spark.network.pmof._
-import org.apache.spark.network.shuffle.{ShuffleClient, TempFileManager}
+import org.apache.spark.network.shuffle.{DownloadFile, DownloadFileManager, DownloadFileWritableChannel, ShuffleClient, SimpleDownloadFile}
+import org.apache.spark.network.util.TransportConf
 import org.apache.spark.shuffle.FetchFailedException
 import org.apache.spark.storage._
 import org.apache.spark.{SparkException, TaskContext}
@@ -70,7 +71,7 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
                                             maxBlocksInFlightPerAddress: Int,
                                             maxReqSizeShuffleToMem: Long,
                                             detectCorrupt: Boolean)
-  extends Iterator[(BlockId, InputStream)] with TempFileManager with Logging {
+  extends Iterator[(BlockId, InputStream)] with DownloadFileManager with Logging {
 
   import RdmaShuffleBlockFetcherIterator._
 
@@ -251,14 +252,16 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
     currentResult = null
   }
 
-  override def createTempFile(): File = {
-    blockManager.diskBlockManager.createTempLocalBlock()._2
+  override def createTempFile(transportConf: TransportConf): DownloadFile = {
+    val file = blockManager.diskBlockManager.createTempLocalBlock()._2
+    new SimpleDownloadFile(file, transportConf)
   }
 
-  override def registerTempFileToClean(file: File): Boolean = synchronized {
+  override def registerTempFileToClean(downloadFile: DownloadFile): Boolean = synchronized {
     if (isZombie) {
       false
     } else {
+      val file = new File(downloadFile.path());
       shuffleFilesSet += file
       true
     }
