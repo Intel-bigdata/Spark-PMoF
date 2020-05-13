@@ -64,7 +64,7 @@ private[spark]
 final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
                                             shuffleClient: ShuffleClient,
                                             blockManager: BlockManager,
-                                            blocksByAddress: Seq[(BlockManagerId, Seq[(BlockId, Long)])],
+                                            blocksByAddress: Iterator[(BlockManagerId, Seq[(BlockId, Long)])],
                                             streamWrapper: (BlockId, InputStream) => InputStream,
                                             maxBytesInFlight: Long,
                                             maxReqsInFlight: Int,
@@ -138,7 +138,7 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
     startFetch(remoteBlocksByAddress)
   }
 
-  def startFetch(remoteBlocksByAddress: Seq[(BlockManagerId, Seq[(BlockId, Long)])]): Unit = {
+  def startFetch(remoteBlocksByAddress: Iterator[(BlockManagerId, Seq[(BlockId, Long)])]): Unit = {
     for ((blockManagerId, blockInfos) <- remoteBlocksByAddress) {
       startFetchMetadata(blockManagerId, blockInfos.filter(_._2 != 0).map(_._1).toArray)
     }
