@@ -2,14 +2,22 @@ package org.apache.spark.storage.pmof
 
 import com.esotericsoftware.kryo.KryoException
 import org.apache.spark.SparkEnv
-import org.apache.spark.serializer.{DeserializationStream, Serializer, SerializerInstance, SerializerManager}
+import org.apache.spark.serializer.{
+  DeserializationStream,
+  Serializer,
+  SerializerInstance,
+  SerializerManager
+}
 import org.apache.spark.storage.BlockId
 
-class PmemBlockInputStream[K, C](pmemBlockOutputStream: PmemBlockOutputStream, serializer: Serializer) {
+class PmemBlockInputStream[K, C](
+    pmemBlockOutputStream: PmemBlockOutputStream,
+    serializer: Serializer) {
   val blockId: BlockId = pmemBlockOutputStream.getBlockId()
   val serializerManager: SerializerManager = SparkEnv.get.serializerManager
   val serInstance: SerializerInstance = serializer.newInstance()
-  val persistentMemoryWriter: PersistentMemoryHandler = PersistentMemoryHandler.getPersistentMemoryHandler
+  val persistentMemoryWriter: PersistentMemoryHandler =
+    PersistentMemoryHandler.getPersistentMemoryHandler
   var pmemInputStream: PmemInputStream = new PmemInputStream(persistentMemoryWriter, blockId.name)
   val wrappedStream = serializerManager.wrapStream(blockId, pmemInputStream)
   var inObjStream: DeserializationStream = serInstance.deserializeStream(wrappedStream)
@@ -30,7 +38,7 @@ class PmemBlockInputStream[K, C](pmemBlockOutputStream: PmemBlockOutputStream, s
       close()
       return null
     }
-    try{
+    try {
       val k = inObjStream.readObject().asInstanceOf[K]
       val c = inObjStream.readObject().asInstanceOf[C]
       indexInBatch += 1
@@ -39,8 +47,7 @@ class PmemBlockInputStream[K, C](pmemBlockOutputStream: PmemBlockOutputStream, s
       }
       (k, c)
     } catch {
-      case ex: KryoException => {
-      }
+      case ex: KryoException => {}
         sys.exit(0)
     }
   }

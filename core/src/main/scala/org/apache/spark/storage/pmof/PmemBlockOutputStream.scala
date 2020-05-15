@@ -119,10 +119,29 @@ private[spark] class PmemBlockOutputStream(
     spilled
   }
 
+  def getPartitionBlockInfo(res_array: Array[Long]): Array[(Long, Int, Int)] = {
+    var i = -3
+    var blockInfo = Array.ofDim[(Long, Int)]((res_array.length)/3)
+    blockInfo.map{
+      x => i += 3;
+      (res_array(i), res_array(i+1).toInt, res_array(i+2).toInt)
+    }
+  }
+
   def getPartitionMeta(): Array[(Long, Int, Int)] = {
     if (partitionMeta == null) {
       var i = -1
-      partitionMeta = persistentMemoryWriter.getPartitionBlockInfo(blockId.name).map { x => i += 1; (x._1, x._2, recordsArray(i)) }
+      partitionMeta = if (!pmofConf.enableRemotePmem) {
+        persistentMemoryWriter.getPartitionBlockInfo(blockId.name).map ( x => {
+          i += 1
+          (x._1, x._2, getRkey().toInt) 
+        })
+      } else {
+        getPartitionBlockInfo(remotePersistentMemoryPool.getMeta(blockId.name)).map( x => {
+          i += 1
+          (x._1, x._2, x._3) 
+        })
+      }
     }
     partitionMeta
   }

@@ -4,9 +4,10 @@ import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 
 import com.intel.hpnl.core.{Connection, EqService}
+import org.apache.spark.internal.Logging
 import org.apache.spark.shuffle.pmof.PmofShuffleManager
 
-class Client(clientFactory: ClientFactory, val shuffleManager: PmofShuffleManager, con: Connection) {
+class Client(clientFactory: ClientFactory, val shuffleManager: PmofShuffleManager, con: Connection) extends Logging {
   final val outstandingReceiveFetches: ConcurrentHashMap[Long, ReceivedCallback] =
     new ConcurrentHashMap[Long, ReceivedCallback]()
   final val outstandingReadFetches: ConcurrentHashMap[Int, ReadCallback] =

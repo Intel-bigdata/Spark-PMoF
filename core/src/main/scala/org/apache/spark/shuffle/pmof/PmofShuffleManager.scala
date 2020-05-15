@@ -16,7 +16,7 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
   }
 
   private[this] val numMapsForShuffle = new ConcurrentHashMap[Int, Int]()
-  private[this] val pmofConf = new PmofConf(conf)
+  private[this] val pmofConf = PmofConf.getConf(conf)
   var metadataResolver: MetadataResolver = _
 
   override def registerShuffle[K, V, C](shuffleId: Int, numMaps: Int, dependency: ShuffleDependency[K, V, C]): ShuffleHandle = {

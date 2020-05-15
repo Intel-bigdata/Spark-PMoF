@@ -65,6 +65,7 @@ private[spark] class PmemShuffleWriter[K, V, C](shuffleBlockResolver: PmemShuffl
   * while by using pmdk, we can do that once since pmdk supports transaction.
   */
   override def write(records: Iterator[Product2[K, V]]): Unit = {
+    logInfo(" write start")
     val PmemBlockOutputStreamArray = (0 until numPartitions).toArray.map(partitionId =>
       new PmemBlockOutputStream(
         context.taskMetrics(),
@@ -109,9 +110,17 @@ private[spark] class PmemShuffleWriter[K, V, C](shuffleBlockResolver: PmemShuffl
     val pmemBlockInfoMap = mutable.HashMap.empty[Int, Array[(Long, Int)]]
     var output_str : String = ""
 
+    logInfo(" write getPartitionMeta")
+    var rKey: Int = 0
     for (i <- spillPartitionArray) {
       if (pmofConf.enableRdma) {
-        pmemBlockInfoMap(i) = PmemBlockOutputStreamArray(i).getPartitionMeta().map { info => (info._1, info._2) }
+        pmemBlockInfoMap(i) = PmemBlockOutputStreamArray(i).getPartitionMeta().map (info => {
+          if (rKey == 0) {
+            rKey = info._3
+          }
+          //logInfo(s"${ShuffleBlockId(stageId, mapId, i)} [${rKey}]${info._1}:${info._2}")
+          (info._1, info._2)
+        })
       }
       partitionLengths(i) = PmemBlockOutputStreamArray(i).size
       output_str += "\tPartition " + i + ": " + partitionLengths(i) + ", records: " + PmemBlockOutputStreamArray(i).records + "\n"
@@ -121,17 +130,22 @@ private[spark] class PmemShuffleWriter[K, V, C](shuffleBlockResolver: PmemShuffl
       PmemBlockOutputStreamArray(i).close()
     }
 
+    logInfo(s" update to metadataResolver, rdma is ${pmofConf.enableRdma}")
     val shuffleServerId = blockManager.shuffleServerId
-    if (pmofConf.enableRdma) {
-      val rkey = PmemBlockOutputStreamArray(0).getRkey()
-      metadataResolver.pushPmemBlockInfo(stageId, mapId, pmemBlockInfoMap, rkey)
-      val blockManagerId: BlockManagerId =
+    if (!pmofConf.enableRdma) {
+      mapStatus = MapStatus(shuffleServerId, partitionLengths)
+    } else {
+      metadataResolver.pushPmemBlockInfo(stageId, mapId, pmemBlockInfoMap, rKey)
+      val blockManagerId: BlockManagerId = if (pmofConf.enableRemotePmem) {
+        BlockManagerId(shuffleServerId.executorId, RemotePersistentMemoryPool.getHost,
+          RemotePersistentMemoryPool.getPort, shuffleServerId.topologyInfo)
+      } else {
         BlockManagerId(shuffleServerId.executorId, PmofTransferService.shuffleNodesMap(shuffleServerId.host),
           PmofTransferService.getTransferServiceInstance(pmofConf, blockManager).port, shuffleServerId.topologyInfo)
+      }
       mapStatus = MapStatus(blockManagerId, partitionLengths)
-    } else {
-      mapStatus = MapStatus(shuffleServerId, partitionLengths)
     }
+    logInfo(s" write done")
   }
 
   /** Close this writer, passing along whether the map completed */

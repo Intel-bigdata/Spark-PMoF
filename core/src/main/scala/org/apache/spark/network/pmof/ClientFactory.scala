@@ -5,10 +5,11 @@ import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 
 import com.intel.hpnl.core._
+import org.apache.spark.internal.Logging
 import org.apache.spark.shuffle.pmof.PmofShuffleManager
 import org.apache.spark.util.configuration.pmof.PmofConf
 
-class ClientFactory(pmofConf: PmofConf) {
+class ClientFactory(pmofConf: PmofConf) extends Logging {
   final val eqService = new EqService(pmofConf.clientWorkerNums, pmofConf.clientBufferNums, false).init()
   private[this] final val cqService = new CqService(eqService).init()
   private[this] final val clientMap = new ConcurrentHashMap[InetSocketAddress, Client]()
@@ -28,6 +29,7 @@ class ClientFactory(pmofConf: PmofConf) {
     var client = clientMap.get(socketAddress)
     if (client == null) {
       ClientFactory.this.synchronized {
+        logInfo(s"createClient target is ${address}:${port}")
         client = clientMap.get(socketAddress)
         if (client == null) {
           val con = eqService.connect(address, port.toString, 0)

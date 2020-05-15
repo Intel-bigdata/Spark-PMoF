@@ -29,6 +29,7 @@ private[spark] class RdmaShuffleReader[K, C](handle: BaseShuffleHandle[K, _, C],
   private[this] val dep = handle.dependency
   private[this] val serializerInstance: SerializerInstance = dep.serializer.newInstance()
   private[this] val enable_pmem: Boolean = SparkEnv.get.conf.getBoolean("spark.shuffle.pmof.enable_pmem", defaultValue = true)
+  private[this] val enable_rpmp: Boolean = SparkEnv.get.conf.getBoolean("spark.shuffle.pmof.enable_remote_pmem", defaultValue = true)
 
   /** Read the combined key-values for this reduce task */
   override def read(): Iterator[Product2[K, C]] = {
@@ -86,7 +87,7 @@ private[spark] class RdmaShuffleReader[K, C](handle: BaseShuffleHandle[K, _, C],
     // Sort the output if there is a sort ordering defined.
     dep.keyOrdering match {
       case Some(keyOrd: Ordering[K]) =>
-        if (enable_pmem) {
+        if (enable_pmem && !enable_rpmp) {
           val sorter = new PmemExternalSorter[K, C, C](context, handle, pmofConf, ordering = Some(keyOrd), serializer = dep.serializer)
           sorter.insertAll(aggregatedIter)
           CompletionIterator[Product2[K, C], Iterator[Product2[K, C]]](sorter.iterator, sorter.stop())
