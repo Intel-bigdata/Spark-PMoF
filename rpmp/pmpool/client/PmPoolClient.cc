@@ -19,12 +19,16 @@ PmPoolClient::PmPoolClient(const string &remote_address,
   tx_finished = true;
   op_finished = false;
   networkClient_ = make_shared<NetworkClient>(remote_address, remote_port);
-  requestHandler_ = make_shared<RequestHandler>(networkClient_.get());
+  requestHandler_ = make_shared<RequestHandler>(networkClient_);
 }
 
-PmPoolClient::~PmPoolClient() {}
+PmPoolClient::~PmPoolClient() { requestHandler_->stop(); }
 
-int PmPoolClient::init() { return networkClient_->init(requestHandler_.get()); }
+int PmPoolClient::init() {
+  auto res = networkClient_->init(requestHandler_);
+  requestHandler_->start();
+  return res;
+}
 
 void PmPoolClient::begin_tx() {
   std::unique_lock<std::mutex> lk(tx_mtx);
@@ -39,10 +43,9 @@ uint64_t PmPoolClient::alloc(uint64_t size) {
   rc.type = ALLOC;
   rc.rid = rid_++;
   rc.size = size;
-  Request request(rc);
-  requestHandler_->addTask(&request);
-  requestHandler_->wait();
-  return requestHandler_->get().address;
+  auto request = std::make_shared<Request>(rc);
+  requestHandler_->addTask(request);
+  return requestHandler_->get(request)->address;
 }
 
 int PmPoolClient::free(uint64_t address) {
@@ -50,10 +53,9 @@ int PmPoolClient::free(uint64_t address) {
   rc.type = FREE;
   rc.rid = rid_++;
   rc.address = address;
-  Request request(rc);
-  requestHandler_->addTask(&request);
-  requestHandler_->wait();
-  return requestHandler_->get().success;
+  auto request = std::make_shared<Request>(rc);
+  requestHandler_->addTask(request);
+  return requestHandler_->get(request)->success;
 }
 
 void PmPoolClient::shutdown() { networkClient_->shutdown(); }
@@ -69,10 +71,9 @@ int PmPoolClient::write(uint64_t address, const char *data, uint64_t size) {
   // allocate memory for RMA read from client.
   rc.src_address = networkClient_->get_dram_buffer(data, rc.size);
   rc.src_rkey = networkClient_->get_rkey();
-  Request request(rc);
-  requestHandler_->addTask(&request);
-  requestHandler_->wait();
-  auto res = requestHandler_->get().success;
+  auto request = std::make_shared<Request>(rc);
+  requestHandler_->addTask(request);
+  auto res = requestHandler_->get(request)->success;
   networkClient_->reclaim_dram_buffer(rc.src_address, rc.size);
   return res;
 }
@@ -86,10 +87,9 @@ uint64_t PmPoolClient::write(const char *data, uint64_t size) {
   // allocate memory for RMA read from client.
   rc.src_address = networkClient_->get_dram_buffer(data, rc.size);
   rc.src_rkey = networkClient_->get_rkey();
-  Request request(rc);
-  requestHandler_->addTask(&request);
-  requestHandler_->wait();
-  auto res = requestHandler_->get().address;
+  auto request = std::make_shared<Request>(rc);
+  requestHandler_->addTask(request);
+  auto res = requestHandler_->get(request)->address;
   networkClient_->reclaim_dram_buffer(rc.src_address, rc.size);
   return res;
 }
@@ -103,10 +103,9 @@ int PmPoolClient::read(uint64_t address, char *data, uint64_t size) {
   // allocate memory for RMA read from client.
   rc.src_address = networkClient_->get_dram_buffer(nullptr, rc.size);
   rc.src_rkey = networkClient_->get_rkey();
-  Request request(rc);
-  requestHandler_->addTask(&request);
-  requestHandler_->wait();
-  auto res = requestHandler_->get().success;
+  auto request = std::make_shared<Request>(rc);
+  requestHandler_->addTask(request);
+  auto res = requestHandler_->get(request)->success;
   if (!res) {
     memcpy(data, reinterpret_cast<char *>(rc.src_address), size);
   }
@@ -124,9 +123,9 @@ int PmPoolClient::read(uint64_t address, char *data, uint64_t size,
   // allocate memory for RMA read from client.
   rc.src_address = networkClient_->get_dram_buffer(nullptr, rc.size);
   rc.src_rkey = networkClient_->get_rkey();
-  Request request(rc);
-  requestHandler_->addTask(&request, [&] {
-    auto res = requestHandler_->get().success;
+  auto request = std::make_shared<Request>(rc);
+  requestHandler_->addTask(request, [&] {
+    auto res = requestHandler_->get(request)->success;
     if (res) {
       memcpy(data, reinterpret_cast<char *>(rc.src_address), size);
     }
@@ -154,16 +153,26 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
   // allocate memory for RMA read from client.
   rc.src_address = networkClient_->get_dram_buffer(value, rc.size);
   rc.src_rkey = networkClient_->get_rkey();
+#ifdef DEBUG
+  std::cout << "[PmPoolClient::put] " << rc.src_rkey << "-" << rc.src_address
+            << ":" << rc.size << std::endl;
+#endif
   rc.key = key_uint;
-  Request request(rc);
-  requestHandler_->addTask(&request);
-  requestHandler_->wait();
-  auto address = requestHandler_->get().address;
-  networkClient_->reclaim_dram_buffer(rc.src_address, rc.size);
-  return address;
+  auto request = std::make_shared<Request>(rc);
+  requestHandler_->addTask(request);
+  auto rrc = requestHandler_->get(request);
+  if (rrc->type == PUT_REPLY) {
+    networkClient_->reclaim_dram_buffer(rc.src_address, rc.size);
+    return rrc->address;
+  } else {
+    std::string err_msg =
+        "PUT function got " + std::to_string(rrc->type) + " msg.";
+    std::cerr << err_msg << std::endl;
+    throw;
+  }
 }
 
-vector<block_meta> PmPoolClient::get(const string &key) {
+vector<block_meta> PmPoolClient::getMeta(const string &key) {
   uint64_t key_uint;
   Digest::computeKeyHash(key, &key_uint);
   RequestContext rc = {};
@@ -171,11 +180,17 @@ vector<block_meta> PmPoolClient::get(const string &key) {
   rc.rid = rid_++;
   rc.address = 0;
   rc.key = key_uint;
-  Request request(rc);
-  requestHandler_->addTask(&request);
-  requestHandler_->wait();
-  auto bml = requestHandler_->get().bml;
-  return bml;
+  auto request = std::make_shared<Request>(rc);
+  requestHandler_->addTask(request);
+  auto rrc = requestHandler_->get(request);
+  if (rrc->type == GET_META_REPLY) {
+    return rrc->bml;
+  } else {
+    std::string err_msg =
+        "GetMeta function got " + std::to_string(rrc->type) + " msg.";
+    std::cerr << err_msg << std::endl;
+    throw;
+  }
 }
 
 int PmPoolClient::del(const string &key) {
@@ -185,9 +200,8 @@ int PmPoolClient::del(const string &key) {
   rc.type = DELETE;
   rc.rid = rid_++;
   rc.key = key_uint;
-  Request request(rc);
-  requestHandler_->addTask(&request);
-  requestHandler_->wait();
-  auto res = requestHandler_->get().success;
+  auto request = std::make_shared<Request>(rc);
+  requestHandler_->addTask(request);
+  auto res = requestHandler_->get(request)->success;
   return res;
 }

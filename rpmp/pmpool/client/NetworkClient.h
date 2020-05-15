@@ -22,11 +22,11 @@
 #include <unordered_map>
 #include <utility>
 
-#include "../Event.h"
-#include "../RmaBufferRegister.h"
-#include "../ThreadWrapper.h"
-#include "../queue/blockingconcurrentqueue.h"
-#include "../queue/concurrentqueue.h"
+#include "pmpool/Event.h"
+#include "pmpool/RmaBufferRegister.h"
+#include "pmpool/ThreadWrapper.h"
+#include "pmpool/queue/blockingconcurrentqueue.h"
+#include "pmpool/queue/concurrentqueue.h"
 
 using moodycamel::BlockingConcurrentQueue;
 using std::atomic;
@@ -48,31 +48,45 @@ class ChunkMgr;
 typedef promise<RequestReplyContext> Promise;
 typedef future<RequestReplyContext> Future;
 
-class RequestHandler {
+class RequestHandler : public ThreadWrapper {
  public:
-  explicit RequestHandler(NetworkClient *networkClient);
+  explicit RequestHandler(std::shared_ptr<NetworkClient> networkClient);
   ~RequestHandler() = default;
-  void addTask(Request *request);
-  void addTask(Request *request, std::function<void()> func);
-  void notify(RequestReply *requestReply);
-  void wait();
-  RequestReplyContext &get();
+  void addTask(std::shared_ptr<Request> request);
+  void addTask(std::shared_ptr<Request> request, std::function<void()> func);
+  int entry() override;
+  void abort() override {}
+  void notify(std::shared_ptr<RequestReply> requestReply);
+  std::shared_ptr<RequestReplyContext> get(std::shared_ptr<Request> request);
 
  private:
-  void handleRequest(Request *request);
-
- private:
-  NetworkClient *networkClient_;
-  BlockingConcurrentQueue<Request *> pendingRequestQueue_;
-  std::mutex h_mtx;
+  std::shared_ptr<NetworkClient> networkClient_;
+  BlockingConcurrentQueue<std::shared_ptr<Request>> pendingRequestQueue_;
   unordered_map<uint64_t, std::function<void()>> callback_map;
   uint64_t total_num = 0;
   uint64_t begin = 0;
   uint64_t end = 0;
   uint64_t time = 0;
-  bool op_finished = false;
-  std::condition_variable cv;
-  RequestReplyContext requestReplyContext;
+  struct InflightRequestContext {
+    std::mutex mtx_reply;
+    std::condition_variable cv_reply;
+    std::condition_variable cv_returned;
+    std::mutex mtx_returned;
+    bool op_finished = false;
+    bool op_returned = false;
+  };
+  std::unordered_map<std::shared_ptr<Request>,
+                     std::shared_ptr<InflightRequestContext>>
+      inflight_;
+  std::mutex inflight_mtx_;
+  std::shared_ptr<RequestReplyContext> requestReplyContext;
+  std::shared_ptr<Request> currentRequest;
+  long expectedReturnType;
+
+  std::shared_ptr<InflightRequestContext> inflight_insert_or_get(
+      std::shared_ptr<Request>);
+  void inflight_erase(std::shared_ptr<Request> request);
+  void handleRequest(std::shared_ptr<Request> request);
 };
 
 class ClientShutdownCallback : public Callback {
@@ -84,23 +98,25 @@ class ClientShutdownCallback : public Callback {
 
 class ClientConnectedCallback : public Callback {
  public:
-  explicit ClientConnectedCallback(NetworkClient *networkClient);
+  explicit ClientConnectedCallback(
+      std::shared_ptr<NetworkClient> networkClient);
   ~ClientConnectedCallback() = default;
   void operator()(void *param_1, void *param_2);
 
  private:
-  NetworkClient *networkClient_;
+  std::shared_ptr<NetworkClient> networkClient_;
 };
 
 class ClientRecvCallback : public Callback {
  public:
-  ClientRecvCallback(ChunkMgr *chunkMgr, RequestHandler *requestHandler);
+  ClientRecvCallback(std::shared_ptr<ChunkMgr> chunkMgr,
+                     std::shared_ptr<RequestHandler> requestHandler);
   ~ClientRecvCallback() = default;
   void operator()(void *param_1, void *param_2);
 
  private:
-  ChunkMgr *chunkMgr_;
-  RequestHandler *requestHandler_;
+  std::shared_ptr<ChunkMgr> chunkMgr_;
+  std::shared_ptr<RequestHandler> requestHandler_;
   uint64_t count_ = 0;
   uint64_t time = 0;
   uint64_t start = 0;
@@ -110,7 +126,8 @@ class ClientRecvCallback : public Callback {
 
 class ClientSendCallback : public Callback {
  public:
-  explicit ClientSendCallback(ChunkMgr *chunkMgr) : chunkMgr_(chunkMgr) {}
+  explicit ClientSendCallback(std::shared_ptr<ChunkMgr> chunkMgr)
+      : chunkMgr_(chunkMgr) {}
   ~ClientSendCallback() = default;
   void operator()(void *param_1, void *param_2) {
     auto buffer_id_ = *static_cast<int *>(param_1);
@@ -119,10 +136,11 @@ class ClientSendCallback : public Callback {
   }
 
  private:
-  ChunkMgr *chunkMgr_;
+  std::shared_ptr<ChunkMgr> chunkMgr_;
 };
 
-class NetworkClient : public RmaBufferRegister {
+class NetworkClient : public RmaBufferRegister,
+                      public std::enable_shared_from_this<NetworkClient> {
  public:
   friend ClientConnectedCallback;
   NetworkClient() = delete;
@@ -131,7 +149,7 @@ class NetworkClient : public RmaBufferRegister {
                 int worker_num, int buffer_num_per_con, int buffer_size,
                 int init_buffer_num);
   ~NetworkClient();
-  int init(RequestHandler *requesthandler);
+  int init(std::shared_ptr<RequestHandler> requesthandler);
   void shutdown();
   void wait();
   Chunk *register_rma_buffer(char *rma_buffer, uint64_t size) override;
@@ -141,7 +159,7 @@ class NetworkClient : public RmaBufferRegister {
   uint64_t get_rkey();
   void connected(Connection *con);
   void send(char *data, uint64_t size);
-  void read(Request *request);
+  void read(std::shared_ptr<Request> request);
 
  private:
   string remote_address_;
@@ -151,12 +169,12 @@ class NetworkClient : public RmaBufferRegister {
   int buffer_size_;
   int init_buffer_num_;
   Client *client_;
-  ChunkMgr *chunkMgr_;
+  std::shared_ptr<ChunkMgr> chunkMgr_;
   Connection *con_;
-  ClientShutdownCallback *shutdownCallback;
-  ClientConnectedCallback *connectedCallback;
-  ClientRecvCallback *recvCallback;
-  ClientSendCallback *sendCallback;
+  std::shared_ptr<ClientShutdownCallback> shutdownCallback;
+  std::shared_ptr<ClientConnectedCallback> connectedCallback;
+  std::shared_ptr<ClientRecvCallback> recvCallback;
+  std::shared_ptr<ClientSendCallback> sendCallback;
   mutex con_mtx;
   bool connected_;
   condition_variable con_v;
