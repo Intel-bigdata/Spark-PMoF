@@ -68,7 +68,7 @@ struct RequestReplyContext {
   uint64_t key;
   Connection* con;
   Chunk* ck;
-  vector <block_meta> bml;
+  vector<block_meta> bml;
 };
 
 template <class T>
@@ -88,19 +88,20 @@ inline void decode_(T* t, char* data, uint64_t size) {
 class RequestReply {
  public:
   RequestReply() = delete;
-  explicit RequestReply(RequestReplyContext requestReplyContext);
+  explicit RequestReply(
+      std::shared_ptr<RequestReplyContext> requestReplyContext);
   RequestReply(char* data, uint64_t size, Connection* con);
   ~RequestReply();
-  RequestReplyContext& get_rrc();
+  std::shared_ptr<RequestReplyContext> get_rrc();
   void decode();
   void encode();
 
  private:
   friend Protocol;
-  char* data_;
-  uint64_t size_;
-  RequestReplyMsg requestReplyMsg_;
-  RequestReplyContext requestReplyContext_;
+  char* data_ = nullptr;
+  uint64_t size_ = 0;
+  // RequestReplyMsg requestReplyMsg_;
+  std::shared_ptr<RequestReplyContext> requestReplyContext_;
 };
 
 typedef promise<RequestReplyContext> Promise;
@@ -126,13 +127,16 @@ class Request {
   RequestContext& get_rc();
   void encode();
   void decode();
+  //#ifdef DEBUG
+  char* getData() { return data_; }
+  uint64_t getSize() { return size_; }
+  //#endif
 
  private:
   friend RequestHandler;
   friend ClientRecvCallback;
   char* data_;
   uint64_t size_;
-  RequestMsg requestMsg_;
   RequestContext requestContext_;
 };
 

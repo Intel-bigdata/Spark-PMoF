@@ -22,10 +22,10 @@
 #include <unordered_map>
 #include <vector>
 
-#include "Event.h"
-#include "ThreadWrapper.h"
-#include "queue/blockingconcurrentqueue.h"
-#include "queue/concurrentqueue.h"
+#include "pmpool/Event.h"
+#include "pmpool/ThreadWrapper.h"
+#include "pmpool/queue/blockingconcurrentqueue.h"
+#include "pmpool/queue/concurrentqueue.h"
 
 class Digest;
 class AllocatorProxy;
@@ -50,92 +50,98 @@ struct MessageHeader {
 class RecvCallback : public Callback {
  public:
   RecvCallback() = delete;
-  RecvCallback(Protocol *protocol, ChunkMgr *chunkMgr);
+  RecvCallback(std::shared_ptr<Protocol> protocol,
+               std::shared_ptr<ChunkMgr> chunkMgr);
   ~RecvCallback() override = default;
   void operator()(void *buffer_id, void *buffer_size) override;
 
  private:
-  Protocol *protocol_;
-  ChunkMgr *chunkMgr_;
+  std::shared_ptr<Protocol> protocol_;
+  std::shared_ptr<ChunkMgr> chunkMgr_;
 };
 
 class SendCallback : public Callback {
  public:
   SendCallback() = delete;
-  explicit SendCallback(ChunkMgr *chunkMgr);
+  explicit SendCallback(
+      std::shared_ptr<ChunkMgr> chunkMgr,
+      std::unordered_map<uint64_t, std::shared_ptr<RequestReply>> rrcMap);
   ~SendCallback() override = default;
   void operator()(void *buffer_id, void *buffer_size) override;
 
  private:
-  ChunkMgr *chunkMgr_;
+  std::shared_ptr<ChunkMgr> chunkMgr_;
+  std::unordered_map<uint64_t, std::shared_ptr<RequestReply>> rrcMap_;
 };
 
 class ReadCallback : public Callback {
  public:
   ReadCallback() = delete;
-  explicit ReadCallback(Protocol *protocol);
+  explicit ReadCallback(std::shared_ptr<Protocol> protocol);
   ~ReadCallback() override = default;
   void operator()(void *buffer_id, void *buffer_size) override;
 
  private:
-  Protocol *protocol_;
+  std::shared_ptr<Protocol> protocol_;
 };
 
 class WriteCallback : public Callback {
  public:
   WriteCallback() = delete;
-  explicit WriteCallback(Protocol *protocol);
+  explicit WriteCallback(std::shared_ptr<Protocol> protocol);
   ~WriteCallback() override = default;
   void operator()(void *buffer_id, void *buffer_size) override;
 
  private:
-  Protocol *protocol_;
+  std::shared_ptr<Protocol> protocol_;
 };
 
 class RecvWorker : public ThreadWrapper {
  public:
   RecvWorker() = delete;
-  RecvWorker(Protocol *protocol, int index);
+  RecvWorker(std::shared_ptr<Protocol> protocol, int index);
   ~RecvWorker() override = default;
   int entry() override;
   void abort() override;
-  void addTask(Request *request);
+  void addTask(std::shared_ptr<Request> request);
 
  private:
-  Protocol *protocol_;
+  std::shared_ptr<Protocol> protocol_;
   int index_;
   bool init;
-  BlockingConcurrentQueue<Request *> pendingRecvRequestQueue_;
+  BlockingConcurrentQueue<std::shared_ptr<Request>> pendingRecvRequestQueue_;
 };
 
 class ReadWorker : public ThreadWrapper {
  public:
   ReadWorker() = delete;
-  ReadWorker(Protocol *protocol, int index);
+  ReadWorker(std::shared_ptr<Protocol> protocol, int index);
   ~ReadWorker() override = default;
   int entry() override;
   void abort() override;
-  void addTask(RequestReply *requestReply);
+  void addTask(std::shared_ptr<RequestReply> requestReply);
 
  private:
-  Protocol *protocol_;
+  std::shared_ptr<Protocol> protocol_;
   int index_;
   bool init;
-  BlockingConcurrentQueue<RequestReply *> pendingReadRequestQueue_;
+  BlockingConcurrentQueue<std::shared_ptr<RequestReply>>
+      pendingReadRequestQueue_;
 };
 
 class FinalizeWorker : public ThreadWrapper {
  public:
   FinalizeWorker() = delete;
-  explicit FinalizeWorker(Protocol *protocol);
+  explicit FinalizeWorker(std::shared_ptr<Protocol> protocol);
   ~FinalizeWorker() override = default;
   int entry() override;
   void abort() override;
-  void addTask(RequestReply *requestReply);
+  void addTask(std::shared_ptr<RequestReply> requestReply);
 
  private:
-  Protocol *protocol_;
-  BlockingConcurrentQueue<RequestReply *> pendingRequestReplyQueue_;
+  std::shared_ptr<Protocol> protocol_;
+  BlockingConcurrentQueue<std::shared_ptr<RequestReply>>
+      pendingRequestReplyQueue_;
 };
 
 /**
@@ -146,34 +152,35 @@ class FinalizeWorker : public ThreadWrapper {
  * finalize queue-> to handle finalization event.
  * rma queue-> to handle remote memory access event.
  */
-class Protocol {
+class Protocol : public std::enable_shared_from_this<Protocol> {
  public:
   Protocol() = delete;
-  Protocol(Config *config, Log *log, NetworkServer *server,
-           AllocatorProxy *allocatorProxy);
+  Protocol(std::shared_ptr<Config> config, std::shared_ptr<Log> log,
+           std::shared_ptr<NetworkServer> server,
+           std::shared_ptr<AllocatorProxy> allocatorProxy);
   ~Protocol();
   int init();
 
   friend class RecvCallback;
   friend class RecvWorker;
 
-  void enqueue_recv_msg(Request *request);
-  void handle_recv_msg(Request *request);
+  void enqueue_recv_msg(std::shared_ptr<Request> request);
+  void handle_recv_msg(std::shared_ptr<Request> request);
 
-  void enqueue_finalize_msg(RequestReply *requestReply);
-  void handle_finalize_msg(RequestReply *requestReply);
+  void enqueue_finalize_msg(std::shared_ptr<RequestReply> requestReply);
+  void handle_finalize_msg(std::shared_ptr<RequestReply> requestReply);
 
   void enqueue_rma_msg(uint64_t buffer_id);
-  void handle_rma_msg(RequestReply *requestReply);
+  void handle_rma_msg(std::shared_ptr<RequestReply> requestReply);
 
  public:
-  Config *config_;
-  Log *log_;
+  std::shared_ptr<Config> config_;
+  std::shared_ptr<Log> log_;
   uint64_t num_requests_ = 0;
 
  private:
-  NetworkServer *networkServer_;
-  AllocatorProxy *allocatorProxy_;
+  std::shared_ptr<NetworkServer> networkServer_;
+  std::shared_ptr<AllocatorProxy> allocatorProxy_;
 
   std::shared_ptr<RecvCallback> recvCallback_;
   std::shared_ptr<SendCallback> sendCallback_;
@@ -188,8 +195,9 @@ class Protocol {
   std::vector<std::shared_ptr<ReadWorker>> readWorkers_;
 
   std::mutex rrcMtx_;
-  std::unordered_map<uint64_t, RequestReply *> rrcMap_;
+  std::unordered_map<uint64_t, std::shared_ptr<RequestReply>> rrcMap_;
   uint64_t time;
+  long address = 0;
 };
 
 #endif  // PMPOOL_PROTOCOL_H_

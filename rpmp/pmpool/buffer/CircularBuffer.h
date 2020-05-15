@@ -25,9 +25,9 @@
 #include <mutex>  // NOLINT
 #include <vector>
 
-#include "../Common.h"
-#include "../NetworkServer.h"
-#include "../RmaBufferRegister.h"
+#include "pmpool/Common.h"
+#include "pmpool/NetworkServer.h"
+#include "pmpool/RmaBufferRegister.h"
 
 #define p2align(x, a) (((x) + (a)-1) & ~((a)-1))
 
@@ -36,12 +36,24 @@ class CircularBuffer {
   CircularBuffer() = delete;
   CircularBuffer(const CircularBuffer &) = delete;
   CircularBuffer(uint64_t buffer_size, uint32_t buffer_num,
-                 bool is_server = false, RmaBufferRegister *rbr = nullptr)
+                 bool is_server = false)
       : buffer_size_(buffer_size),
         buffer_num_(buffer_num),
-        rbr_(rbr),
         read_(0),
         write_(0) {
+    init();
+  }
+  CircularBuffer(uint64_t buffer_size, uint32_t buffer_num, bool is_server,
+                 std::shared_ptr<RmaBufferRegister> rbr)
+      : rbr_(rbr),
+        buffer_size_(buffer_size),
+        buffer_num_(buffer_num),
+        read_(0),
+        write_(0) {
+    init();
+  }
+
+  void init() {
     uint64_t total = buffer_num_ * buffer_size_;
     buffer_ = static_cast<char *>(mmap(0, buffer_num_ * buffer_size_,
                                        PROT_READ | PROT_WRITE,
@@ -57,16 +69,21 @@ class CircularBuffer {
 
     if (rbr_) {
       ck_ = rbr_->register_rma_buffer(buffer_, buffer_num_ * buffer_size_);
+      printf("[CircularBuffer::Register_RMA_Buffer] range is %ld - %ld\n",
+             (uint64_t)buffer_,
+             (uint64_t)(buffer_ + buffer_num_ * buffer_size_));
     }
 
-    for (int i = 0; i < buffer_num; i++) {
+    for (int i = 0; i < buffer_num_; i++) {
       bits.push_back(0);
     }
   }
+
   ~CircularBuffer() {
     munmap(buffer_, buffer_num_ * buffer_size_);
     buffer_ = nullptr;
   }
+
   char *get(uint64_t bytes) {
     uint64_t offset = 0;
     bool res = get(bytes, &offset);
@@ -75,6 +92,7 @@ class CircularBuffer {
     }
     return buffer_ + offset * buffer_size_;
   }
+
   void put(const char *data, uint64_t bytes) {
     assert((data - buffer_) % buffer_size_ == 0);
     uint64_t offset = (data - buffer_) / buffer_size_;
@@ -203,7 +221,7 @@ class CircularBuffer {
   char *tmp_;
   uint64_t buffer_size_;
   uint64_t buffer_num_;
-  RmaBufferRegister *rbr_;
+  std::shared_ptr<RmaBufferRegister> rbr_;
   Chunk *ck_;
   std::vector<uint16_t> bits;
   uint64_t read_;

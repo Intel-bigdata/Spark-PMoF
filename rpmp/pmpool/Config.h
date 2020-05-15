@@ -68,10 +68,10 @@ class Config {
       pool_paths_.push_back("/dev/dax0.1");
       pool_paths_.push_back("/dev/dax1.0");
       pool_paths_.push_back("/dev/dax1.1");
-      sizes_.push_back(126833655808L);
-      sizes_.push_back(126833655808L);
-      sizes_.push_back(126833655808L);
-      sizes_.push_back(126833655808L);
+      sizes_.push_back(253669408768L);
+      sizes_.push_back(253669408768L);
+      sizes_.push_back(253669408768L);
+      sizes_.push_back(253669408768L);
       affinities_.push_back(2);
       affinities_.push_back(41);
       affinities_.push_back(22);

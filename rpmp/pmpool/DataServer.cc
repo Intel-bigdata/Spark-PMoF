@@ -9,14 +9,15 @@
 
 #include "pmpool/DataServer.h"
 
-#include "AllocatorProxy.h"
-#include "Config.h"
-#include "Digest.h"
-#include "NetworkServer.h"
-#include "Protocol.h"
-#include "Log.h"
+#include "pmpool/AllocatorProxy.h"
+#include "pmpool/Config.h"
+#include "pmpool/Digest.h"
+#include "pmpool/Log.h"
+#include "pmpool/NetworkServer.h"
+#include "pmpool/Protocol.h"
 
-DataServer::DataServer(Config *config, Log *log) : config_(config), log_(log) {}
+DataServer::DataServer(std::shared_ptr<Config> config, std::shared_ptr<Log> log)
+    : config_(config), log_(log) {}
 
 int DataServer::init() {
   networkServer_ = std::make_shared<NetworkServer>(config_, log_);
@@ -24,12 +25,12 @@ int DataServer::init() {
   log_->get_file_log()->info("network server initialized.");
 
   allocatorProxy_ =
-      std::make_shared<AllocatorProxy>(config_, log_, networkServer_.get());
+      std::make_shared<AllocatorProxy>(config_, log_, networkServer_);
   CHK_ERR("allocator proxy init", allocatorProxy_->init());
   log_->get_file_log()->info("allocator proxy initialized.");
 
-  protocol_ = std::make_shared<Protocol>(config_, log_, networkServer_.get(),
-                                         allocatorProxy_.get());
+  protocol_ = std::make_shared<Protocol>(config_, log_, networkServer_,
+                                         allocatorProxy_);
   CHK_ERR("protocol init", protocol_->init());
   log_->get_file_log()->info("protocol initialized.");
 

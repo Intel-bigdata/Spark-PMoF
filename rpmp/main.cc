@@ -28,7 +28,7 @@ int ServerMain(int argc, char **argv) {
   std::shared_ptr<Log> log = std::make_shared<Log>(config.get());
   /// initialize DataServer class
   std::shared_ptr<DataServer> dataServer =
-      std::make_shared<DataServer>(config.get(), log.get());
+      std::make_shared<DataServer>(config, log);
   log->get_file_log()->info("start to initialize data server.");
   CHK_ERR("data server init", dataServer->init());
   log->get_file_log()->info("data server initailized.");
