@@ -51,9 +51,10 @@ typedef future<RequestReplyContext> Future;
 class RequestHandler : public ThreadWrapper {
  public:
   explicit RequestHandler(std::shared_ptr<NetworkClient> networkClient);
-  ~RequestHandler() = default;
+  ~RequestHandler();
   void addTask(std::shared_ptr<Request> request);
   void addTask(std::shared_ptr<Request> request, std::function<void()> func);
+  void reset();
   int entry() override;
   void abort() override {}
   void notify(std::shared_ptr<RequestReply> requestReply);
@@ -160,6 +161,8 @@ class NetworkClient : public RmaBufferRegister,
   void connected(Connection *con);
   void send(char *data, uint64_t size);
   void read(std::shared_ptr<Request> request);
+  std::shared_ptr<ChunkMgr> get_chunkMgr();
+  void reset();
 
  private:
   string remote_address_;
@@ -168,7 +171,7 @@ class NetworkClient : public RmaBufferRegister,
   int buffer_num_per_con_;
   int buffer_size_;
   int init_buffer_num_;
-  Client *client_;
+  std::shared_ptr<Client> client_;
   std::shared_ptr<ChunkMgr> chunkMgr_;
   Connection *con_;
   std::shared_ptr<ClientShutdownCallback> shutdownCallback;

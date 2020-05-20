@@ -23,13 +23,14 @@ int count = 0;
 std::mutex mtx;
 std::vector<std::string> keys;
 char str[1048576];
+int numReqs = 2048;
 
 void func1(std::shared_ptr<PmPoolClient> client) {
   while (true) {
     std::unique_lock<std::mutex> lk(mtx);
     uint64_t count_ = count++;
     lk.unlock();
-    if (count_ < 20480) {
+    if (count_ < numReqs) {
       char str_read[1048576];
       client->begin_tx();
       client->put(keys[count_], str, 1048576);
@@ -93,8 +94,9 @@ int main(int argc, char** argv) {
   uint64_t end = timestamp_now();
   std::cout << "pmemkv put test: 1048576 "
             << " bytes test, consumes " << (end - start) / 1000.0
-            << "s, throughput is " << 20480 / ((end - start) / 1000.0) << "MB/s"
-            << std::endl;
+            << "s, throughput is " << numReqs / ((end - start) / 1000.0)
+            << "MB/s" << std::endl;
+  client.reset();
   /*for (int i = 0; i < 20480; i++) {
     client->begin_tx();
     client->del(keys[i]);

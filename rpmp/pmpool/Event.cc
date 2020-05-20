@@ -21,6 +21,7 @@ Request::Request(char *data, uint64_t size, Connection *con) : size_(size) {
 }
 
 Request::~Request() {
+  const std::lock_guard<std::mutex> lock(data_lock_);
   if (data_ != nullptr) {
     std::free(data_);
     data_ = nullptr;
@@ -30,6 +31,7 @@ Request::~Request() {
 RequestContext &Request::get_rc() { return requestContext_; }
 
 void Request::encode() {
+  const std::lock_guard<std::mutex> lock(data_lock_);
   OpType rt = requestContext_.type;
   assert(rt == ALLOC || rt == FREE || rt == WRITE || rt == READ);
   size_ = sizeof(RequestMsg);
@@ -45,6 +47,7 @@ void Request::encode() {
 }
 
 void Request::decode() {
+  const std::lock_guard<std::mutex> lock(data_lock_);
   assert(size_ == sizeof(RequestMsg));
   RequestMsg *requestMsg = (RequestMsg *)data_;
   requestContext_.type = (OpType)requestMsg->type;
@@ -69,6 +72,7 @@ RequestReply::RequestReply(char *data, uint64_t size, Connection *con)
 }
 
 RequestReply::~RequestReply() {
+  const std::lock_guard<std::mutex> lock(data_lock_);
   if (data_ != nullptr) {
     std::free(data_);
     data_ = nullptr;
@@ -80,6 +84,7 @@ std::shared_ptr<RequestReplyContext> RequestReply::get_rrc() {
 }
 
 void RequestReply::encode() {
+  const std::lock_guard<std::mutex> lock(data_lock_);
   RequestReplyMsg requestReplyMsg;
   requestReplyMsg.type = (OpType)requestReplyContext_->type;
   requestReplyMsg.success = requestReplyContext_->success;
@@ -104,6 +109,7 @@ void RequestReply::encode() {
 }
 
 void RequestReply::decode() {
+  const std::lock_guard<std::mutex> lock(data_lock_);
   // memcpy(&requestReplyMsg_, data_, size_);
   if (data_ == nullptr) {
     std::string err_msg = "Decode with null data";

@@ -97,6 +97,7 @@ class RequestReply {
   void encode();
 
  private:
+  std::mutex data_lock_;
   friend Protocol;
   char* data_ = nullptr;
   uint64_t size_ = 0;
@@ -133,6 +134,7 @@ class Request {
   //#endif
 
  private:
+  std::mutex data_lock_;
   friend RequestHandler;
   friend ClientRecvCallback;
   char* data_;

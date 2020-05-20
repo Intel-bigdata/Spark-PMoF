@@ -25,6 +25,24 @@ uint64_t timestamp_now() {
 RequestHandler::RequestHandler(std::shared_ptr<NetworkClient> networkClient)
     : networkClient_(networkClient) {}
 
+RequestHandler::~RequestHandler() {
+#ifdef DEBUG
+  std::cout << "RequestHandler destructed" << std::endl;
+#endif
+}
+
+void RequestHandler::reset() {
+  this->stop();
+  this->join();
+  networkClient_.reset();
+#ifdef DEBUG
+  std::cout << "Callback map is "
+            << (callback_map.empty() ? "empty" : "not empty") << std::endl;
+  std::cout << "inflight map is " << (inflight_.empty() ? "empty" : "not empty")
+            << std::endl;
+#endif
+}
+
 void RequestHandler::addTask(std::shared_ptr<Request> request) {
   pendingRequestQueue_.enqueue(request);
 }
@@ -87,7 +105,7 @@ void RequestHandler::notify(std::shared_ptr<RequestReply> requestReply) {
     std::cout << err_msg << std::endl;
     return;
   }
-  requestReplyContext = rrc;
+  requestReplyContext = std::move(rrc);
   if (callback_map.count(requestReplyContext->rid) != 0) {
     callback_map[requestReplyContext->rid]();
     callback_map.erase(requestReplyContext->rid);
@@ -246,15 +264,19 @@ NetworkClient::NetworkClient(const string &remote_address,
       init_buffer_num_(init_buffer_num),
       connected_(false) {}
 
-NetworkClient::~NetworkClient() {}
+NetworkClient::~NetworkClient() {
+#ifdef DUBUG
+  std::cout << "NetworkClient destructed" << std::endl;
+#endif
+}
 
 int NetworkClient::init(std::shared_ptr<RequestHandler> requestHandler) {
-  client_ = new Client(worker_num_, buffer_num_per_con_);
+  client_ = std::make_shared<Client>(worker_num_, buffer_num_per_con_);
   if ((client_->init()) != 0) {
     return -1;
   }
-  chunkMgr_ =
-      std::make_shared<ChunkPool>(client_, buffer_size_, init_buffer_num_);
+  chunkMgr_ = std::make_shared<ChunkPool>(client_.get(), buffer_size_,
+                                          init_buffer_num_);
 
   client_->set_chunk_mgr(chunkMgr_.get());
 
@@ -285,6 +307,24 @@ int NetworkClient::init(std::shared_ptr<RequestHandler> requestHandler) {
 void NetworkClient::shutdown() { client_->shutdown(); }
 
 void NetworkClient::wait() { client_->wait(); }
+
+void NetworkClient::reset() {
+  circularBuffer_.reset();
+  shutdownCallback.reset();
+  connectedCallback.reset();
+  recvCallback.reset();
+  sendCallback.reset();
+  chunkMgr_.reset();
+  if (con_ != nullptr) {
+    con_->shutdown();
+  }
+  if (client_) {
+    client_->shutdown();
+    client_.reset();
+  }
+}
+
+std::shared_ptr<ChunkMgr> NetworkClient::get_chunkMgr() { return chunkMgr_; }
 
 Chunk *NetworkClient::register_rma_buffer(char *rma_buffer, uint64_t size) {
   return client_->reg_rma_buffer(rma_buffer, size, buffer_id_++);

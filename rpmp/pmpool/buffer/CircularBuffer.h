@@ -69,9 +69,11 @@ class CircularBuffer {
 
     if (rbr_) {
       ck_ = rbr_->register_rma_buffer(buffer_, buffer_num_ * buffer_size_);
+#ifdef DEBUG
       printf("[CircularBuffer::Register_RMA_Buffer] range is %ld - %ld\n",
              (uint64_t)buffer_,
              (uint64_t)(buffer_ + buffer_num_ * buffer_size_));
+#endif
     }
 
     for (int i = 0; i < buffer_num_; i++) {
@@ -80,8 +82,14 @@ class CircularBuffer {
   }
 
   ~CircularBuffer() {
+    if (ck_ != nullptr) {
+      rbr_->unregister_rma_buffer(ck_->buffer_id);
+    }
     munmap(buffer_, buffer_num_ * buffer_size_);
     buffer_ = nullptr;
+#ifdef DEBUG
+    std::cout << "CircularBuffer destructed" << std::endl;
+#endif
   }
 
   char *get(uint64_t bytes) {
@@ -222,7 +230,7 @@ class CircularBuffer {
   uint64_t buffer_size_;
   uint64_t buffer_num_;
   std::shared_ptr<RmaBufferRegister> rbr_;
-  Chunk *ck_;
+  Chunk *ck_ = nullptr;
   std::vector<uint16_t> bits;
   uint64_t read_;
   uint64_t write_;

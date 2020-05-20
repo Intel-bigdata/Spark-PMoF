@@ -22,7 +22,14 @@ PmPoolClient::PmPoolClient(const string &remote_address,
   requestHandler_ = make_shared<RequestHandler>(networkClient_);
 }
 
-PmPoolClient::~PmPoolClient() { requestHandler_->stop(); }
+PmPoolClient::~PmPoolClient() {
+  requestHandler_->reset();
+  networkClient_->reset();
+
+#ifdef DEBUG
+  std::cout << "PmPoolClient destructed" << std::endl;
+#endif
+}
 
 int PmPoolClient::init() {
   auto res = networkClient_->init(requestHandler_);

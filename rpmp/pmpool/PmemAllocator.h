@@ -306,6 +306,7 @@ class PmemObjAllocator : public Allocator {
                                  err_msg);
       return -1;
     }
+
     pmemContext_.poid = pmemobj_root(pmemContext_.pop, sizeof(struct Base));
     pmemContext_.base = (struct Base *)pmemobj_direct(pmemContext_.poid);
     pmemContext_.base->head = OID_NULL;
@@ -319,8 +320,8 @@ class PmemObjAllocator : public Allocator {
       auto addr = reinterpret_cast<char *>(pmemContext_.pop);
       log_->get_console_log()->info(
           "successfully registered Persistent Memory(" + diskInfo_->path +
-              ") as RDMA region, range is {0} - {1}",
-          (uint64_t)addr, (uint64_t)(addr + diskInfo_->size));
+              ") as RDMA region, size is {0}",
+          diskInfo_->size);
     }
     return 0;
   }
@@ -389,6 +390,7 @@ class PmemObjAllocator : public Allocator {
   std::mutex mtx;
   unordered_map<uint64_t, PMEMoid> index_map;
   uint64_t total = 0;
+  uint64_t disk_size = 0;
   char str[1048576];
   Chunk *base_ck;
 };
