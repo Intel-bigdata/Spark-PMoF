@@ -18,3 +18,6 @@ target_link_libraries(remote_read pmpool_client_jni)
 
 add_executable(remote_put remote_put.cc)
 target_link_libraries(remote_put pmpool_client_jni)
+
+add_executable(put_and_read put_and_read.cc)
+target_link_libraries(put_and_read pmpool_client_jni)

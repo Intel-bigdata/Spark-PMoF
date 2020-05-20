@@ -87,7 +87,7 @@ std::shared_ptr<RequestReplyContext> RequestHandler::get(
   unique_lock<mutex> lk(ctx->mtx_reply);
   while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx] { return ctx->op_finished; })) {
   }
-  auto res = requestReplyContext;
+  auto res = std::move(requestReplyContext);
   ctx->op_returned = true;
   ctx->cv_returned.notify_one();
   return res;
@@ -314,7 +314,6 @@ void NetworkClient::reset() {
   connectedCallback.reset();
   recvCallback.reset();
   sendCallback.reset();
-  chunkMgr_.reset();
   if (con_ != nullptr) {
     con_->shutdown();
   }

@@ -44,8 +44,10 @@ class Config {
           "set network buffer number")("network_worker,nw",
                                        value<int>()->default_value(1),
                                        "set network wroker number")(
-          "paths,ps", value<vector<string>>(), "set memory pool path")(
-          "sizes,ss", value<vector<uint64_t>>(), "set memory pool size")(
+          "paths,ps", value<vector<string>>()->multitoken(),
+          "set memory pool path")("sizes,ss",
+                                  value<vector<uint64_t>>()->multitoken(),
+                                  "set memory pool size")(
           "log,l", value<string>()->default_value("/tmp/rpmp.log"),
           "set rpmp log file path")("log_level,ll",
                                     value<string>()->default_value("warn"),
@@ -75,7 +77,7 @@ class Config {
         if (sizes_.size() < pool_paths_.size() && !sizes_.empty()) {
           auto first = sizes_[0];
           sizes_.resize(pool_paths_.size(), first);
-        } else if (sizes_.size() < pool_paths_.size()) {
+        } else if (sizes_.size() > pool_paths_.size()) {
           sizes_.resize(pool_paths_.size());
         } else {
           throw 1;
