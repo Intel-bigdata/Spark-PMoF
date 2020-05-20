@@ -12,10 +12,9 @@ public class RemotePersistentMemoryPool {
     pmPoolClient = new PmPoolClient(remote_address, remote_port);
   }
 
-  public static RemotePersistentMemoryPool getInstance(String remote_address, String remote_port)
-      throws IOException {
-    if (instance == null) {
-      synchronized (RemotePersistentMemoryPool.class) {
+  public static RemotePersistentMemoryPool getInstance(String remote_address, String remote_port) throws IOException {
+    synchronized (RemotePersistentMemoryPool.class) {
+      if (instance == null) {
         if (instance == null) {
           remote_host = remote_address;
           remote_port_str = remote_port;
@@ -24,6 +23,15 @@ public class RemotePersistentMemoryPool {
       }
     }
     return instance;
+  }
+
+  public static int close() {
+    synchronized (RemotePersistentMemoryPool.class) {
+      if (instance != null)
+        return instance.dispose();
+      else
+        return 0;
+    }
   }
 
   public static String getHost() {
@@ -48,6 +56,11 @@ public class RemotePersistentMemoryPool {
 
   public int del(String key) throws IOException {
     return pmPoolClient.del(key);
+  }
+
+  public int dispose() {
+    pmPoolClient.dispose();
+    return 0;
   }
 
   private static PmPoolClient pmPoolClient;

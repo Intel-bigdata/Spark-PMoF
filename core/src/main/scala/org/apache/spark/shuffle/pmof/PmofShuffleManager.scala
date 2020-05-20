@@ -19,19 +19,29 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
   private[this] val pmofConf = PmofConf.getConf(conf)
   var metadataResolver: MetadataResolver = _
 
-  override def registerShuffle[K, V, C](shuffleId: Int, numMaps: Int, dependency: ShuffleDependency[K, V, C]): ShuffleHandle = {
+  override def registerShuffle[K, V, C](
+      shuffleId: Int,
+      numMaps: Int,
+      dependency: ShuffleDependency[K, V, C]): ShuffleHandle = {
     val env: SparkEnv = SparkEnv.get
 
     metadataResolver = MetadataResolver.getMetadataResolver(pmofConf)
 
     if (pmofConf.enableRdma) {
-      PmofTransferService.getTransferServiceInstance(pmofConf: PmofConf, env.blockManager, this, isDriver = true)
+      PmofTransferService.getTransferServiceInstance(
+        pmofConf: PmofConf,
+        env.blockManager,
+        this,
+        isDriver = true)
     }
 
     new BaseShuffleHandle(shuffleId, numMaps, dependency)
   }
 
-  override def getWriter[K, V](handle: ShuffleHandle, mapId: Int, context: TaskContext): ShuffleWriter[K, V] = {
+  override def getWriter[K, V](
+      handle: ShuffleHandle,
+      mapId: Int,
+      context: TaskContext): ShuffleWriter[K, V] = {
     assert(handle.isInstanceOf[BaseShuffleHandle[_, _, _]])
 
     val env: SparkEnv = SparkEnv.get
@@ -47,28 +57,61 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
     }
 
     if (pmofConf.enablePmem) {
-      new PmemShuffleWriter(shuffleBlockResolver.asInstanceOf[PmemShuffleBlockResolver], metadataResolver, blockManager, serializerManager, 
-        handle.asInstanceOf[BaseShuffleHandle[K, V, _]], mapId, context, env.conf, pmofConf)
+      new PmemShuffleWriter(
+        shuffleBlockResolver.asInstanceOf[PmemShuffleBlockResolver],
+        metadataResolver,
+        blockManager,
+        serializerManager,
+        handle.asInstanceOf[BaseShuffleHandle[K, V, _]],
+        mapId,
+        context,
+        env.conf,
+        pmofConf)
     } else {
-      new BaseShuffleWriter(shuffleBlockResolver.asInstanceOf[IndexShuffleBlockResolver], metadataResolver, blockManager, serializerManager, 
-        handle.asInstanceOf[BaseShuffleHandle[K, V, _]], mapId, context, pmofConf)
+      new BaseShuffleWriter(
+        shuffleBlockResolver.asInstanceOf[IndexShuffleBlockResolver],
+        metadataResolver,
+        blockManager,
+        serializerManager,
+        handle.asInstanceOf[BaseShuffleHandle[K, V, _]],
+        mapId,
+        context,
+        pmofConf)
     }
   }
 
-  override def getReader[K, C](handle: _root_.org.apache.spark.shuffle.ShuffleHandle, startPartition: Int, endPartition: Int, context: _root_.org.apache.spark.TaskContext): _root_.org.apache.spark.shuffle.ShuffleReader[K, C] = {
+  override def getReader[K, C](
+      handle: _root_.org.apache.spark.shuffle.ShuffleHandle,
+      startPartition: Int,
+      endPartition: Int,
+      context: _root_.org.apache.spark.TaskContext)
+      : _root_.org.apache.spark.shuffle.ShuffleReader[K, C] = {
+    val env: SparkEnv = SparkEnv.get
     if (pmofConf.enableRdma) {
-      new RdmaShuffleReader(handle.asInstanceOf[BaseShuffleHandle[K, _, C]],
-        startPartition, endPartition, context, pmofConf)
+      metadataResolver = MetadataResolver.getMetadataResolver(pmofConf)
+      PmofTransferService.getTransferServiceInstance(pmofConf, env.blockManager, this)
+      new RdmaShuffleReader(
+        handle.asInstanceOf[BaseShuffleHandle[K, _, C]],
+        startPartition,
+        endPartition,
+        context,
+        pmofConf)
     } else {
       new BaseShuffleReader(
-        handle.asInstanceOf[BaseShuffleHandle[K, _, C]], startPartition, endPartition, context, pmofConf)
+        handle.asInstanceOf[BaseShuffleHandle[K, _, C]],
+        startPartition,
+        endPartition,
+        context,
+        pmofConf)
     }
   }
 
   override def unregisterShuffle(shuffleId: Int): Boolean = {
     Option(numMapsForShuffle.remove(shuffleId)).foreach { numMaps =>
       (0 until numMaps).foreach { mapId =>
-        shuffleBlockResolver.asInstanceOf[IndexShuffleBlockResolver].removeDataByMap(shuffleId, mapId)
+        shuffleBlockResolver
+          .asInstanceOf[IndexShuffleBlockResolver]
+          .removeDataByMap(shuffleId, mapId)
       }
     }
     true
