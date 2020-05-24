@@ -19,20 +19,20 @@
     <dependencies>
         <dependency>
             <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_2.11</artifactId>
-            <version>2.3.0</version>
+            <artifactId>spark-core_2.12</artifactId>
+            <version>3.0.0-preview2</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
-            <artifactId>spark-network-common_2.11</artifactId>
-            <version>2.3.0</version>
+            <artifactId>spark-network-common_2.12</artifactId>
+            <version>3.0.0-preview2</version>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_2.11</artifactId>
-            <version>2.3.0</version>
-            <type>test-jar</type>
+            <artifactId>spark-core_2.12</artifactId>
+            <version>3.0.0-preview2</version>
+            <type>test-jar</type
             <scope>test</scope>
         </dependency>
         <dependency>
