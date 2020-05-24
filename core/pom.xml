@@ -32,7 +32,7 @@
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-core_2.12</artifactId>
             <version>3.0.0-preview2</version>
-            <type>test-jar</type
+            <type>test-jar</type>
             <scope>test</scope>
         </dependency>
         <dependency>
