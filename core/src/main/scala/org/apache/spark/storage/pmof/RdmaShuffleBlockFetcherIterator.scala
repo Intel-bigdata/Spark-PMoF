@@ -64,7 +64,7 @@ private[spark]
 final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
                                             blockStoreClient: BlockStoreClient,
                                             blockManager: BlockManager,
-                                            blocksByAddress: Iterator[(BlockManagerId, Seq[(BlockId, Long)])],
+                                            blocksByAddress: Iterator[(BlockManagerId, Seq[(BlockId, Long, Int)])],
                                             streamWrapper: (BlockId, InputStream) => InputStream,
                                             maxBytesInFlight: Long,
                                             maxReqsInFlight: Int,
@@ -125,7 +125,7 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
   initialize()
 
   def initialize(): Unit = {
-    context.addTaskCompletionListener(_ => cleanup())
+    context.addTaskCompletionListener[Unit](_ => cleanup())
 
     val remoteBlocksByAddress = blocksByAddress.filter(_._1.executorId != blockManager.blockManagerId.executorId)
     for ((address, blockInfos) <- blocksByAddress) {
@@ -138,7 +138,7 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
     startFetch(remoteBlocksByAddress)
   }
 
-  def startFetch(remoteBlocksByAddress: Seq[(BlockManagerId, Seq[(BlockId, Long)])]): Unit = {
+  def startFetch(remoteBlocksByAddress: Iterator[(BlockManagerId, Seq[(BlockId, Long, Int)])]): Unit = {
     for ((blockManagerId, blockInfos) <- remoteBlocksByAddress) {
       startFetchMetadata(blockManagerId, blockInfos.filter(_._2 != 0).map(_._1).toArray)
     }
@@ -195,7 +195,7 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
     while (iter.hasNext) {
       val blockId = iter.next()
       try {
-        val buf = blockManager.getBlockData(blockId)
+        val buf = blockManager.getLocalBlockData(blockId)
         shuffleMetrics.incLocalBlocksFetched(1)
         shuffleMetrics.incLocalBytesRead(buf.size)
         buf.retain()
@@ -405,7 +405,7 @@ final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
   private def throwFetchFailedException(blockId: BlockId, address: BlockManagerId, e: Throwable) = {
     blockId match {
       case ShuffleBlockId(shufId, mapId, reduceId) =>
-        throw new FetchFailedException(address, shufId.toInt, mapId.toInt, reduceId, e)
+        throw new FetchFailedException(address, shufId.toInt, mapId.toInt, reduceId, 0, "FetchFailedException", e)
       case _ =>
         throw new SparkException(
           "Failed to get block " + blockId + ", which is not a shuffle block", e)

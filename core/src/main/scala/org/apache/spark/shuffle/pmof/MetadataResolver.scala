@@ -174,7 +174,7 @@ class MetadataResolver(pmofConf: PmofConf) {
     byteBufferTmp.putInt(nums)
     for (i <- 0 until nums) {
       byteBufferTmp.putInt(blockIds(i).shuffleId)
-      byteBufferTmp.putInt(blockIds(i).mapId)
+      byteBufferTmp.putLong(blockIds(i).mapId)
       byteBufferTmp.putInt(blockIds(i).reduceId)
     }
     byteBufferTmp.flip()
