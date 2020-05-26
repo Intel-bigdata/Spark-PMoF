@@ -43,7 +43,7 @@ class MetadataResolver(pmofConf: PmofConf) {
     * @param dataAddressMap
     * @param rkey
     */
-  def pushPmemBlockInfo(shuffleId: Int, mapId: Int, dataAddressMap: mutable.HashMap[Int, Array[(Long, Int)]], rkey: Long): Unit = {
+  def pushPmemBlockInfo(shuffleId: Int, mapId: Long, dataAddressMap: mutable.HashMap[Int, Array[(Long, Int)]], rkey: Long): Unit = {
     val buffer: Array[Byte] = new Array[Byte](pmofConf.reduce_serializer_buffer_size.toInt)
     var output = new Output(buffer)
     val bufferArray = new ArrayBuffer[ByteBuffer]()
@@ -96,7 +96,7 @@ class MetadataResolver(pmofConf: PmofConf) {
     * @param mapId
     * @param partitionLengths
     */
-  def pushFileBlockInfo(shuffleId: Int, mapId: Int, partitionLengths: Array[Long]): Unit = {
+  def pushFileBlockInfo(shuffleId: Int, mapId: Long, partitionLengths: Array[Long]): Unit = {
     var offset: Long = 0L
     val file = blockManager.diskBlockManager.getFile(ShuffleDataBlockId(shuffleId, mapId, NOOP_REDUCE_ID))
     val channel: FileChannel = new RandomAccessFile(file, "rw").getChannel

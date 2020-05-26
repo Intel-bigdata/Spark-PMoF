@@ -64,7 +64,7 @@ private[spark]
 final class RdmaShuffleBlockFetcherIterator(context: TaskContext,
                                             blockStoreClient: BlockStoreClient,
                                             blockManager: BlockManager,
-                                            blocksByAddress: Seq[(BlockManagerId, Seq[(BlockId, Long)])],
+                                            blocksByAddress: Iterator[(BlockManagerId, Seq[(BlockId, Long)])],
                                             streamWrapper: (BlockId, InputStream) => InputStream,
                                             maxBytesInFlight: Long,
                                             maxReqsInFlight: Int,
