@@ -22,7 +22,7 @@ jobs:
       before_script:
       - cd /tmp
       #libfabric   
-      - git clone https://github.com/ofiwg/libfabric.git &&  cd libfabric && git checkout -b v1.8.0 tags/v1.8.0 && ./autogen.sh && ./configure --prefix=/usr/local --enable-sockets && make -j && make install
+      - git clone https://github.com/ofiwg/libfabric.git &&  cd libfabric && git checkout -b v1.8.0 tags/v1.8.0 && ./autogen.sh && ./configure --prefix=/opt/local --enable-sockets && make -j && make install
       #HPNL
       - cd /tmp
       - git clone https://github.com/Intel-bigdata/HPNL.git
