@@ -26,9 +26,8 @@ jobs:
       #HPNL
       - cd /tmp
       - git clone https://github.com/Intel-bigdata/HPNL.git
-      - export LD_LIBRARY_PATH=/opt/local/lib:$LD_LIBRARY_PATH
       - cd HPNL && git submodule update --init --recursive && mkdir build &&  cd build
-      - cmake -DWITH_VERBS=ON -DWITH_JAVA=ON ..
+      - cmake -DWITH_VERBS=ON -DWITH_JAVA=ON  -DLIBFABRIC_PREFIX=/opt/local ..
       - make -j && make install
       - cd ../java/hpnl
       - mvn install
