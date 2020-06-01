@@ -37,17 +37,17 @@ private[spark] class PmemShuffleWriter[K, V, C](shuffleBlockResolver: PmemShuffl
                                                 blockManager: BlockManager,
                                                 serializerManager: SerializerManager,
                                                 handle: BaseShuffleHandle[K, V, C],
-                                                mapId: Int,
+                                                mapId: Long,
                                                 context: TaskContext,
                                                 conf: SparkConf,
-                                                pmofConf: PmofConf)
+                                                pmofConf: PmofConf
+                                                )
   extends ShuffleWriter[K, V] with Logging {
   private[this] val dep = handle.dependency
   private[this] var mapStatus: MapStatus = _
   private[this] val stageId = dep.shuffleId
   private[this] val partitioner = dep.partitioner
   private[this] val numPartitions = partitioner.numPartitions
-  private[this] val numMaps = handle.numMaps
   private[this] val writeMetrics = context.taskMetrics().shuffleWriteMetrics
   private[this] val partitionLengths: Array[Long] = Array.fill[Long](numPartitions)(0)
   private[this] var sorter: PmemExternalSorter[K, V, _] = _
@@ -73,7 +73,6 @@ private[spark] class PmemShuffleWriter[K, V, C](shuffleBlockResolver: PmemShuffl
         dep.serializer,
         conf,
         pmofConf,
-        numMaps,
         numPartitions))
 
     if (dep.mapSideCombine) { // do aggregation
@@ -128,9 +127,9 @@ private[spark] class PmemShuffleWriter[K, V, C](shuffleBlockResolver: PmemShuffl
       val blockManagerId: BlockManagerId =
         BlockManagerId(shuffleServerId.executorId, PmofTransferService.shuffleNodesMap(shuffleServerId.host),
           PmofTransferService.getTransferServiceInstance(pmofConf, blockManager).port, shuffleServerId.topologyInfo)
-      mapStatus = MapStatus(blockManagerId, partitionLengths)
+      mapStatus = MapStatus(blockManagerId, partitionLengths, mapId)
     } else {
-      mapStatus = MapStatus(shuffleServerId, partitionLengths)
+      mapStatus = MapStatus(shuffleServerId, partitionLengths, mapId)
     }
   }
 
