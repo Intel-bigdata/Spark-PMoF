@@ -2,7 +2,8 @@ sudo: required
 dist: trusty
 language: generic
 jobs:
-  include:    
+  include:
+      
     - name: oap-Rpmem-shuffle
       dist: bionic
       jdk:
