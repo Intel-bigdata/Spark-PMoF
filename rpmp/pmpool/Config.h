@@ -17,12 +17,14 @@
 
 #include <boost/program_options.hpp>
 
-using boost::program_options::error;
+using namespace boost::program_options;
+using namespace std;
+/*using boost::program_options::error;
 using boost::program_options::options_description;
 using boost::program_options::value;
 using boost::program_options::variables_map;
 using std::string;
-using std::vector;
+using std::vector;*/
 
 /**
  * @brief This class represents the current RPMP configuration.
@@ -48,13 +50,17 @@ class Config {
           "set memory pool path")("sizes,ss",
                                   value<vector<uint64_t>>()->multitoken(),
                                   "set memory pool size")(
+          "task_set, t", value<vector<int>>()->multitoken(),
+          "set affinity for each device")(
           "log,l", value<string>()->default_value("/tmp/rpmp.log"),
           "set rpmp log file path")("log_level,ll",
                                     value<string>()->default_value("warn"),
                                     "set log level");
 
+      command_line_parser parser{argc, argv};
+      parsed_options parsed_options = parser.options(desc).run();
       variables_map vm;
-      store(parse_command_line(argc, argv, desc), vm);
+      store(parsed_options, vm);
       notify(vm);
 
       if (vm.count("help")) {
@@ -72,6 +78,9 @@ class Config {
       }
       if (vm.count("paths")) {
         set_pool_paths(vm["paths"].as<vector<string>>());
+      } else {
+        std::cerr << "No input device!!" << std::endl;
+        throw;
       }
       if (pool_paths_.size() != sizes_.size()) {
         if (sizes_.size() < pool_paths_.size() && !sizes_.empty()) {
@@ -83,18 +92,11 @@ class Config {
           throw 1;
         }
       }
-      affinities_.resize(pool_paths_.size(), 0);
-      /*pool_paths_.push_back("/dev/dax0.1");
-      pool_paths_.push_back("/dev/dax1.0");
-      pool_paths_.push_back("/dev/dax1.1");
-      sizes_.push_back(0L);
-      sizes_.push_back(0L);
-      sizes_.push_back(0L);
-      sizes_.push_back(0L);
-      affinities_.push_back(2);
-      affinities_.push_back(41);
-      affinities_.push_back(22);
-      affinities_.push_back(60);*/
+      if (vm.count("task_set")) {
+        set_affinities_(vm["task_set"].as<vector<int>>());
+      } else {
+        affinities_.resize(pool_paths_.size(), -1);
+      }
       set_log_path(vm["log"].as<string>());
       set_log_level(vm["log_level"].as<string>());
     } catch (const error &ex) {
@@ -134,7 +136,18 @@ class Config {
 
   int get_pool_size() { return sizes_.size(); }
 
-  std::vector<uint64_t> get_affinities_() { return affinities_; }
+  void set_affinities_(vector<int> affinities) {
+    if (affinities.size() < pool_paths_.size()) {
+      affinities_.resize(pool_paths_.size(), -1);
+    } else {
+      for (int i = 0; i < pool_paths_.size(); i++) {
+        affinities_.push_back(affinities[i]);
+        std::cout << pool_paths_[i] << " task_set to " << affinities[i]
+                  << std::endl;
+      }
+    }
+  }
+  std::vector<int> get_affinities_() { return affinities_; }
 
   string get_log_path() { return log_path_; }
   void set_log_path(string log_path) { log_path_ = log_path; }
@@ -150,7 +163,7 @@ class Config {
   int network_worker_num_;
   vector<string> pool_paths_;
   vector<uint64_t> sizes_;
-  vector<uint64_t> affinities_;
+  vector<int> affinities_;
   string log_path_;
   string log_level_;
 };

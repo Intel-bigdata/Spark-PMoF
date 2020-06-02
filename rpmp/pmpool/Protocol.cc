@@ -82,7 +82,9 @@ RecvWorker::RecvWorker(std::shared_ptr<Protocol> protocol, int index)
 
 int RecvWorker::entry() {
   if (!init) {
-    // set_affinity(index_);
+    if (index_ != -1) {
+      set_affinity(index_);
+    }
     init = true;
   }
   std::shared_ptr<Request> request;
@@ -107,7 +109,9 @@ ReadWorker::ReadWorker(std::shared_ptr<Protocol> protocol, int index)
 
 int ReadWorker::entry() {
   if (!init) {
-    // set_affinity(index_);
+    if (index_ != -1) {
+      set_affinity(index_);
+    }
     init = true;
   }
   std::shared_ptr<RequestReply> requestReply;
@@ -324,17 +328,47 @@ void Protocol::handle_recv_msg(std::shared_ptr<Request> request) {
       networkServer_->get_dram_buffer(rrc);
       std::shared_ptr<RequestReply> requestReply =
           std::make_shared<RequestReply>(rrc);
-      /// bypass real workload to rpmp pool ///
-      /*requestReply->encode();
-      networkServer_->send(reinterpret_cast<char *>(requestReply->data_),
-                           requestReply->size_, rrc->con);*/
-      ////////////////////////////////////////////
       rrc->ck->ptr = requestReply.get();  // rrc->ck set by get_dram_buffer
 
       std::unique_lock<std::mutex> lk(rrcMtx_);
       rrcMap_[rrc->ck->buffer_id] = requestReply;
       lk.unlock();
       networkServer_->read(requestReply);
+      break;
+    }
+    case GET: {
+      rrc->type = GET_REPLY;
+      rrc->success = 0;
+      rrc->rid = rc.rid;
+      rrc->src_address = rc.src_address;
+      rrc->src_rkey = rc.src_rkey;
+      rrc->size = rc.size;
+      rrc->key = rc.key;
+      rrc->con = rc.con;
+      rrc->ck = nullptr;
+      auto bml = allocatorProxy_->get_cached_chunk(rrc->key);
+      uint64_t wrote_size = 0;
+      networkServer_->get_dram_buffer(rrc);
+      rrc->address = rrc->dest_address;
+      for (auto bm : bml) {
+        if ((wrote_size + bm.size) <= rrc->size) {
+          auto partition_data = reinterpret_cast<char *>(
+              allocatorProxy_->get_virtual_address(bm.address));
+          auto dest_address = reinterpret_cast<char *>(rrc->dest_address);
+          /*printf("[GET]key is %ld, rrc->size is %ld, bm.size is %ld\n",
+                 rrc->key, rrc->size, bm.size);*/
+          memcpy((dest_address + wrote_size), partition_data, bm.size);
+          wrote_size += bm.size;
+        }
+      }
+      rrc->size = wrote_size;
+      std::shared_ptr<RequestReply> requestReply =
+          std::make_shared<RequestReply>(rrc);
+      rrc->ck->ptr = requestReply.get();
+      std::unique_lock<std::mutex> lk(rrcMtx_);
+      rrcMap_[rrc->ck->buffer_id] = requestReply;
+      lk.unlock();
+      networkServer_->write(requestReply);
       break;
     }
     case GET_META: {
@@ -348,15 +382,6 @@ void Protocol::handle_recv_msg(std::shared_ptr<Request> request) {
       rrc->con = rc.con;
       std::shared_ptr<RequestReply> requestReply =
           std::make_shared<RequestReply>(rrc);
-      // rrc->ck->ptr = requestReply.get();
-      /// bypass real workload to rpmp pool ///
-      /*vector<block_meta> bml;
-      bml.push_back(block_meta(address, rc.size, networkServer_->get_rkey()));
-      requestReply->requestReplyContext_->bml = bml;
-      requestReply->encode();
-      networkServer_->send(reinterpret_cast<char *>(requestReply->data_),
-                           requestReply->size_, rrc->con);*/
-      //////////////////////////////////////////
       enqueue_finalize_msg(requestReply);
       break;
     }
@@ -395,6 +420,7 @@ void Protocol::handle_finalize_msg(std::shared_ptr<RequestReply> requestReply) {
       }
     }
     allocatorProxy_->del_chunk(rrc->key);
+  } else if (rrc->type == GET_REPLY) {
   } else {
   }
   requestReply->encode();
@@ -442,6 +468,10 @@ void Protocol::handle_rma_msg(std::shared_ptr<RequestReply> requestReply) {
 #endif
       rrc->address = allocatorProxy_->allocate_and_write(
           rrc->size, buffer, rrc->rid % config_->get_pool_size());
+      networkServer_->reclaim_dram_buffer(rrc);
+      break;
+    }
+    case GET_REPLY: {
       networkServer_->reclaim_dram_buffer(rrc);
       break;
     }

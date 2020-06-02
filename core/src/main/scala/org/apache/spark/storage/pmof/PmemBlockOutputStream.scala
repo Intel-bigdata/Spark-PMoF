@@ -29,15 +29,23 @@ object PmemBlockId {
 }
 
 private[spark] class PmemBlockOutputStream(
-                                            taskMetrics: TaskMetrics,
-                                            blockId: BlockId,
-                                            serializerManager: SerializerManager,
-                                            serializer: Serializer,
-                                            conf: SparkConf,
-                                            pmofConf: PmofConf,
-                                            numMaps: Int = 0,
-                                            numPartitions: Int = 1
-                                          ) extends DiskBlockObjectWriter(new File(Utils.getConfiguredLocalDirs(conf).toList(0) + "/null"), null, null, 0, true, null, null) with Logging {
+    taskMetrics: TaskMetrics,
+    blockId: BlockId,
+    serializerManager: SerializerManager,
+    serializer: Serializer,
+    conf: SparkConf,
+    pmofConf: PmofConf,
+    numMaps: Int = 0,
+    numPartitions: Int = 1)
+    extends DiskBlockObjectWriter(
+      new File(Utils.getConfiguredLocalDirs(conf).toList(0) + "/null"),
+      null,
+      null,
+      0,
+      true,
+      null,
+      null)
+    with Logging {
 
   var size: Int = 0
   var records: Int = 0
@@ -50,17 +58,27 @@ private[spark] class PmemBlockOutputStream(
   var remotePersistentMemoryPool: RemotePersistentMemoryPool = _
 
   if (!pmofConf.enableRemotePmem) {
-    persistentMemoryWriter = PersistentMemoryHandler.getPersistentMemoryHandler(pmofConf,
-      root_dir, pmofConf.path_list, blockId.name, pmofConf.maxPoolSize)
+    persistentMemoryWriter = PersistentMemoryHandler.getPersistentMemoryHandler(
+      pmofConf,
+      root_dir,
+      pmofConf.path_list,
+      blockId.name,
+      pmofConf.maxPoolSize)
   } else {
-    remotePersistentMemoryPool = RemotePersistentMemoryPool.getInstance(pmofConf.rpmpHost, pmofConf.rpmpPort)
+    remotePersistentMemoryPool =
+      RemotePersistentMemoryPool.getInstance(pmofConf.rpmpHost, pmofConf.rpmpPort)
   }
 
   //disable metadata updating by default
   //persistentMemoryWriter.updateShuffleMeta(blockId.name)
 
   val pmemOutputStream: PmemOutputStream = new PmemOutputStream(
-    persistentMemoryWriter, remotePersistentMemoryPool, numPartitions, blockId.name, numMaps, (pmofConf.spill_throttle.toInt + 1024))
+    persistentMemoryWriter,
+    remotePersistentMemoryPool,
+    numPartitions,
+    blockId.name,
+    numMaps,
+    (pmofConf.spill_throttle.toInt + 1024))
   val serInstance = serializer.newInstance()
   val bs = serializerManager.wrapStream(blockId, pmemOutputStream)
   var objStream: SerializationStream = serInstance.serializeStream(bs)
@@ -100,7 +118,7 @@ private[spark] class PmemBlockOutputStream(
       if (bufSize > 0) {
         recordsArray += recordsPerBlock
         recordsPerBlock = 0
-        size += bufSize
+        size = bufSize
 
         if (blockId.isShuffle == true) {
           val writeMetrics = taskMetrics.shuffleWriteMetrics
@@ -121,10 +139,10 @@ private[spark] class PmemBlockOutputStream(
 
   def getPartitionBlockInfo(res_array: Array[Long]): Array[(Long, Int, Int)] = {
     var i = -3
-    var blockInfo = Array.ofDim[(Long, Int)]((res_array.length)/3)
-    blockInfo.map{
-      x => i += 3;
-      (res_array(i), res_array(i+1).toInt, res_array(i+2).toInt)
+    var blockInfo = Array.ofDim[(Long, Int)]((res_array.length) / 3)
+    blockInfo.map { x =>
+      i += 3;
+      (res_array(i), res_array(i + 1).toInt, res_array(i + 2).toInt)
     }
   }
 
@@ -132,14 +150,16 @@ private[spark] class PmemBlockOutputStream(
     if (partitionMeta == null) {
       var i = -1
       partitionMeta = if (!pmofConf.enableRemotePmem) {
-        persistentMemoryWriter.getPartitionBlockInfo(blockId.name).map ( x => {
-          i += 1
-          (x._1, x._2, getRkey().toInt) 
-        })
+        persistentMemoryWriter
+          .getPartitionBlockInfo(blockId.name)
+          .map(x => {
+            i += 1
+            (x._1, x._2, getRkey().toInt)
+          })
       } else {
-        getPartitionBlockInfo(remotePersistentMemoryPool.getMeta(blockId.name)).map( x => {
+        getPartitionBlockInfo(remotePersistentMemoryPool.getMeta(blockId.name)).map(x => {
           i += 1
-          (x._1, x._2, x._3) 
+          (x._1, x._2, x._3)
         })
       }
     }

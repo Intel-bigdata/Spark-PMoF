@@ -18,8 +18,14 @@ import org.apache.spark.network.buffer.ManagedBuffer
 class NioManagedBuffer(bufSize: Int) extends ManagedBuffer {
   private val buf: ByteBuf = NettyByteBufferPool.allocateNewBuffer(bufSize)
   private val byteBuffer: ByteBuffer = buf.nioBuffer(0, bufSize)
-  private val nettyObj = Unpooled.wrappedBuffer(byteBuffer)
   private val refCount = new AtomicInteger(1)
+  private var in: InputStream = _
+  private var nettyObj: ByteBuf = _
+
+  def getByteBuf: ByteBuf = buf
+  def resize(size: Int): Unit = {
+    byteBuffer.limit(size)
+  }
 
   override def size: Long = {
     byteBuffer.remaining()
@@ -30,7 +36,9 @@ class NioManagedBuffer(bufSize: Int) extends ManagedBuffer {
   }
 
   override def createInputStream: InputStream = {
-    new ByteBufInputStream(nettyObj)
+    nettyObj = Unpooled.wrappedBuffer(byteBuffer)
+    in = new ByteBufInputStream(nettyObj)
+    in
   }
 
   override def retain: ManagedBuffer = {
@@ -40,12 +48,21 @@ class NioManagedBuffer(bufSize: Int) extends ManagedBuffer {
 
   override def release: ManagedBuffer = {
     if (refCount.decrementAndGet() == 0) {
+      if (in != null) {
+        in.close()
+      }
+      if (nettyObj != null) {
+        nettyObj.release()
+      }
       NettyByteBufferPool.releaseBuffer(buf)
     }
     return this
   }
 
   override def convertToNetty: Object = {
+    if (nettyObj == null) {
+      nettyObj = Unpooled.wrappedBuffer(byteBuffer)
+    }
     nettyObj
   }
 

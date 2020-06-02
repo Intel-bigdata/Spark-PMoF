@@ -167,16 +167,50 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
   rc.key = key_uint;
   auto request = std::make_shared<Request>(rc);
   requestHandler_->addTask(request);
-  auto rrc = requestHandler_->get(request);
-  if (rrc->type == PUT_REPLY) {
-    networkClient_->reclaim_dram_buffer(rc.src_address, rc.size);
-    return rrc->address;
-  } else {
-    std::string err_msg =
-        "PUT function got " + std::to_string(rrc->type) + " msg.";
-    std::cerr << err_msg << std::endl;
-    throw;
+  requestHandler_->wait(request);
+  networkClient_->reclaim_dram_buffer(rc.src_address, rc.size);
+#ifdef DEBUG
+  fprintf(stderr, "[PUT]key is %s, length is %ld, content is \n", key.c_str(),
+          size);
+  for (int i = 0; i < 100; i++) {
+    fprintf(stderr, "%X ", *(value + i));
   }
+  fprintf(stderr, " ...\n");
+#endif
+  return 0;
+}
+
+uint64_t PmPoolClient::get(const string &key, char *value, uint64_t size) {
+  uint64_t key_uint;
+  Digest::computeKeyHash(key, &key_uint);
+  RequestContext rc = {};
+  rc.type = GET;
+  rc.rid = rid_++;
+  rc.size = size;
+  rc.address = 0;
+  // allocate memory for RMA read from client.
+  rc.src_address = networkClient_->get_dram_buffer(nullptr, rc.size);
+  rc.src_rkey = networkClient_->get_rkey();
+#ifdef DEBUG
+  std::cout << "[PmPoolClient::get] " << rc.src_rkey << "-" << rc.src_address
+            << ":" << rc.size << std::endl;
+#endif
+  rc.key = key_uint;
+  auto request = std::make_shared<Request>(rc);
+  requestHandler_->addTask(request);
+  auto get_len = requestHandler_->wait(request);
+  memcpy(value, reinterpret_cast<char *>(rc.src_address), get_len);
+  networkClient_->reclaim_dram_buffer(rc.src_address, rc.size);
+
+#ifdef DEBUG
+  fprintf(stderr, "[GET]key is %s, length is %ld, content is \n", key.c_str(),
+          size);
+  for (int i = 0; i < 100; i++) {
+    fprintf(stderr, "%X ", *(value + i));
+  }
+  fprintf(stderr, " ...\n");
+#endif
+  return get_len;
 }
 
 vector<block_meta> PmPoolClient::getMeta(const string &key) {

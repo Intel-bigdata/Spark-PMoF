@@ -50,6 +50,10 @@ public class RemotePersistentMemoryPool {
     return pmPoolClient.put(key, data, size);
   }
 
+  public long get(String key, long size, ByteBuffer data) {
+    return pmPoolClient.get(key, size, data);
+  }
+
   public long[] getMeta(String key) {
     return pmPoolClient.getMeta(key);
   }

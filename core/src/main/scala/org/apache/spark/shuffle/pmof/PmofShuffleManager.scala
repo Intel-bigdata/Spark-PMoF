@@ -87,7 +87,15 @@ private[spark] class PmofShuffleManager(conf: SparkConf) extends ShuffleManager 
       context: _root_.org.apache.spark.TaskContext)
       : _root_.org.apache.spark.shuffle.ShuffleReader[K, C] = {
     val env: SparkEnv = SparkEnv.get
-    if (pmofConf.enableRdma) {
+    if (pmofConf.enableRemotePmem) {
+      new RpmpShuffleReader(
+        handle.asInstanceOf[BaseShuffleHandle[K, _, C]],
+        startPartition,
+        endPartition,
+        context,
+        pmofConf)
+
+    } else if (pmofConf.enableRdma) {
       metadataResolver = MetadataResolver.getMetadataResolver(pmofConf)
       PmofTransferService.getTransferServiceInstance(pmofConf, env.blockManager, this)
       new RdmaShuffleReader(

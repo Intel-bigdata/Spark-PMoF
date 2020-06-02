@@ -49,6 +49,10 @@ public class PmPoolClient {
     return nativePut(key, data, size, objectId);
   }
 
+  public long get(String key, long size, ByteBuffer data) {
+    return nativeGet(key, size, data, objectId);
+  }
+
   public long[] getMeta(String key) {
     long[] res = nativeGetMeta(key, objectId);
     if (res == null) {
@@ -112,6 +116,8 @@ public class PmPoolClient {
   private native long nativeAllocAndWriteWithByteBuffer(ByteBuffer data, long size, long objectId);
 
   private native long nativePut(String key, ByteBuffer data, long size, long objectId);
+
+  private native long nativeGet(String key, long size, ByteBuffer data, long objectId);
 
   private native long[] nativeGetMeta(String key, long objectId);
 

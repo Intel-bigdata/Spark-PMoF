@@ -141,6 +141,19 @@ JNIEXPORT jlong JNICALL Java_com_intel_rpmp_PmPoolClient_nativePut(
   return address;
 }
 
+JNIEXPORT jlong JNICALL Java_com_intel_rpmp_PmPoolClient_nativeGet(
+    JNIEnv *env, jobject obj, jstring key, jlong size, jobject data,
+    jlong objectId) {
+  char *raw_data = static_cast<char *>((*env).GetDirectBufferAddress(data));
+  const char *raw_key = env->GetStringUTFChars(key, 0);
+  auto client = GetClient(env, objectId);
+  client->begin_tx();
+  auto address = client->get(raw_key, raw_data, size);
+  client->end_tx();
+  env->ReleaseStringUTFChars(key, raw_key);
+  return address;
+}
+
 JNIEXPORT jlongArray JNICALL Java_com_intel_rpmp_PmPoolClient_nativeGetMeta(
     JNIEnv *env, jobject obj, jstring key, jlong objectId) {
   const char *raw_key = env->GetStringUTFChars(key, 0);

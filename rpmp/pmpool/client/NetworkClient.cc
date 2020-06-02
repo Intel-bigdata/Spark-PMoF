@@ -66,36 +66,77 @@ int RequestHandler::entry() {
 std::shared_ptr<RequestHandler::InflightRequestContext>
 RequestHandler::inflight_insert_or_get(std::shared_ptr<Request> request) {
   const std::lock_guard<std::mutex> lock(inflight_mtx_);
-  if (inflight_.find(request) == inflight_.end()) {
+  auto rid = request->requestContext_.rid;
+  if (inflight_.find(rid) == inflight_.end()) {
     auto ctx = std::make_shared<InflightRequestContext>();
-    inflight_.emplace(request, ctx);
+    inflight_.emplace(rid, ctx);
     return ctx;
   } else {
-    auto ctx = inflight_[request];
+    auto ctx = inflight_[rid];
     return ctx;
   }
 }
 
 void RequestHandler::inflight_erase(std::shared_ptr<Request> request) {
   const std::lock_guard<std::mutex> lock(inflight_mtx_);
-  inflight_.erase(request);
+  inflight_.erase(request->requestContext_.rid);
+}
+
+uint64_t RequestHandler::wait(std::shared_ptr<Request> request) {
+  auto ctx = inflight_insert_or_get(request);
+  unique_lock<mutex> lk(ctx->mtx_reply);
+  while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request] {
+    auto current = std::chrono::steady_clock::now();
+    auto elapse = current - ctx->start;
+    if (elapse > 30s) {  // tried 10s and found 8 process * 8 threads request
+                         // will still go timeout, need to fix
+      ctx->op_failed = true;
+      fprintf(stderr, "Request [TYPE %ld][Key %ld] spent %ld s, time out\n",
+              request->requestContext_.type, request->requestContext_.key,
+              std::chrono::duration_cast<std::chrono::seconds>(elapse).count());
+      return true;
+    }
+    return ctx->op_finished;
+  })) {
+  }
+  if (ctx->op_failed) {
+    throw;
+  }
+  auto res = ctx->requestReplyContext->size;
+  inflight_erase(request);
+  return res;
 }
 
 std::shared_ptr<RequestReplyContext> RequestHandler::get(
     std::shared_ptr<Request> request) {
   auto ctx = inflight_insert_or_get(request);
   unique_lock<mutex> lk(ctx->mtx_reply);
-  while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx] { return ctx->op_finished; })) {
+  while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request] {
+    auto current = std::chrono::steady_clock::now();
+    auto elapse = current - ctx->start;
+    if (elapse > 10s) {  // tried 10s and found 8 process * 8 threads request
+                         // will still go timeout, need to fix
+      ctx->op_failed = true;
+      fprintf(stderr, "Request [TYPE %ld] spent %ld s, time out\n",
+              request->requestContext_.type,
+              std::chrono::duration_cast<std::chrono::seconds>(elapse).count());
+      return true;
+    }
+    return ctx->op_finished;
+  })) {
   }
-  auto res = std::move(requestReplyContext);
-  ctx->op_returned = true;
-  ctx->cv_returned.notify_one();
+  auto res = std::move(ctx->requestReplyContext);
+  if (ctx->op_failed) {
+    throw;
+  }
+  inflight_erase(request);
   return res;
 }
 
 void RequestHandler::notify(std::shared_ptr<RequestReply> requestReply) {
   const std::lock_guard<std::mutex> lock(inflight_mtx_);
-  auto ctx = inflight_[currentRequest];
+  auto rid = requestReply->get_rrc()->rid;
+  auto ctx = inflight_[rid];
   ctx->op_finished = true;
   auto rrc = requestReply->get_rrc();
   if (expectedReturnType != rrc->type) {
@@ -105,10 +146,10 @@ void RequestHandler::notify(std::shared_ptr<RequestReply> requestReply) {
     std::cout << err_msg << std::endl;
     return;
   }
-  requestReplyContext = std::move(rrc);
-  if (callback_map.count(requestReplyContext->rid) != 0) {
-    callback_map[requestReplyContext->rid]();
-    callback_map.erase(requestReplyContext->rid);
+  ctx->requestReplyContext = std::move(rrc);
+  if (callback_map.count(ctx->requestReplyContext->rid) != 0) {
+    callback_map[ctx->requestReplyContext->rid]();
+    callback_map.erase(ctx->requestReplyContext->rid);
   } else {
     ctx->cv_reply.notify_one();
   }
@@ -116,7 +157,6 @@ void RequestHandler::notify(std::shared_ptr<RequestReply> requestReply) {
 
 void RequestHandler::handleRequest(std::shared_ptr<Request> request) {
   auto ctx = inflight_insert_or_get(request);
-  currentRequest = request;
   OpType rt = request->get_rc().type;
   switch (rt) {
     case ALLOC: {
@@ -154,6 +194,13 @@ void RequestHandler::handleRequest(std::shared_ptr<Request> request) {
                            request->size_);
       break;
     }
+    case GET: {
+      expectedReturnType = GET_REPLY;
+      request->encode();
+      networkClient_->send(reinterpret_cast<char *>(request->data_),
+                           request->size_);
+      break;
+    }
     case GET_META: {
       expectedReturnType = GET_META_REPLY;
       request->encode();
@@ -163,11 +210,6 @@ void RequestHandler::handleRequest(std::shared_ptr<Request> request) {
     }
     default: {}
   }
-  unique_lock<mutex> lk(ctx->mtx_returned);
-  while (
-      !ctx->cv_returned.wait_for(lk, 5ms, [ctx] { return ctx->op_returned; })) {
-  }
-  inflight_erase(request);
 }
 
 ClientConnectedCallback::ClientConnectedCallback(
@@ -236,6 +278,10 @@ void ClientRecvCallback::operator()(void *param_1, void *param_2) {
       break;
     }
     case PUT_REPLY: {
+      requestHandler_->notify(requestReply);
+      break;
+    }
+    case GET_REPLY: {
       requestHandler_->notify(requestReply);
       break;
     }

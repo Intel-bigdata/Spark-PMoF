@@ -80,6 +80,7 @@ class PmPoolClient {
 
   /// key-value storage interface
   uint64_t put(const string &key, const char *value, uint64_t size);
+  uint64_t get(const string &key, char *value, uint64_t size);
   vector<block_meta> getMeta(const string &key);
   int del(const string &key);
 

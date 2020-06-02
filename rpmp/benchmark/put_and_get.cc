@@ -26,42 +26,43 @@ bool comp(char* str, char* str_read, uint64_t size) {
   auto res = memcmp(str, str_read, size);
   if (res != 0) {
     fprintf(stderr,
-            "strcmp is %d, read res is not aligned with wrote. readed "
+            "** strcmp is %d, read res is not aligned with wrote. **\nreaded "
             "content is \n",
             res);
-    for (int i = 0; i < size; i++) {
+    for (int i = 0; i < 100; i++) {
       fprintf(stderr, "%X ", *(str_read + i));
     }
-    fprintf(stderr, "\n wrote content is \n");
-    for (int i = 0; i < size; i++) {
+    fprintf(stderr, " ...\nwrote content is \n");
+    for (int i = 0; i < 100; i++) {
       fprintf(stderr, "%X ", *(str + i));
     }
-    fprintf(stderr, "\n");
+    fprintf(stderr, " ...\n");
   }
   return res == 0;
 }
 
-void get(std::vector<block_meta> addresses,
-         std::shared_ptr<PmPoolClient> client) {
-  for (auto bm : addresses) {
+void get(int map_id, int start, int end, std::shared_ptr<PmPoolClient> client) {
+  int count = start;
+  while (count < end) {
+    std::string key =
+        "block_" + std::to_string(map_id) + "_" + std::to_string(count++);
     char str_read[1048576];
-    client->read(bm.address, str_read, bm.size);
-    comp(str, str_read, bm.size);
+    client->begin_tx();
+    client->get(key, str_read, 1048576);
+    client->end_tx();
+    if (comp(str, str_read, 1048576) == false) {
+      throw;
+    }
   }
 }
 
-void put(int map_id, int start, int end, std::shared_ptr<PmPoolClient> client,
-         std::vector<block_meta>* addresses) {
+void put(int map_id, int start, int end, std::shared_ptr<PmPoolClient> client) {
   int count = start;
   while (count < end) {
     std::string key =
         "block_" + std::to_string(map_id) + "_" + std::to_string(count++);
     client->begin_tx();
     client->put(key, str, 1048576);
-    auto res = client->getMeta(key);
-    for (auto bm : res) {
-      (*addresses).push_back(bm);
-    }
     client->end_tx();
   }
 }
@@ -97,13 +98,11 @@ int main(int argc, char** argv) {
   std::cout << "start put." << std::endl;
   int start = 0;
   int step = numReqs / threads;
-  std::vector<std::vector<block_meta>> addresses_list;
-  addresses_list.resize(threads);
   std::vector<std::shared_ptr<std::thread>> threads_1;
   uint64_t begin = timestamp_now();
   for (int i = 0; i < threads; i++) {
-    auto t = std::make_shared<std::thread>(put, map_id, start, start + step,
-                                           client, &addresses_list[i]);
+    auto t =
+        std::make_shared<std::thread>(put, map_id, start, start + step, client);
     threads_1.push_back(t);
     start += step;
   }
@@ -120,9 +119,12 @@ int main(int argc, char** argv) {
   std::cout << "start get." << std::endl;
   std::vector<std::shared_ptr<std::thread>> threads_2;
   begin = timestamp_now();
+  start = 0;
   for (int i = 0; i < threads; i++) {
-    auto t = std::make_shared<std::thread>(get, addresses_list[i], client);
+    auto t =
+        std::make_shared<std::thread>(get, map_id, start, start + step, client);
     threads_2.push_back(t);
+    start += step;
   }
   for (auto thread : threads_2) {
     thread->join();

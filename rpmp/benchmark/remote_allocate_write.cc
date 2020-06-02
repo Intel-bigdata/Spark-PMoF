@@ -27,7 +27,7 @@ std::map<int, std::vector<uint64_t>> addresses;
 
 void func1(int i) {
   while (true) {
-    uint64_t count_ = count++;
+    auto count_ = count++;
     if (count_ < 20480) {
       clients[i]->begin_tx();
       if (addresses.count(i) != 0) {

@@ -58,6 +58,7 @@ class RequestHandler : public ThreadWrapper {
   int entry() override;
   void abort() override {}
   void notify(std::shared_ptr<RequestReply> requestReply);
+  uint64_t wait(std::shared_ptr<Request> request);
   std::shared_ptr<RequestReplyContext> get(std::shared_ptr<Request> request);
 
  private:
@@ -71,17 +72,16 @@ class RequestHandler : public ThreadWrapper {
   struct InflightRequestContext {
     std::mutex mtx_reply;
     std::condition_variable cv_reply;
-    std::condition_variable cv_returned;
     std::mutex mtx_returned;
+    std::chrono::time_point<std::chrono::steady_clock> start;
     bool op_finished = false;
-    bool op_returned = false;
+    bool op_failed = false;
+    InflightRequestContext() { start = std::chrono::steady_clock::now(); }
+    std::shared_ptr<RequestReplyContext> requestReplyContext;
   };
-  std::unordered_map<std::shared_ptr<Request>,
-                     std::shared_ptr<InflightRequestContext>>
+  std::unordered_map<uint64_t, std::shared_ptr<InflightRequestContext>>
       inflight_;
   std::mutex inflight_mtx_;
-  std::shared_ptr<RequestReplyContext> requestReplyContext;
-  std::shared_ptr<Request> currentRequest;
   long expectedReturnType;
 
   std::shared_ptr<InflightRequestContext> inflight_insert_or_get(
