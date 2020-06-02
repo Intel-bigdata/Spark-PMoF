@@ -117,13 +117,12 @@ class AllocatorProxy {
   }
 
   void cache_chunk(uint64_t key, block_meta bm) {
-    if (kv_meta_map.count(key)) {
-      kv_meta_map[key].push_back(bm);
-    } else {
-      vector<block_meta> bml;
-      bml.push_back(bm);
-      kv_meta_map[key] = bml;
-    }
+    /*if (kv_meta_map.count(key)) {
+      auto cur_bm = kv_meta_map[key][0];
+    }*/
+    vector<block_meta> bml;
+    bml.push_back(bm);
+    kv_meta_map[key] = bml;
   }
 
   vector<block_meta> get_cached_chunk(uint64_t key) {

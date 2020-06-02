@@ -5,6 +5,7 @@ import java.nio.ByteBuffer
 
 import io.netty.buffer.{ByteBuf, PooledByteBufAllocator}
 import org.apache.spark.internal.Logging
+import java.io.IOException
 
 class PmemOutputStream(
     persistentMemoryWriter: PersistentMemoryHandler,
@@ -47,7 +48,9 @@ class PmemOutputStream(
         logDebug(
           s"[put Remote Block] target is ${RemotePersistentMemoryPool.getHost}:${RemotePersistentMemoryPool.getPort}, "
             + s"${blockId} ${bufferRemainingSize}")
-        remotePersistentMemoryPool.put(blockId, byteBuffer, bufferRemainingSize)
+        if (remotePersistentMemoryPool.put(blockId, byteBuffer, bufferRemainingSize) == -1) {
+          throw new IOException("RPMem put failed with time out of 120s.")
+        }
       }
       bufferFlushedSize += bufferRemainingSize
       bufferRemainingSize = 0

@@ -177,7 +177,7 @@ private[spark] final class RpmpShuffleBlockFetcherIterator(
     val buf = new NioManagedBuffer(size.toInt)
     val startFetchWait = System.currentTimeMillis()
     val readed_len = remotePersistentMemoryPool.get(blockId.name, size, buf.nioByteBuffer)
-    if (readed_len != 0) {
+    if (readed_len != -1) {
       // Since mapStatus decompressed Size is incorrect, we should shink buf here
       buf.resize(readed_len.toInt)
       val stopFetchWait = System.currentTimeMillis()

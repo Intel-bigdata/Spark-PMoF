@@ -158,10 +158,6 @@ private[spark] class PmemShuffleWriter[K, V, C](
           shuffleServerId.topologyInfo)
       mapStatus = MapStatus(blockManagerId, partitionLengths)
     }
-    logWarning(
-      s" shuffle_${stageId}_${mapId}_0 size is ${partitionLengths(0)}, decompressed size is ${mapStatus
-        .getSizeForBlock(0)}")
-    logInfo(s" write done")
   }
 
   /** Close this writer, passing along whether the map completed */
@@ -172,7 +168,6 @@ private[spark] class PmemShuffleWriter[K, V, C](
       }
       stopping = true
       if (success) {
-        logWarning(s" stop shuffle_${stageId}_${mapId} mapStatus is ${mapStatus}")
         Option(mapStatus)
       } else {
         None
