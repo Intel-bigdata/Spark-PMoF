@@ -21,6 +21,7 @@ import org.apache.spark._
 import org.apache.spark.internal.Logging
 import org.apache.spark.network.pmof.PmofTransferService
 import org.apache.spark.scheduler.MapStatus
+import org.apache.spark.scheduler.pmof.UnCompressedMapStatus
 import org.apache.spark.shuffle.{BaseShuffleHandle, ShuffleWriter}
 import org.apache.spark.storage._
 import org.apache.spark.util.collection.pmof.PmemExternalSorter
@@ -144,8 +145,8 @@ private[spark] class PmemShuffleWriter[K, V, C](
 
     val shuffleServerId = blockManager.shuffleServerId
     if (pmofConf.enableRemotePmem) {
-      //mapStatus = UnCompressedMapStatus(shuffleServerId, partitionLengths)
-      mapStatus = MapStatus(shuffleServerId, partitionLengths)
+      mapStatus = new UnCompressedMapStatus(shuffleServerId, partitionLengths)
+      //mapStatus = MapStatus(shuffleServerId, partitionLengths)
     } else if (!pmofConf.enableRdma) {
       mapStatus = MapStatus(shuffleServerId, partitionLengths)
     } else {
@@ -158,6 +159,9 @@ private[spark] class PmemShuffleWriter[K, V, C](
           shuffleServerId.topologyInfo)
       mapStatus = MapStatus(blockManagerId, partitionLengths)
     }
+    logWarning(
+      s"shuffle_${stageId}_${mapId}_0 size is ${partitionLengths(0)}, decompressed length is ${mapStatus
+        .getSizeForBlock(0)}")
   }
 
   /** Close this writer, passing along whether the map completed */

@@ -49,7 +49,7 @@ class PmemOutputStream(
           s"[put Remote Block] target is ${RemotePersistentMemoryPool.getHost}:${RemotePersistentMemoryPool.getPort}, "
             + s"${blockId} ${bufferRemainingSize}")
         if (remotePersistentMemoryPool.put(blockId, byteBuffer, bufferRemainingSize) == -1) {
-          throw new IOException("RPMem put failed with time out of 120s.")
+          throw new IOException("RPMem put failed with time out.")
         }
       }
       bufferFlushedSize += bufferRemainingSize

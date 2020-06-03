@@ -348,20 +348,31 @@ void Protocol::handle_recv_msg(std::shared_ptr<Request> request) {
       rrc->ck = nullptr;
       auto bml = allocatorProxy_->get_cached_chunk(rrc->key);
       uint64_t wrote_size = 0;
-      networkServer_->get_dram_buffer(rrc);
-      rrc->address = rrc->dest_address;
-      for (auto bm : bml) {
-        if ((wrote_size + bm.size) <= rrc->size) {
-          auto partition_data = reinterpret_cast<char *>(
-              allocatorProxy_->get_virtual_address(bm.address));
-          auto dest_address = reinterpret_cast<char *>(rrc->dest_address);
-          /*printf("[GET]key is %ld, rrc->size is %ld, bm.size is %ld\n",
-                 rrc->key, rrc->size, bm.size);*/
-          memcpy((dest_address + wrote_size), partition_data, bm.size);
-          wrote_size += bm.size;
+      if (bml.size() == 1) {
+        rrc->address = bml[0].address;
+        rrc->dest_address = allocatorProxy_->get_virtual_address(rrc->address);
+        Chunk *base_ck = allocatorProxy_->get_rma_chunk(rrc->address);
+        networkServer_->get_pmem_buffer(rrc, base_ck);
+
+      } else {
+        throw;
+        networkServer_->get_dram_buffer(rrc);
+        rrc->address = rrc->dest_address;
+        for (auto bm : bml) {
+          if ((wrote_size + bm.size) <= rrc->size) {
+            auto partition_data = reinterpret_cast<char *>(
+                allocatorProxy_->get_virtual_address(bm.address));
+            auto dest_address = reinterpret_cast<char *>(rrc->dest_address);
+            if ((wrote_size + bm.size) < rrc->size) {
+              printf("[GET]key is %ld, rrc->size is %ld, bm.size is %ld\n",
+                     rrc->key, rrc->size, bm.size);
+            }
+            memcpy((dest_address + wrote_size), partition_data, bm.size);
+            wrote_size += bm.size;
+          }
         }
+        rrc->size = wrote_size;
       }
-      rrc->size = wrote_size;
       std::shared_ptr<RequestReply> requestReply =
           std::make_shared<RequestReply>(rrc);
       rrc->ck->ptr = requestReply.get();
@@ -472,7 +483,8 @@ void Protocol::handle_rma_msg(std::shared_ptr<RequestReply> requestReply) {
       break;
     }
     case GET_REPLY: {
-      networkServer_->reclaim_dram_buffer(rrc);
+      // networkServer_->reclaim_dram_buffer(rrc);
+      networkServer_->reclaim_pmem_buffer(rrc);
       break;
     }
     default: { break; }

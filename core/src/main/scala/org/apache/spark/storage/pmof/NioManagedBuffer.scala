@@ -23,6 +23,7 @@ class NioManagedBuffer(bufSize: Int) extends ManagedBuffer {
   private var nettyObj: ByteBuf = _
 
   def getByteBuf: ByteBuf = buf
+
   def resize(size: Int): Unit = {
     byteBuffer.limit(size)
   }

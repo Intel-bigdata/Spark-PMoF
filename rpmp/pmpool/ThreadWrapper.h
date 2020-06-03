@@ -13,10 +13,10 @@
 #include <assert.h>
 
 #include <atomic>
-#include <condition_variable> // NOLINT
+#include <condition_variable>  // NOLINT
 #include <iostream>
-#include <mutex>  // NOLINT
-#include <thread> // NOLINT
+#include <mutex>   // NOLINT
+#include <thread>  // NOLINT
 
 class ThreadWrapper {
  public:
@@ -41,7 +41,9 @@ class ThreadWrapper {
 #ifdef __linux__
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
-    CPU_SET(cpu, &cpuset);
+    for (int i = 0; i < 10; i++) {
+      CPU_SET(cpu + i, &cpuset);
+    }
     int res = pthread_setaffinity_np(thread.native_handle(), sizeof(cpu_set_t),
                                      &cpuset);
     if (res) {

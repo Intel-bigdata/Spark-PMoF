@@ -174,12 +174,10 @@ private[spark] final class RpmpShuffleBlockFetcherIterator(
     next_called = true
     var input: InputStream = null
     val (blockId, size) = iterator.next()
-    val buf = new NioManagedBuffer(size.toInt)
+    var buf = new NioManagedBuffer(size.toInt)
     val startFetchWait = System.currentTimeMillis()
     val readed_len = remotePersistentMemoryPool.get(blockId.name, size, buf.nioByteBuffer)
     if (readed_len != -1) {
-      // Since mapStatus decompressed Size is incorrect, we should shink buf here
-      buf.resize(readed_len.toInt)
       val stopFetchWait = System.currentTimeMillis()
       shuffleMetrics.incFetchWaitTime(stopFetchWait - startFetchWait)
       shuffleMetrics.incRemoteBytesRead(buf.size)
@@ -187,12 +185,35 @@ private[spark] final class RpmpShuffleBlockFetcherIterator(
 
       val in = buf.createInputStream()
       input = streamWrapper(blockId, in)
-      logDebug(
-        s"[fetch Remote Blocks Succeeded] target is ${blockId}-${size}, wrappedInputStream has available as ${in.available}")
+      if (detectCorrupt && !input.eq(in)) {
+        val originalInput = input
+        val out = new ChunkedByteBufferOutputStream(64 * 1024, ByteBuffer.allocate)
+        try {
+          Utils.copyStream(input, out)
+          out.close()
+          input = out.toChunkedByteBuffer.toInputStream(dispose = true)
+          logDebug(s" buf ${blockId}-${size} decompress succeeded.")
+        } catch {
+          case e: IOException =>
+            val tmp_byte_buffer = buf.nioByteBuffer
+            logWarning(
+              s" buf ${blockId}-${size} decompress corrupted, input is ${input}, raw_data is ${tmp_byte_buffer}, remaining is ${tmp_byte_buffer.remaining}")
+            val tmp: Array[Byte] = Array()
+            buf.nioByteBuffer.rewind
+            buf.nioByteBuffer.get(tmp, 0, size.toInt)
+            logWarning(s"content is ${convertBytesToHex(tmp)}.")
+            throw e
+
+        } finally {
+          originalInput.close()
+          in.close()
+          buf.release()
+        }
+      }
     } else {
       throw new IOException(s"remotePersistentMemoryPool.get(${blockId}, ${size}) failed.");
     }
-    (blockId, new RpmpBufferReleasingInputStream(input, buf))
+    (blockId, new RpmpBufferReleasingInputStream(input, null))
   }
 
   override def hasNext: Boolean = {
@@ -251,6 +272,13 @@ private[spark] final class RpmpShuffleBlockFetcherIterator(
   override def createTempFile(): File = {
     blockManager.diskBlockManager.createTempLocalBlock()._2
   }
+  def convertBytesToHex(bytes: Seq[Byte]): String = {
+    val sb = new StringBuilder
+    for (b <- bytes) {
+      sb.append(String.format("%02x", Byte.box(b)))
+    }
+    sb.toString
+  }
 
 }
 
@@ -268,7 +296,9 @@ private class RpmpBufferReleasingInputStream(
   override def close(): Unit = {
     if (!closed) {
       delegate.close()
-      parent.release()
+      if (parent != null) {
+        parent.release()
+      }
       closed = true
     }
   }
