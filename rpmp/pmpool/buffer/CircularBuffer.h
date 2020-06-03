@@ -41,7 +41,7 @@ class CircularBuffer {
         buffer_num_(buffer_num),
         read_(0),
         write_(0) {
-    init();
+    // init();
   }
   CircularBuffer(uint64_t buffer_size, uint32_t buffer_num, bool is_server,
                  std::shared_ptr<RmaBufferRegister> rbr)
@@ -50,9 +50,12 @@ class CircularBuffer {
         buffer_num_(buffer_num),
         read_(0),
         write_(0) {
-    init();
+    // init();
   }
-
+  void try_init() {
+    std::lock_guard<std::mutex> lk(lock_);
+    if (!initialized) init();
+  }
   void init() {
     uint64_t total = buffer_num_ * buffer_size_;
     buffer_ = static_cast<char *>(mmap(0, buffer_num_ * buffer_size_,
@@ -79,6 +82,7 @@ class CircularBuffer {
     for (int i = 0; i < buffer_num_; i++) {
       bits.push_back(0);
     }
+    initialized = true;
   }
 
   ~CircularBuffer() {
@@ -93,6 +97,7 @@ class CircularBuffer {
   }
 
   char *get(uint64_t bytes) {
+    try_init();
     uint64_t offset = 0;
     bool res = get(bytes, &offset);
     if (res == false) {
@@ -102,12 +107,14 @@ class CircularBuffer {
   }
 
   void put(const char *data, uint64_t bytes) {
+    try_init();
     assert((data - buffer_) % buffer_size_ == 0);
     uint64_t offset = (data - buffer_) / buffer_size_;
     put(offset, bytes);
   }
 
   void dump() {
+    try_init();
     std::cout << "********************************************" << std::endl;
     std::cout << "read_ " << read_ << " write_ " << write_ << std::endl;
     for (int i = 0; i < buffer_num_; i++) {
@@ -221,8 +228,14 @@ class CircularBuffer {
       }
     }
   }
-  Chunk *get_rma_chunk() { return ck_; }
-  uint64_t get_offset(uint64_t data) { return (data - (uint64_t)buffer_); }
+  Chunk *get_rma_chunk() {
+    try_init();
+    return ck_;
+  }
+  uint64_t get_offset(uint64_t data) {
+    try_init();
+    return (data - (uint64_t)buffer_);
+  }
 
  private:
   char *buffer_;
@@ -237,6 +250,8 @@ class CircularBuffer {
   std::mutex read_mtx;
   std::condition_variable read_cv;
   spin_mutex write_mtx;
+  bool initialized = false;
+  std::mutex lock_;
   char tmp[4096];
 };
 

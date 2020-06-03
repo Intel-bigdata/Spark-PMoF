@@ -37,20 +37,20 @@ class PmemOutputStream(
 
   override def flush(): Unit = {
     if (bufferRemainingSize > 0) {
-      if (persistentMemoryWriter != null) {
+      if (remotePersistentMemoryPool != null) {
+        if (remotePersistentMemoryPool.put(blockId, byteBuffer, bufferRemainingSize) == -1) {
+          throw new IOException(
+            s"${blockId}-${bufferRemainingSize} RPMem put failed due to time out.")
+        }
+        logDebug(s" [PUT Completed]${blockId}-${bufferRemainingSize}, ${NettyByteBufferPool
+          .dump(byteBuffer, bufferRemainingSize)}")
+      } else {
         persistentMemoryWriter.setPartition(
           numPartitions,
           blockId,
           byteBuffer,
           bufferRemainingSize,
           set_clean)
-      } else {
-        logDebug(
-          s"[put Remote Block] target is ${RemotePersistentMemoryPool.getHost}:${RemotePersistentMemoryPool.getPort}, "
-            + s"${blockId} ${bufferRemainingSize}")
-        if (remotePersistentMemoryPool.put(blockId, byteBuffer, bufferRemainingSize) == -1) {
-          throw new IOException("RPMem put failed with time out of 120s.")
-        }
       }
       bufferFlushedSize += bufferRemainingSize
       bufferRemainingSize = 0

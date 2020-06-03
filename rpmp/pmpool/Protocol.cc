@@ -157,10 +157,6 @@ Protocol::Protocol(std::shared_ptr<Config> config, std::shared_ptr<Log> log,
       networkServer_(server),
       allocatorProxy_(allocatorProxy) {
   time = 0;
-  char *buffer = new char[2147483648]();
-  memset(buffer, 0, 2147483648);
-  address = allocatorProxy_->allocate_and_write(2147483648, buffer, 0);
-  delete[] buffer;
 }
 
 Protocol::~Protocol() {
@@ -314,21 +310,25 @@ void Protocol::handle_recv_msg(std::shared_ptr<Request> request) {
       break;
     }
     case PUT: {
-      // log_->get_console_log()->info("Protocol::handle_recv_msg put
-      // request.");
       rrc->type = PUT_REPLY;
       rrc->success = 0;
       rrc->rid = rc.rid;
-      rrc->address = rc.address;
       rrc->src_address = rc.src_address;
       rrc->src_rkey = rc.src_rkey;
       rrc->size = rc.size;
       rrc->key = rc.key;
       rrc->con = rc.con;
-      networkServer_->get_dram_buffer(rrc);
+      /////// Use Pmem Addr /////////
+      uint64_t addr = allocatorProxy_->allocate_and_write(
+          rc.size, nullptr, rc.rid % config_->get_pool_size());
+      rrc->address = addr;
+      rrc->dest_address = allocatorProxy_->get_virtual_address(addr);
+      Chunk *base_ck = allocatorProxy_->get_rma_chunk(addr);
+      networkServer_->get_pmem_buffer(rrc, base_ck);
+      ///////////////////////////////
       std::shared_ptr<RequestReply> requestReply =
           std::make_shared<RequestReply>(rrc);
-      rrc->ck->ptr = requestReply.get();  // rrc->ck set by get_dram_buffer
+      rrc->ck->ptr = requestReply.get();
 
       std::unique_lock<std::mutex> lk(rrcMtx_);
       rrcMap_[rrc->ck->buffer_id] = requestReply;
@@ -348,20 +348,32 @@ void Protocol::handle_recv_msg(std::shared_ptr<Request> request) {
       rrc->ck = nullptr;
       auto bml = allocatorProxy_->get_cached_chunk(rrc->key);
       uint64_t wrote_size = 0;
-      networkServer_->get_dram_buffer(rrc);
-      rrc->address = rrc->dest_address;
-      for (auto bm : bml) {
-        if ((wrote_size + bm.size) <= rrc->size) {
-          auto partition_data = reinterpret_cast<char *>(
-              allocatorProxy_->get_virtual_address(bm.address));
-          auto dest_address = reinterpret_cast<char *>(rrc->dest_address);
-          /*printf("[GET]key is %ld, rrc->size is %ld, bm.size is %ld\n",
-                 rrc->key, rrc->size, bm.size);*/
-          memcpy((dest_address + wrote_size), partition_data, bm.size);
-          wrote_size += bm.size;
+      if (bml.size() == 1) {
+        rrc->address = bml[0].address;
+        rrc->dest_address = allocatorProxy_->get_virtual_address(rrc->address);
+        Chunk *base_ck = allocatorProxy_->get_rma_chunk(rrc->address);
+        networkServer_->get_pmem_buffer(rrc, base_ck);
+      } else {
+        fprintf(stderr, "key %ld has zero or more than one BlockMeta\n",
+                rrc->key);
+        throw;
+        networkServer_->get_dram_buffer(rrc);
+        rrc->address = rrc->dest_address;
+        for (auto bm : bml) {
+          if ((wrote_size + bm.size) <= rrc->size) {
+            auto partition_data = reinterpret_cast<char *>(
+                allocatorProxy_->get_virtual_address(bm.address));
+            auto dest_address = reinterpret_cast<char *>(rrc->dest_address);
+            if ((wrote_size + bm.size) < rrc->size) {
+              printf("[GET]key is %ld, rrc->size is %ld, bm.size is %ld\n",
+                     rrc->key, rrc->size, bm.size);
+            }
+            memcpy((dest_address + wrote_size), partition_data, bm.size);
+            wrote_size += bm.size;
+          }
         }
+        rrc->size = wrote_size;
       }
-      rrc->size = wrote_size;
       std::shared_ptr<RequestReply> requestReply =
           std::make_shared<RequestReply>(rrc);
       rrc->ck->ptr = requestReply.get();
@@ -372,8 +384,6 @@ void Protocol::handle_recv_msg(std::shared_ptr<Request> request) {
       break;
     }
     case GET_META: {
-      // log_->get_console_log()->info(
-      //    "Protocol::handle_recv_msg getMeta request.");
       rrc->type = GET_META_REPLY;
       rrc->success = 0;
       rrc->rid = rc.rid;
@@ -461,18 +471,28 @@ void Protocol::handle_rma_msg(std::shared_ptr<RequestReply> requestReply) {
     }
     case PUT_REPLY: {
       char *buffer = static_cast<char *>(rrc->ck->buffer);
-      assert(rrc->address == 0);
 #ifdef DEBUG
-      std::cout << "[handle_rma_msg]" << rrc->src_rkey << "-"
-                << rrc->src_address << ":" << rrc->size << std::endl;
+      std::stringstream ss;
+      char tmp[150] = {};
+      for (int i = 0; i < 50; i++) {
+        sprintf(tmp + (i * 3), "%02X ", *(buffer + i) & 0xff);
+      }
+      ss << tmp;
+      ss << " ... ";
+      auto start = rrc->size - 51;
+      for (int i = 0; i < 50; i++) {
+        sprintf(tmp + (i * 3), "%02X ", *(buffer + start + i) & 0xff);
+      }
+      ss << tmp;
+      ss << std::endl;
+      fprintf(stderr, "key is %lu, size is %ld, content is %s\n", rrc->key,
+              rrc->size, ss.str().c_str());
 #endif
-      rrc->address = allocatorProxy_->allocate_and_write(
-          rrc->size, buffer, rrc->rid % config_->get_pool_size());
-      networkServer_->reclaim_dram_buffer(rrc);
+      networkServer_->reclaim_pmem_buffer(rrc);
       break;
     }
     case GET_REPLY: {
-      networkServer_->reclaim_dram_buffer(rrc);
+      networkServer_->reclaim_pmem_buffer(rrc);
       break;
     }
     default: { break; }

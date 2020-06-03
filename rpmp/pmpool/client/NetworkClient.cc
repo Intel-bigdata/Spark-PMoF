@@ -88,8 +88,8 @@ uint64_t RequestHandler::wait(std::shared_ptr<Request> request) {
   while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request] {
     auto current = std::chrono::steady_clock::now();
     auto elapse = current - ctx->start;
-    if (elapse > 120s) {  // tried 10s and found 8 process * 8 threads request
-                          // will still go timeout, need to fix
+    if (elapse > 60s) {  // tried 10s and found 8 process * 8 threads request
+                         // will still go timeout, need to fix
       ctx->op_failed = true;
       fprintf(stderr, "Request [TYPE %ld][Key %ld] spent %ld s, time out\n",
               request->requestContext_.type, request->requestContext_.key,
@@ -103,7 +103,7 @@ uint64_t RequestHandler::wait(std::shared_ptr<Request> request) {
   if (ctx->op_failed) {
     res = -1;
   }
-  res = ctx->requestReplyContext->size;
+  // res = ctx->requestReplyContext->size;
   inflight_erase(request);
   return res;
 }
@@ -115,8 +115,8 @@ std::shared_ptr<RequestReplyContext> RequestHandler::get(
   while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request] {
     auto current = std::chrono::steady_clock::now();
     auto elapse = current - ctx->start;
-    if (elapse > 120s) {  // tried 10s and found 8 process * 8 threads request
-                          // will still go timeout, need to fix
+    if (elapse > 60s) {  // tried 10s and found 8 process * 8 threads request
+                         // will still go timeout, need to fix
       ctx->op_failed = true;
       fprintf(stderr, "Request [TYPE %ld] spent %ld s, time out\n",
               request->requestContext_.type,
@@ -140,13 +140,6 @@ void RequestHandler::notify(std::shared_ptr<RequestReply> requestReply) {
   auto ctx = inflight_[rid];
   ctx->op_finished = true;
   auto rrc = requestReply->get_rrc();
-  if (expectedReturnType != rrc->type) {
-    std::string err_msg = "expected return type is " +
-                          std::to_string(expectedReturnType) +
-                          ", current rrc.type is " + std::to_string(rrc->type);
-    std::cout << err_msg << std::endl;
-    return;
-  }
   ctx->requestReplyContext = std::move(rrc);
   if (callback_map.count(ctx->requestReplyContext->rid) != 0) {
     callback_map[ctx->requestReplyContext->rid]();
@@ -260,7 +253,8 @@ void ClientRecvCallback::operator()(void *param_1, void *param_2) {
       reinterpret_cast<char *>(ck->buffer), ck->size,
       reinterpret_cast<Connection *>(ck->con));
   requestReply->decode();
-  auto rrc = requestReply->get_rrc();
+  requestHandler_->notify(requestReply);
+  /*auto rrc = requestReply->get_rrc();
   switch (rrc->type) {
     case ALLOC_REPLY: {
       requestHandler_->notify(requestReply);
@@ -291,7 +285,7 @@ void ClientRecvCallback::operator()(void *param_1, void *param_2) {
       break;
     }
     default: {}
-  }
+  }*/
   chunkMgr_->reclaim(ck, static_cast<Connection *>(ck->con));
 }
 

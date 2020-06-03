@@ -197,7 +197,6 @@ class Protocol : public std::enable_shared_from_this<Protocol> {
   std::mutex rrcMtx_;
   std::unordered_map<uint64_t, std::shared_ptr<RequestReply>> rrcMap_;
   uint64_t time;
-  long address = 0;
 };
 
 #endif  // PMPOOL_PROTOCOL_H_

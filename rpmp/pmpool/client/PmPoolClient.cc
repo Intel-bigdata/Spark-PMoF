@@ -161,13 +161,13 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
   rc.src_address = networkClient_->get_dram_buffer(value, rc.size);
   rc.src_rkey = networkClient_->get_rkey();
 #ifdef DEBUG
-  std::cout << "[PmPoolClient::put] " << rc.src_rkey << "-" << rc.src_address
-            << ":" << rc.size << std::endl;
+  std::cout << "[PmPoolClient::put] " << key << "-" << rc.size
+            << ", hashkey is " << key_uint << std::endl;
 #endif
   rc.key = key_uint;
   auto request = std::make_shared<Request>(rc);
   requestHandler_->addTask(request);
-  requestHandler_->wait(request);
+  auto res = requestHandler_->wait(request);
   networkClient_->reclaim_dram_buffer(rc.src_address, rc.size);
 #ifdef DEBUG
   fprintf(stderr, "[PUT]key is %s, length is %ld, content is \n", key.c_str(),
@@ -177,7 +177,7 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
   }
   fprintf(stderr, " ...\n");
 #endif
-  return 0;
+  return res;
 }
 
 uint64_t PmPoolClient::get(const string &key, char *value, uint64_t size) {
@@ -192,14 +192,14 @@ uint64_t PmPoolClient::get(const string &key, char *value, uint64_t size) {
   rc.src_address = networkClient_->get_dram_buffer(nullptr, rc.size);
   rc.src_rkey = networkClient_->get_rkey();
 #ifdef DEBUG
-  std::cout << "[PmPoolClient::get] " << rc.src_rkey << "-" << rc.src_address
-            << ":" << rc.size << std::endl;
+  std::cout << "[PmPoolClient::get] " << key << "-" << rc.size
+            << ", hashkey is " << key_uint << std::endl;
 #endif
   rc.key = key_uint;
   auto request = std::make_shared<Request>(rc);
   requestHandler_->addTask(request);
-  auto get_len = requestHandler_->wait(request);
-  memcpy(value, reinterpret_cast<char *>(rc.src_address), get_len);
+  auto res = requestHandler_->wait(request);
+  memcpy(value, reinterpret_cast<char *>(rc.src_address), rc.size);
   networkClient_->reclaim_dram_buffer(rc.src_address, rc.size);
 
 #ifdef DEBUG
@@ -210,7 +210,7 @@ uint64_t PmPoolClient::get(const string &key, char *value, uint64_t size) {
   }
   fprintf(stderr, " ...\n");
 #endif
-  return get_len;
+  return res;
 }
 
 vector<block_meta> PmPoolClient::getMeta(const string &key) {

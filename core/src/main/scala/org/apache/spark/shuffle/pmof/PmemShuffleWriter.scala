@@ -21,6 +21,7 @@ import org.apache.spark._
 import org.apache.spark.internal.Logging
 import org.apache.spark.network.pmof.PmofTransferService
 import org.apache.spark.scheduler.MapStatus
+import org.apache.spark.scheduler.pmof.UnCompressedMapStatus
 import org.apache.spark.shuffle.{BaseShuffleHandle, ShuffleWriter}
 import org.apache.spark.storage._
 import org.apache.spark.util.collection.pmof.PmemExternalSorter
@@ -133,19 +134,19 @@ private[spark] class PmemShuffleWriter[K, V, C](
           })
       }
       partitionLengths(i) = PmemBlockOutputStreamArray(i).getSize
-      output_str += "\tPartition " + i + ": " + partitionLengths(i) + ", records: " + PmemBlockOutputStreamArray(
-        i).records + "\n"
+      output_str += s"\t${ShuffleBlockId(stageId, mapId, i)}: ${partitionLengths(i)}, records: ${PmemBlockOutputStreamArray(i).records}\n"
     }
 
     //logWarning(output_str)
     for (i <- 0 until numPartitions) {
       PmemBlockOutputStreamArray(i).close()
     }
+    //logWarning(s"[MapStatus]\n\t$output_str")
 
     val shuffleServerId = blockManager.shuffleServerId
     if (pmofConf.enableRemotePmem) {
-      //mapStatus = UnCompressedMapStatus(shuffleServerId, partitionLengths)
-      mapStatus = MapStatus(shuffleServerId, partitionLengths)
+      mapStatus = new UnCompressedMapStatus(shuffleServerId, partitionLengths)
+      //mapStatus = MapStatus(shuffleServerId, partitionLengths)
     } else if (!pmofConf.enableRdma) {
       mapStatus = MapStatus(shuffleServerId, partitionLengths)
     } else {

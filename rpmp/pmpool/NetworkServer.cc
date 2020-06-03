@@ -45,7 +45,7 @@ int NetworkServer::start() {
   CHK_ERR("hpnl server listen", server_->listen(config_->get_ip().c_str(),
                                                 config_->get_port().c_str()));
 
-  circularBuffer_ = std::make_shared<CircularBuffer>(1024 * 1024, 4096, true,
+  circularBuffer_ = std::make_shared<CircularBuffer>(1024 * 1024, 10240, true,
                                                      shared_from_this());
   return 0;
 }
@@ -62,6 +62,12 @@ void NetworkServer::unregister_rma_buffer(int buffer_id) {
 
 void NetworkServer::get_dram_buffer(std::shared_ptr<RequestReplyContext> rrc) {
   char *buffer = circularBuffer_->get(rrc->size);
+#ifdef DEBUG
+  fprintf(stderr, "[get_dram_buffer]key is %lu, start is %lu, end is %lu\n",
+          rrc->key, circularBuffer_->get_offset((uint64_t)buffer),
+          circularBuffer_->get_offset((uint64_t)buffer) + rrc->size);
+#endif
+
   rrc->dest_address = (uint64_t)buffer;
 
   Chunk *base_ck = circularBuffer_->get_rma_chunk();
