@@ -29,9 +29,9 @@
 #include <utility>
 #include <vector>
 
-#include "../Base.h"
-#include "../Common.h"
-#include "../ThreadWrapper.h"
+#include "pmpool/Base.h"
+#include "pmpool/Common.h"
+#include "pmpool/ThreadWrapper.h"
 
 class NetworkClient;
 class RequestHandler;
@@ -80,7 +80,8 @@ class PmPoolClient {
 
   /// key-value storage interface
   uint64_t put(const string &key, const char *value, uint64_t size);
-  vector<block_meta> get(const string &key);
+  uint64_t get(const string &key, char *value, uint64_t size);
+  vector<block_meta> getMeta(const string &key);
   int del(const string &key);
 
   void shutdown();

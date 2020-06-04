@@ -44,11 +44,19 @@ struct RequestReplyMsg {
 };
 
 struct block_meta {
-  block_meta() : block_meta(0, 0) {}
+  block_meta() : block_meta(0, 0, 0) {}
   block_meta(uint64_t _address, uint64_t _size)
       : address(_address), size(_size) {}
+  block_meta(uint64_t _address, uint64_t _size, int _r_key)
+      : address(_address), size(_size), r_key(_r_key) {}
+  void set_rKey(int _r_key) { r_key = _r_key; }
+  std::string ToString() {
+    return std::to_string(r_key) + "-" + std::to_string(address) + ":" +
+           std::to_string(size);
+  }
   uint64_t address;
   uint64_t size;
+  int r_key;
 };
 
 #endif  // PMPOOL_BASE_H_

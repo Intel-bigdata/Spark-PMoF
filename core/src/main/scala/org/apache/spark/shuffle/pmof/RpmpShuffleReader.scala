@@ -13,29 +13,32 @@ import org.apache.spark.util.collection.pmof.PmemExternalSorter
 import org.apache.spark.util.configuration.pmof.PmofConf
 
 /**
-  * Fetches and reads the partitions in range [startPartition, endPartition) from a shuffle by
-  * requesting them from other nodes' block stores.
-  */
-private[spark] class RdmaShuffleReader[K, C](handle: BaseShuffleHandle[K, _, C],
-                                             startPartition: Int,
-                                             endPartition: Int,
-                                             context: TaskContext,
-                                             pmofConf: PmofConf,
-                                             serializerManager: SerializerManager = SparkEnv.get.serializerManager,
-                                             blockManager: BlockManager = SparkEnv.get.blockManager,
-                                             mapOutputTracker: MapOutputTracker = SparkEnv.get.mapOutputTracker)
-  extends ShuffleReader[K, C] with Logging {
+ * Fetches and reads the partitions in range [startPartition, endPartition) from a shuffle by
+ * requesting them from other nodes' block stores.
+ */
+private[spark] class RpmpShuffleReader[K, C](
+    handle: BaseShuffleHandle[K, _, C],
+    startPartition: Int,
+    endPartition: Int,
+    context: TaskContext,
+    pmofConf: PmofConf,
+    serializerManager: SerializerManager = SparkEnv.get.serializerManager,
+    blockManager: BlockManager = SparkEnv.get.blockManager,
+    mapOutputTracker: MapOutputTracker = SparkEnv.get.mapOutputTracker)
+    extends ShuffleReader[K, C]
+    with Logging {
 
   private[this] val dep = handle.dependency
   private[this] val serializerInstance: SerializerInstance = dep.serializer.newInstance()
-  private[this] val enable_pmem: Boolean = SparkEnv.get.conf.getBoolean("spark.shuffle.pmof.enable_pmem", defaultValue = true)
-  private[this] val enable_rpmp: Boolean = SparkEnv.get.conf.getBoolean("spark.shuffle.pmof.enable_remote_pmem", defaultValue = true)
+  private[this] val enable_pmem: Boolean =
+    SparkEnv.get.conf.getBoolean("spark.shuffle.pmof.enable_pmem", defaultValue = true)
+  private[this] val enable_rpmp: Boolean =
+    SparkEnv.get.conf.getBoolean("spark.shuffle.pmof.enable_remote_pmem", defaultValue = true)
 
   /** Read the combined key-values for this reduce task */
   override def read(): Iterator[Product2[K, C]] = {
-    val wrappedStreams: RdmaShuffleBlockFetcherIterator = new RdmaShuffleBlockFetcherIterator(
+    val wrappedStreams: RpmpShuffleBlockFetcherIterator = new RpmpShuffleBlockFetcherIterator(
       context,
-      PmofTransferService.getTransferServiceInstance(pmofConf, blockManager),
       blockManager,
       mapOutputTracker.getMapSizesByExecutorId(handle.shuffleId, startPartition, endPartition),
       serializerManager.wrapStream,
@@ -44,25 +47,25 @@ private[spark] class RdmaShuffleReader[K, C](handle: BaseShuffleHandle[K, _, C],
       SparkEnv.get.conf.getInt("spark.reducer.maxReqsInFlight", Int.MaxValue),
       SparkEnv.get.conf.get(config.REDUCER_MAX_BLOCKS_IN_FLIGHT_PER_ADDRESS),
       SparkEnv.get.conf.get(config.MAX_REMOTE_BLOCK_SIZE_FETCH_TO_MEM),
-      SparkEnv.get.conf.getBoolean("spark.shuffle.detectCorrupt", defaultValue = true))
-
+      SparkEnv.get.conf.getBoolean("spark.shuffle.detectCorrupt", defaultValue = true),
+      pmofConf)
 
     // Create a key/value iterator for each stream
-    val recordIter = wrappedStreams.flatMap { case (_, wrappedStream) =>
-      // Note: the asKeyValueIterator below wraps a key/value iterator inside of a
-      // NextIterator. The NextIterator makes sure that close() is called on the
-      // underlying InputStream when all records have been read.
-      serializerInstance.deserializeStream(wrappedStream).asKeyValueIterator
+    val recordIter = wrappedStreams.flatMap {
+      case (_, wrappedStream) =>
+        // Note: the asKeyValueIterator below wraps a key/value iterator inside of a
+        // NextIterator. The NextIterator makes sure that close() is called on the
+        // underlying InputStream when all records have been read.
+        serializerInstance.deserializeStream(wrappedStream).asKeyValueIterator
     }
 
     // Update the context task metrics for each record read.
     val readMetrics = context.taskMetrics.createTempShuffleReadMetrics()
-    val metricIter = CompletionIterator[(Any, Any), Iterator[(Any, Any)]](
-      recordIter.map { record =>
+    val metricIter = CompletionIterator[(Any, Any), Iterator[(Any, Any)]](recordIter.map {
+      record =>
         readMetrics.incRecordsRead(1)
         record
-      },
-      context.taskMetrics().mergeShuffleReadMetrics())
+    }, context.taskMetrics().mergeShuffleReadMetrics())
 
     // An interruptible iterator must be used here in order to support task cancellation
     val interruptibleIter = new InterruptibleIterator[(Any, Any)](context, metricIter)
@@ -87,19 +90,18 @@ private[spark] class RdmaShuffleReader[K, C](handle: BaseShuffleHandle[K, _, C],
     // Sort the output if there is a sort ordering defined.
     dep.keyOrdering match {
       case Some(keyOrd: Ordering[K]) =>
-        if (enable_pmem && !enable_rpmp) {
-          val sorter = new PmemExternalSorter[K, C, C](context, handle, pmofConf, ordering = Some(keyOrd), serializer = dep.serializer)
-          sorter.insertAll(aggregatedIter)
-          CompletionIterator[Product2[K, C], Iterator[Product2[K, C]]](sorter.iterator, sorter.stop())
-        } else {
-          val sorter =
-            new ExternalSorter[K, C, C](context, ordering = Some(keyOrd), serializer = dep.serializer)
-          sorter.insertAll(aggregatedIter)
-          context.taskMetrics().incMemoryBytesSpilled(sorter.memoryBytesSpilled)
-          context.taskMetrics().incDiskBytesSpilled(sorter.diskBytesSpilled)
-          context.taskMetrics().incPeakExecutionMemory(sorter.peakMemoryUsedBytes)
-          CompletionIterator[Product2[K, C], Iterator[Product2[K, C]]](sorter.iterator, sorter.stop())
-        }
+        val sorter =
+          new ExternalSorter[K, C, C](
+            context,
+            ordering = Some(keyOrd),
+            serializer = dep.serializer)
+        sorter.insertAll(aggregatedIter)
+        context.taskMetrics().incMemoryBytesSpilled(sorter.memoryBytesSpilled)
+        context.taskMetrics().incDiskBytesSpilled(sorter.diskBytesSpilled)
+        context.taskMetrics().incPeakExecutionMemory(sorter.peakMemoryUsedBytes)
+        CompletionIterator[Product2[K, C], Iterator[Product2[K, C]]](
+          sorter.iterator,
+          sorter.stop())
       case None =>
         aggregatedIter
     }

@@ -13,7 +13,7 @@
     <packaging>jar</packaging>
 
     <groupId>com.intel.spark-pmof.java</groupId>
-    <artifactId>java</artifactId>
+    <artifactId>spark-pmof-java</artifactId>
     <version>1.0</version>
 
     <dependencies>
@@ -39,6 +39,11 @@
             <groupId>com.intel.hpnl</groupId>
             <artifactId>hpnl</artifactId>
             <version>0.5</version>
+        </dependency>
+        <dependency>
+            <groupId>com.intel.rpmp</groupId>
+            <artifactId>rpmp</artifactId>
+            <version>0.1</version>
         </dependency>
         <dependency>
             <groupId>org.xerial</groupId>

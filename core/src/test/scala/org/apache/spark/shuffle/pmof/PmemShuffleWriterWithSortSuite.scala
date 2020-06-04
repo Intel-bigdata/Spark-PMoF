@@ -53,7 +53,7 @@ class PmemShuffleWriterWithSortSuite extends SparkFunSuite with SharedSparkConte
     conf.set("spark.shuffle.pmof.pmem_list", "/dev/dax0.0")
     shuffleBlockResolver = new PmemShuffleBlockResolver(conf)
     serializer = new JavaSerializer(conf)
-    pmofConf = new PmofConf(conf)
+    pmofConf = PmofConf.getConf(conf)
     taskMetrics = new TaskMetrics()
     serializerManager = new SerializerManager(serializer, conf)
 

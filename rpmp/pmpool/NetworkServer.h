@@ -17,7 +17,7 @@
 #include <atomic>
 #include <memory>
 
-#include "RmaBufferRegister.h"
+#include "pmpool/RmaBufferRegister.h"
 
 class CircularBuffer;
 class Config;
@@ -30,10 +30,11 @@ class Log;
  * asynchronous network library. RPMP currently supports RDMA iWarp and RoCE V2
  * protocol.
  */
-class NetworkServer : public RmaBufferRegister {
+class NetworkServer : public RmaBufferRegister,
+                      public std::enable_shared_from_this<NetworkServer> {
  public:
   NetworkServer() = delete;
-  NetworkServer(Config *config, Log *log_);
+  NetworkServer(std::shared_ptr<Config> config, std::shared_ptr<Log> log_);
   ~NetworkServer();
   int init();
   int start();
@@ -47,19 +48,22 @@ class NetworkServer : public RmaBufferRegister {
   void unregister_rma_buffer(int buffer_id) override;
 
   /// get DRAM buffer from circular buffer pool.
-  void get_dram_buffer(RequestReplyContext *rrc);
+  void get_dram_buffer(std::shared_ptr<RequestReplyContext> rrc);
 
   /// reclaim DRAM buffer from circular buffer pool.
-  void reclaim_dram_buffer(RequestReplyContext *rrc);
+  void reclaim_dram_buffer(std::shared_ptr<RequestReplyContext> rrc);
+
+  /// get rdma registered memory key for client.
+  uint64_t get_rkey();
 
   /// get Persistent Memory buffer from circular buffer pool
-  void get_pmem_buffer(RequestReplyContext *rrc, Chunk *ck);
+  void get_pmem_buffer(std::shared_ptr<RequestReplyContext> rrc, Chunk *ck);
 
   /// reclaim Persistent Memory buffer form circular buffer pool
-  void reclaim_pmem_buffer(RequestReplyContext *rrc);
+  void reclaim_pmem_buffer(std::shared_ptr<RequestReplyContext> rrc);
 
   /// return the pointer of chunk manager.
-  ChunkMgr *get_chunk_mgr();
+  std::shared_ptr<ChunkMgr> get_chunk_mgr();
 
   /// since the network implementation is asynchronous,
   /// we need to define callback better before starting network service.
@@ -69,12 +73,12 @@ class NetworkServer : public RmaBufferRegister {
   void set_write_callback(Callback *callback);
 
   void send(char *data, uint64_t size, Connection *con);
-  void read(RequestReply *rrc);
-  void write(RequestReply *rrc);
+  void read(std::shared_ptr<RequestReply> rrc);
+  void write(std::shared_ptr<RequestReply> rrc);
 
  private:
-  Config *config_;
-  Log* log_;
+  std::shared_ptr<Config> config_;
+  std::shared_ptr<Log> log_;
   std::shared_ptr<Server> server_;
   std::shared_ptr<ChunkMgr> chunkMgr_;
   std::shared_ptr<CircularBuffer> circularBuffer_;

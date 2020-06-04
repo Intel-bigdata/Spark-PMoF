@@ -5,23 +5,19 @@ import io.netty.buffer.{ByteBuf, PooledByteBufAllocator, UnpooledByteBufAllocato
 import scala.collection.mutable.Stack
 import java.lang.RuntimeException
 import org.apache.spark.internal.Logging
+import scala.collection.mutable.Map
 
 object NettyByteBufferPool extends Logging {
   private val allocatedBufRenCnt: AtomicLong = new AtomicLong(0)
-  private val allocatedBytes: AtomicLong = new AtomicLong(0) 
-  private val peakAllocatedBytes: AtomicLong = new AtomicLong(0) 
-  private val unpooledAllocatedBytes: AtomicLong = new AtomicLong(0) 
-  private var fixedBufferSize: Long = 0
-  private val allocatedBufferPool: Stack[ByteBuf] = Stack[ByteBuf]() 
+  private val allocatedBytes: AtomicLong = new AtomicLong(0)
+  private val peakAllocatedBytes: AtomicLong = new AtomicLong(0)
+  private val unpooledAllocatedBytes: AtomicLong = new AtomicLong(0)
+  private val bufferMap: Map[ByteBuf, Long] = Map()
+  private val allocatedBufferPool: Stack[ByteBuf] = Stack[ByteBuf]()
   private var reachRead = false
   private val allocator = UnpooledByteBufAllocator.DEFAULT
 
   def allocateNewBuffer(bufSize: Int): ByteBuf = synchronized {
-    if (fixedBufferSize == 0) {
-      fixedBufferSize = bufSize
-    } else if (bufSize > fixedBufferSize) {
-      throw new RuntimeException(s"allocateNewBuffer, expected size is ${fixedBufferSize}, actual size is ${bufSize}")
-    }
     allocatedBufRenCnt.getAndIncrement()
     allocatedBytes.getAndAdd(bufSize)
     if (allocatedBytes.get > peakAllocatedBytes.get) {
@@ -33,9 +29,11 @@ object NettyByteBufferPool extends Logging {
       } else {
         allocator.directBuffer(bufSize, bufSize)
       }*/
-      allocator.directBuffer(bufSize, bufSize)
+      val byteBuf = allocator.directBuffer(bufSize, bufSize)
+      bufferMap += (byteBuf -> bufSize)
+      byteBuf
     } catch {
-      case e : Throwable =>
+      case e: Throwable =>
         logError(s"allocateNewBuffer size is ${bufSize}")
         throw e
     }
@@ -43,7 +41,8 @@ object NettyByteBufferPool extends Logging {
 
   def releaseBuffer(buf: ByteBuf): Unit = synchronized {
     allocatedBufRenCnt.getAndDecrement()
-    allocatedBytes.getAndAdd(0 - fixedBufferSize)
+    val bufSize = bufferMap(buf)
+    allocatedBytes.getAndAdd(bufSize)
     buf.clear()
     //allocatedBufferPool.push(buf)
     buf.release(buf.refCnt())

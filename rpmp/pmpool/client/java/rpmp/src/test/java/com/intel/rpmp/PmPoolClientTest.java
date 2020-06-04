@@ -16,7 +16,11 @@ public class PmPoolClientTest
 {
     @Before
     public void setup() {
-        pmPoolClient = new PmPoolClient("172.168.0.40", "12346");
+        try {
+          pmPoolClient = new PmPoolClient("172.168.0.209", "12346");
+        } catch (Exception e) {
+          assertTrue(false);
+        }
     }
 
     @After

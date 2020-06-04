@@ -20,10 +20,10 @@
 #include <unordered_map>
 #include <vector>
 
-#include "Allocator.h"
-#include "DataServer.h"
-#include "Log.h"
-#include "NetworkServer.h"
+#include "pmpool/Allocator.h"
+#include "pmpool/DataServer.h"
+#include "pmpool/Log.h"
+#include "pmpool/NetworkServer.h"
 
 using std::shared_ptr;
 using std::unordered_map;
@@ -68,8 +68,9 @@ enum types { BLOCK_ENTRY_TYPE, DATA_TYPE, MAX_TYPE };
 class PmemObjAllocator : public Allocator {
  public:
   PmemObjAllocator() = delete;
-  explicit PmemObjAllocator(Log *log, DiskInfo *diskInfos,
-                            NetworkServer *server, int wid)
+  explicit PmemObjAllocator(std::shared_ptr<Log> log,
+                            std::shared_ptr<DiskInfo> diskInfos,
+                            std::shared_ptr<NetworkServer> server, int wid)
       : log_(log), diskInfo_(diskInfos), server_(server), wid_(wid) {}
   ~PmemObjAllocator() { close(); }
 
@@ -305,6 +306,7 @@ class PmemObjAllocator : public Allocator {
                                  err_msg);
       return -1;
     }
+
     pmemContext_.poid = pmemobj_root(pmemContext_.pop, sizeof(struct Base));
     pmemContext_.base = (struct Base *)pmemobj_direct(pmemContext_.poid);
     pmemContext_.base->head = OID_NULL;
@@ -315,9 +317,11 @@ class PmemObjAllocator : public Allocator {
       base_ck = server_->register_rma_buffer(
           reinterpret_cast<char *>(pmemContext_.pop), diskInfo_->size);
       assert(base_ck != nullptr);
+      auto addr = reinterpret_cast<char *>(pmemContext_.pop);
       log_->get_console_log()->info(
           "successfully registered Persistent Memory(" + diskInfo_->path +
-          ") as RDMA region");
+              ") as RDMA region, size is {0}",
+          diskInfo_->size);
     }
     return 0;
   }
@@ -374,17 +378,19 @@ class PmemObjAllocator : public Allocator {
   int free_meta() {
     std::lock_guard<std::mutex> l(mtx);
     index_map.clear();
+    return 0;
   }
 
  private:
-  Log *log_;
-  DiskInfo *diskInfo_;
-  NetworkServer *server_;
+  std::shared_ptr<Log> log_;
+  std::shared_ptr<DiskInfo> diskInfo_;
+  std::shared_ptr<NetworkServer> server_;
   int wid_;
   PmemContext pmemContext_;
   std::mutex mtx;
   unordered_map<uint64_t, PMEMoid> index_map;
   uint64_t total = 0;
+  uint64_t disk_size = 0;
   char str[1048576];
   Chunk *base_ck;
 };

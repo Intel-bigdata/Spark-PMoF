@@ -11,22 +11,23 @@
 #define PMPOOL_ALLOCATORPROXY_H_
 
 #include <atomic>
+#include <cstdlib>
 #include <memory>
 #include <string>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 #include "Allocator.h"
+#include "Base.h"
 #include "Config.h"
 #include "DataServer.h"
 #include "Log.h"
 #include "PmemAllocator.h"
-#include "Base.h"
 
 using std::atomic;
 using std::make_shared;
-using std::unordered_map;
 using std::string;
+using std::unordered_map;
 using std::vector;
 
 /**
@@ -37,24 +38,21 @@ using std::vector;
 class AllocatorProxy {
  public:
   AllocatorProxy() = delete;
-  AllocatorProxy(Config *config, Log *log, NetworkServer *networkServer)
+  AllocatorProxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log,
+                 std::shared_ptr<NetworkServer> networkServer)
       : config_(config), log_(log) {
     vector<string> paths = config_->get_pool_paths();
     vector<uint64_t> sizes = config_->get_pool_sizes();
     assert(paths.size() == sizes.size());
     for (int i = 0; i < paths.size(); i++) {
-      DiskInfo *diskInfo = new DiskInfo(paths[i], sizes[i]);
+      auto diskInfo = std::make_shared<DiskInfo>(paths[i], sizes[i]);
       diskInfos_.push_back(diskInfo);
       allocators_.push_back(
-          new PmemObjAllocator(log_, diskInfo, networkServer, i));
+          std::make_shared<PmemObjAllocator>(log_, diskInfo, networkServer, i));
     }
   }
 
   ~AllocatorProxy() {
-    for (int i = 0; i < config_->get_pool_paths().size(); i++) {
-      delete allocators_[i];
-      delete diskInfos_[i];
-    }
     allocators_.clear();
     diskInfos_.clear();
   }
@@ -76,6 +74,7 @@ class AllocatorProxy {
       addr = allocators_[index % diskInfos_.size()]->allocate_and_write(
           size, content);
     }
+    return addr;
   }
 
   int write(uint64_t address, const char *content, uint64_t size) {
@@ -112,14 +111,16 @@ class AllocatorProxy {
     return allocators_[wid]->get_rma_chunk();
   }
 
-  void cache_chunk(uint64_t key, uint64_t address, uint64_t size) {
-    block_meta bm = {address, size};
+  void cache_chunk(uint64_t key, uint64_t address, uint64_t size, int r_key) {
+    block_meta bm = {address, size, r_key};
     cache_chunk(key, bm);
   }
 
   void cache_chunk(uint64_t key, block_meta bm) {
     if (kv_meta_map.count(key)) {
+      printf("key exists\n");
       kv_meta_map[key].push_back(bm);
+      // kv_meta_map.erase(key);
     } else {
       vector<block_meta> bml;
       bml.push_back(bm);
@@ -135,16 +136,16 @@ class AllocatorProxy {
   }
 
   void del_chunk(uint64_t key) {
-    if (kv_meta_map.count(key))  {
+    if (kv_meta_map.count(key)) {
       kv_meta_map.erase(key);
     }
   }
 
  private:
-  Config *config_;
-  Log *log_;
-  vector<Allocator *> allocators_;
-  vector<DiskInfo *> diskInfos_;
+  std::shared_ptr<Config> config_;
+  std::shared_ptr<Log> log_;
+  vector<std::shared_ptr<Allocator>> allocators_;
+  vector<std::shared_ptr<DiskInfo>> diskInfos_;
   atomic<uint64_t> buffer_id_{0};
   unordered_map<uint64_t, vector<block_meta>> kv_meta_map;
 };

@@ -13,89 +13,208 @@
 #include <HPNL/ChunkMgr.h>
 #include <HPNL/Connection.h>
 
-#include "../Event.h"
-#include "../buffer/CircularBuffer.h"
+#include "pmpool/Event.h"
+#include "pmpool/buffer/CircularBuffer.h"
+using namespace std::chrono_literals;
 
 uint64_t timestamp_now() {
   return std::chrono::high_resolution_clock::now().time_since_epoch() /
          std::chrono::milliseconds(1);
 }
 
-RequestHandler::RequestHandler(NetworkClient *networkClient)
+RequestHandler::RequestHandler(std::shared_ptr<NetworkClient> networkClient)
     : networkClient_(networkClient) {}
 
-void RequestHandler::addTask(Request *request) { handleRequest(request); }
+RequestHandler::~RequestHandler() {
+#ifdef DEBUG
+  std::cout << "RequestHandler destructed" << std::endl;
+#endif
+}
 
-void RequestHandler::addTask(Request *request, std::function<void()> func) {
+void RequestHandler::reset() {
+  this->stop();
+  this->join();
+  networkClient_.reset();
+#ifdef DEBUG
+  std::cout << "Callback map is "
+            << (callback_map.empty() ? "empty" : "not empty") << std::endl;
+  std::cout << "inflight map is " << (inflight_.empty() ? "empty" : "not empty")
+            << std::endl;
+#endif
+}
+
+void RequestHandler::addTask(std::shared_ptr<Request> request) {
+  pendingRequestQueue_.enqueue(request);
+}
+
+void RequestHandler::addTask(std::shared_ptr<Request> request,
+                             std::function<void()> func) {
   callback_map[request->get_rc().rid] = func;
-  handleRequest(request);
+  pendingRequestQueue_.enqueue(request);
 }
 
-void RequestHandler::wait() {
-  unique_lock<mutex> lk(h_mtx);
-  while (!op_finished) {
-    cv.wait(lk);
+int RequestHandler::entry() {
+  std::shared_ptr<Request> request;
+  bool res = pendingRequestQueue_.wait_dequeue_timed(
+      request, std::chrono::milliseconds(1000));
+  if (res) {
+    handleRequest(request);
   }
+  return 0;
 }
 
-void RequestHandler::notify(RequestReply *requestReply) {
-  unique_lock<mutex> lk(h_mtx);
-  requestReplyContext = requestReply->get_rrc();
-  op_finished = true;
-  if (callback_map.count(requestReplyContext.rid) != 0) {
-    callback_map[requestReplyContext.rid]();
-    callback_map.erase(requestReplyContext.rid);
+std::shared_ptr<RequestHandler::InflightRequestContext>
+RequestHandler::inflight_insert_or_get(std::shared_ptr<Request> request) {
+  const std::lock_guard<std::mutex> lock(inflight_mtx_);
+  auto rid = request->requestContext_.rid;
+  if (inflight_.find(rid) == inflight_.end()) {
+    auto ctx = std::make_shared<InflightRequestContext>();
+    inflight_.emplace(rid, ctx);
+    return ctx;
   } else {
-    cv.notify_one();
-    lk.unlock();
+    auto ctx = inflight_[rid];
+    return ctx;
   }
 }
 
-void RequestHandler::handleRequest(Request *request) {
-  op_finished = false;
+void RequestHandler::inflight_erase(std::shared_ptr<Request> request) {
+  const std::lock_guard<std::mutex> lock(inflight_mtx_);
+  inflight_.erase(request->requestContext_.rid);
+}
+
+uint64_t RequestHandler::wait(std::shared_ptr<Request> request) {
+  auto ctx = inflight_insert_or_get(request);
+  unique_lock<mutex> lk(ctx->mtx_reply);
+  while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request] {
+    auto current = std::chrono::steady_clock::now();
+    auto elapse = current - ctx->start;
+    if (elapse > 30s) {  // tried 10s and found 8 process * 8 threads request
+                         // will still go timeout, need to fix
+      ctx->op_failed = true;
+      fprintf(stderr, "Request [TYPE %ld][Key %ld] spent %ld s, time out\n",
+              request->requestContext_.type, request->requestContext_.key,
+              std::chrono::duration_cast<std::chrono::seconds>(elapse).count());
+      return true;
+    }
+    return ctx->op_finished;
+  })) {
+  }
+  uint64_t res = 0;
+  if (ctx->op_failed) {
+    res = -1;
+  }
+  // res = ctx->requestReplyContext->size;
+  inflight_erase(request);
+  return res;
+}
+
+std::shared_ptr<RequestReplyContext> RequestHandler::get(
+    std::shared_ptr<Request> request) {
+  auto ctx = inflight_insert_or_get(request);
+  unique_lock<mutex> lk(ctx->mtx_reply);
+  while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request] {
+    auto current = std::chrono::steady_clock::now();
+    auto elapse = current - ctx->start;
+    if (elapse > 30s) {  // tried 10s and found 8 process * 8 threads request
+                         // will still go timeout, need to fix
+      ctx->op_failed = true;
+      fprintf(stderr, "Request [TYPE %ld] spent %ld s, time out\n",
+              request->requestContext_.type,
+              std::chrono::duration_cast<std::chrono::seconds>(elapse).count());
+      return true;
+    }
+    return ctx->op_finished;
+  })) {
+  }
+  auto res = std::move(ctx->requestReplyContext);
+  if (ctx->op_failed) {
+    throw;
+  }
+  inflight_erase(request);
+  return res;
+}
+
+void RequestHandler::notify(std::shared_ptr<RequestReply> requestReply) {
+  const std::lock_guard<std::mutex> lock(inflight_mtx_);
+  auto rid = requestReply->get_rrc()->rid;
+  auto ctx = inflight_[rid];
+  ctx->op_finished = true;
+  auto rrc = requestReply->get_rrc();
+  if (expectedReturnType != rrc->type) {
+    std::string err_msg = "expected return type is " +
+                          std::to_string(expectedReturnType) +
+                          ", current rrc.type is " + std::to_string(rrc->type);
+    std::cout << err_msg << std::endl;
+    return;
+  }
+  ctx->requestReplyContext = std::move(rrc);
+  if (callback_map.count(ctx->requestReplyContext->rid) != 0) {
+    callback_map[ctx->requestReplyContext->rid]();
+    callback_map.erase(ctx->requestReplyContext->rid);
+  } else {
+    ctx->cv_reply.notify_one();
+  }
+}
+
+void RequestHandler::handleRequest(std::shared_ptr<Request> request) {
+  auto ctx = inflight_insert_or_get(request);
   OpType rt = request->get_rc().type;
   switch (rt) {
     case ALLOC: {
+      expectedReturnType = ALLOC_REPLY;
       request->encode();
       networkClient_->send(reinterpret_cast<char *>(request->data_),
                            request->size_);
       break;
     }
     case FREE: {
+      expectedReturnType = FREE_REPLY;
       request->encode();
       networkClient_->send(reinterpret_cast<char *>(request->data_),
                            request->size_);
       break;
     }
     case WRITE: {
+      expectedReturnType = WRITE_REPLY;
       request->encode();
       networkClient_->send(reinterpret_cast<char *>(request->data_),
                            request->size_);
       break;
     }
     case READ: {
+      expectedReturnType = READ_REPLY;
       request->encode();
       networkClient_->send(reinterpret_cast<char *>(request->data_),
                            request->size_);
       break;
     }
     case PUT: {
+      expectedReturnType = PUT_REPLY;
       request->encode();
       networkClient_->send(reinterpret_cast<char *>(request->data_),
                            request->size_);
+      break;
+    }
+    case GET: {
+      expectedReturnType = GET_REPLY;
+      request->encode();
+      networkClient_->send(reinterpret_cast<char *>(request->data_),
+                           request->size_);
+      break;
     }
     case GET_META: {
+      expectedReturnType = GET_META_REPLY;
       request->encode();
       networkClient_->send(reinterpret_cast<char *>(request->data_),
                            request->size_);
+      break;
     }
     default: {}
   }
 }
 
-RequestReplyContext &RequestHandler::get() { return requestReplyContext; }
-
-ClientConnectedCallback::ClientConnectedCallback(NetworkClient *networkClient) {
+ClientConnectedCallback::ClientConnectedCallback(
+    std::shared_ptr<NetworkClient> networkClient) {
   networkClient_ = networkClient;
 }
 
@@ -104,8 +223,9 @@ void ClientConnectedCallback::operator()(void *param_1, void *param_2) {
   networkClient_->connected(con);
 }
 
-ClientRecvCallback::ClientRecvCallback(ChunkMgr *chunkMgr,
-                                       RequestHandler *requestHandler)
+ClientRecvCallback::ClientRecvCallback(
+    std::shared_ptr<ChunkMgr> chunkMgr,
+    std::shared_ptr<RequestHandler> requestHandler)
     : chunkMgr_(chunkMgr), requestHandler_(requestHandler) {}
 
 void ClientRecvCallback::operator()(void *param_1, void *param_2) {
@@ -136,25 +256,38 @@ void ClientRecvCallback::operator()(void *param_1, void *param_2) {
   // con->send(new_ck);
   // test end
 
-  RequestReply requestReply(reinterpret_cast<char *>(ck->buffer), ck->size,
-                            reinterpret_cast<Connection *>(ck->con));
-  requestReply.decode();
-  RequestReplyContext rrc = requestReply.get_rrc();
-  switch (rrc.type) {
+  auto requestReply = std::make_shared<RequestReply>(
+      reinterpret_cast<char *>(ck->buffer), ck->size,
+      reinterpret_cast<Connection *>(ck->con));
+  requestReply->decode();
+  auto rrc = requestReply->get_rrc();
+  switch (rrc->type) {
     case ALLOC_REPLY: {
-      requestHandler_->notify(&requestReply);
+      requestHandler_->notify(requestReply);
       break;
     }
     case FREE_REPLY: {
-      requestHandler_->notify(&requestReply);
+      requestHandler_->notify(requestReply);
       break;
     }
     case WRITE_REPLY: {
-      requestHandler_->notify(&requestReply);
+      requestHandler_->notify(requestReply);
       break;
     }
     case READ_REPLY: {
-      requestHandler_->notify(&requestReply);
+      requestHandler_->notify(requestReply);
+      break;
+    }
+    case PUT_REPLY: {
+      requestHandler_->notify(requestReply);
+      break;
+    }
+    case GET_REPLY: {
+      requestHandler_->notify(requestReply);
+      break;
+    }
+    case GET_META_REPLY: {
+      requestHandler_->notify(requestReply);
       break;
     }
     default: {}
@@ -179,30 +312,32 @@ NetworkClient::NetworkClient(const string &remote_address,
       connected_(false) {}
 
 NetworkClient::~NetworkClient() {
-  delete shutdownCallback;
-  delete connectedCallback;
-  delete sendCallback;
-  delete recvCallback;
+#ifdef DUBUG
+  std::cout << "NetworkClient destructed" << std::endl;
+#endif
 }
 
-int NetworkClient::init(RequestHandler *requestHandler) {
-  client_ = new Client(worker_num_, buffer_num_per_con_);
+int NetworkClient::init(std::shared_ptr<RequestHandler> requestHandler) {
+  client_ = std::make_shared<Client>(worker_num_, buffer_num_per_con_);
   if ((client_->init()) != 0) {
     return -1;
   }
-  chunkMgr_ = new ChunkPool(client_, buffer_size_, init_buffer_num_);
+  chunkMgr_ = std::make_shared<ChunkPool>(client_.get(), buffer_size_,
+                                          init_buffer_num_);
 
-  client_->set_chunk_mgr(chunkMgr_);
+  client_->set_chunk_mgr(chunkMgr_.get());
 
-  shutdownCallback = new ClientShutdownCallback();
-  connectedCallback = new ClientConnectedCallback(this);
-  recvCallback = new ClientRecvCallback(chunkMgr_, requestHandler);
-  sendCallback = new ClientSendCallback(chunkMgr_);
+  shutdownCallback = std::make_shared<ClientShutdownCallback>();
+  connectedCallback =
+      std::make_shared<ClientConnectedCallback>(shared_from_this());
+  recvCallback =
+      std::make_shared<ClientRecvCallback>(chunkMgr_, requestHandler);
+  sendCallback = std::make_shared<ClientSendCallback>(chunkMgr_);
 
-  client_->set_shutdown_callback(shutdownCallback);
-  client_->set_connected_callback(connectedCallback);
-  client_->set_recv_callback(recvCallback);
-  client_->set_send_callback(sendCallback);
+  client_->set_shutdown_callback(shutdownCallback.get());
+  client_->set_connected_callback(connectedCallback.get());
+  client_->set_recv_callback(recvCallback.get());
+  client_->set_send_callback(sendCallback.get());
 
   client_->start();
   int res = client_->connect(remote_address_.c_str(), remote_port_.c_str());
@@ -211,12 +346,31 @@ int NetworkClient::init(RequestHandler *requestHandler) {
     con_v.wait(lk);
   }
 
-  circularBuffer_ = make_shared<CircularBuffer>(1024 * 1024, 512, false, this);
+  circularBuffer_ =
+      make_shared<CircularBuffer>(1024 * 1024, 512, false, shared_from_this());
+  return 0;
 }
 
 void NetworkClient::shutdown() { client_->shutdown(); }
 
 void NetworkClient::wait() { client_->wait(); }
+
+void NetworkClient::reset() {
+  circularBuffer_.reset();
+  shutdownCallback.reset();
+  connectedCallback.reset();
+  recvCallback.reset();
+  sendCallback.reset();
+  if (con_ != nullptr) {
+    con_->shutdown();
+  }
+  if (client_) {
+    client_->shutdown();
+    client_.reset();
+  }
+}
+
+std::shared_ptr<ChunkMgr> NetworkClient::get_chunkMgr() { return chunkMgr_; }
 
 Chunk *NetworkClient::register_rma_buffer(char *rma_buffer, uint64_t size) {
   return client_->reg_rma_buffer(rma_buffer, size, buffer_id_++);
@@ -254,9 +408,18 @@ void NetworkClient::send(char *data, uint64_t size) {
   auto ck = chunkMgr_->get(con_);
   std::memcpy(reinterpret_cast<char *>(ck->buffer), data, size);
   ck->size = size;
+#ifdef DEBUG
+  RequestMsg *requestMsg = (RequestMsg *)(data);
+  std::cout << "[NetworkClient::send][" << requestMsg->type << "] size is "
+            << size << std::endl;
+  for (int i = 0; i < size; i++) {
+    printf("%X ", *(data + i));
+  }
+  printf("\n");
+#endif
   con_->send(ck);
 }
 
-void NetworkClient::read(Request *request) {
+void NetworkClient::read(std::shared_ptr<Request> request) {
   RequestContext rc = request->get_rc();
 }

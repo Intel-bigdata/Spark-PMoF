@@ -29,7 +29,7 @@ std::mutex mtx;
 uint64_t count = 0;
 char str[1048576];
 
-void func(AllocatorProxy *proxy, int index) {
+void func(std::shared_ptr<AllocatorProxy> proxy, int index) {
   while (true) {
     std::unique_lock<std::mutex> lk(mtx);
     uint64_t count_ = count++;
@@ -47,7 +47,7 @@ int main() {
   std::shared_ptr<Config> config = std::make_shared<Config>();
   config->init(0, nullptr);
   std::shared_ptr<Log> log = std::make_shared<Log>(config.get());
-  auto allocatorProxy = new AllocatorProxy(config.get(), log.get(), nullptr);
+  auto allocatorProxy = std::make_shared<AllocatorProxy>(config, log, nullptr);
   allocatorProxy->init();
   std::vector<std::thread *> threads;
   memset(str, '0', 1048576);

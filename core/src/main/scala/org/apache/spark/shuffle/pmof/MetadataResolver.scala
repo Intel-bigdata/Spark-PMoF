@@ -9,6 +9,7 @@ import java.util.zip.{Deflater, DeflaterOutputStream, Inflater, InflaterInputStr
 
 import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.io.{ByteBufferInputStream, ByteBufferOutputStream, Input, Output}
+import org.apache.spark.internal.Logging
 import org.apache.spark.SparkEnv
 import org.apache.spark.network.pmof._
 import org.apache.spark.shuffle.IndexShuffleBlockResolver
@@ -27,7 +28,7 @@ import scala.util.control.{Breaks, ControlThrowable}
   * and can be used by executor to send metadata to driver
   * @param pmofConf
   */
-class MetadataResolver(pmofConf: PmofConf) {
+class MetadataResolver(pmofConf: PmofConf) extends Logging {
   private[this] val blockManager = SparkEnv.get.blockManager
   private[this] val blockMap: ConcurrentHashMap[String, ShuffleBuffer] = new ConcurrentHashMap[String, ShuffleBuffer]()
   private[this] val blockInfoMap = mutable.HashMap.empty[String, ArrayBuffer[ShuffleBlockInfo]]
@@ -44,7 +45,7 @@ class MetadataResolver(pmofConf: PmofConf) {
     * @param rkey
     */
   def pushPmemBlockInfo(shuffleId: Int, mapId: Int, dataAddressMap: mutable.HashMap[Int, Array[(Long, Int)]], rkey: Long): Unit = {
-    val buffer: Array[Byte] = new Array[Byte](pmofConf.reduce_serializer_buffer_size.toInt)
+    val buffer: Array[Byte] = new Array[Byte](pmofConf.map_serializer_buffer_size.toInt)
     var output = new Output(buffer)
     val bufferArray = new ArrayBuffer[ByteBuffer]()
 
@@ -60,7 +61,7 @@ class MetadataResolver(pmofConf: PmofConf) {
             blockBuffer.flip()
             bufferArray += blockBuffer
             output.close()
-            val new_buffer = new Array[Byte](pmofConf.reduce_serializer_buffer_size.toInt)
+            val new_buffer = new Array[Byte](pmofConf.map_serializer_buffer_size.toInt)
             output = new Output(new_buffer)
           }
         }
