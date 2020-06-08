@@ -5,11 +5,17 @@ import org.apache.spark.SparkConf
 class PmofConf(conf: SparkConf) {
   val enableRdma: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_rdma", defaultValue = true)
   val enablePmem: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_pmem", defaultValue = true)
-  val path_list: List[String] = conf.get("spark.shuffle.pmof.pmem_list", defaultValue = "/dev/dax0.0").split(",").map(_.trim).toList
-  val maxPoolSize: Long = conf.getLong("spark.shuffle.pmof.pmpool_size", defaultValue = 1073741824)
+  val path_list: List[String] = conf
+    .get("spark.shuffle.pmof.pmem_list", defaultValue = "/dev/dax0.0")
+    .split(",")
+    .map(_.trim)
+    .toList
+  val maxPoolSize: Long =
+    conf.getLong("spark.shuffle.pmof.pmpool_size", defaultValue = 1073741824)
   val maxStages: Int = conf.getInt("spark.shuffle.pmof.max_stage_num", defaultValue = 1000)
   val maxMaps: Int = conf.getInt("spark.shuffle.pmof.max_map_num", defaultValue = 1000)
-  val spill_throttle: Long = conf.getLong("spark.shuffle.pmof.spill_throttle", defaultValue = 4194304)
+  val spill_throttle: Long =
+    conf.getLong("spark.shuffle.pmof.spill_throttle", defaultValue = 4194304)
   val inMemoryCollectionSizeThreshold: Long =
     conf.getLong("spark.shuffle.spill.pmof.MemoryThreshold", 5 * 1024 * 1024)
   val networkBufferSize: Int = conf.getInt("spark.shuffle.pmof.network_buffer_size", 4096 * 3)
@@ -21,28 +27,44 @@ class PmofConf(conf: SparkConf) {
   val clientWorkerNums = conf.getInt("spark.shuffle.pmof.server_pool_size", 1)
   val shuffleNodes: Array[Array[String]] =
     conf.get("spark.shuffle.pmof.node", defaultValue = "").split(",").map(_.split("-"))
-  val map_serializer_buffer_size = conf.getLong("spark.shuffle.pmof.map_serializer_buffer_size", 16 * 1024)
-  val reduce_serializer_buffer_size = conf.getLong("spark.shuffle.pmof.reduce_serializer_buffer_size", 16 * 1024)
-  val metadataCompress: Boolean = conf.getBoolean("spark.shuffle.pmof.metadata_compress", defaultValue = false)
-  val shuffleBlockSize: Int = conf.getInt("spark.shuffle.pmof.shuffle_block_size", defaultValue = 2048)
-  val pmemCapacity: Long = conf.getLong("spark.shuffle.pmof.pmem_capacity", defaultValue = 264239054848L)
-  val pmemCoreMap = conf.get("spark.shuffle.pmof.dev_core_set", defaultValue = "/dev/dax0.0:0-17,36-53").split(";").map(_.trim).map(_.split(":")).map(arr => arr(0) -> arr(1)).toMap
-  val enableRemotePmem: Boolean = conf.getBoolean("spark.shuffle.pmof.enable_remote_pmem", defaultValue = false);
+  val map_serializer_buffer_size =
+    conf.getLong("spark.shuffle.pmof.map_serializer_buffer_size", 16 * 1024)
+  val reduce_serializer_buffer_size =
+    conf.getLong("spark.shuffle.pmof.reduce_serializer_buffer_size", 16 * 1024)
+  val metadataCompress: Boolean =
+    conf.getBoolean("spark.shuffle.pmof.metadata_compress", defaultValue = false)
+  val shuffleBlockSize: Int =
+    conf.getInt("spark.shuffle.pmof.shuffle_block_size", defaultValue = 2048)
+  val pmemCapacity: Long =
+    conf.getLong("spark.shuffle.pmof.pmem_capacity", defaultValue = 264239054848L)
+  val pmemCoreMap = conf
+    .get("spark.shuffle.pmof.dev_core_set", defaultValue = "/dev/dax0.0:0-17,36-53")
+    .split(";")
+    .map(_.trim)
+    .map(_.split(":"))
+    .map(arr => arr(0) -> arr(1))
+    .toMap
+  val enableRemotePmem: Boolean =
+    conf.getBoolean("spark.shuffle.pmof.enable_remote_pmem", defaultValue = false);
+  val enableRemotePmemSort: Boolean =
+    conf.getBoolean("spark.shuffle.pmof.enable_remote_pmem_sort", defaultValue = false);
   val rpmpHost: String = conf.get("spark.rpmp.rhost", defaultValue = "172.168.0.40")
   val rpmpPort: String = conf.get("spark.rpmp.rport", defaultValue = "61010")
 }
 
 object PmofConf {
   var ins: PmofConf = null
-  def getConf(conf: SparkConf): PmofConf = if (ins == null) {
-    ins = new PmofConf(conf)
-    ins
-  } else {
-    ins
-  }
-  def getConf: PmofConf = if (ins == null) {
-    throw new IllegalStateException("PmofConf is not initialized yet")
-  } else {
-    ins
-  }
+  def getConf(conf: SparkConf): PmofConf =
+    if (ins == null) {
+      ins = new PmofConf(conf)
+      ins
+    } else {
+      ins
+    }
+  def getConf: PmofConf =
+    if (ins == null) {
+      throw new IllegalStateException("PmofConf is not initialized yet")
+    } else {
+      ins
+    }
 }

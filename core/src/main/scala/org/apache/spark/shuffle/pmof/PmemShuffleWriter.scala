@@ -87,6 +87,7 @@ private[spark] class PmemShuffleWriter[K, V, C](
           context,
           handle,
           pmofConf,
+          blockManager,
           dep.aggregator,
           Some(dep.partitioner),
           dep.keyOrdering,

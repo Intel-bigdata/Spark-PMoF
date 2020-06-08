@@ -354,7 +354,7 @@ void Protocol::handle_recv_msg(std::shared_ptr<Request> request) {
         Chunk *base_ck = allocatorProxy_->get_rma_chunk(rrc.address);
         networkServer_->get_pmem_buffer(&rrc, base_ck);
       } else {
-        fprintf(stderr, "key %ld has zero or more than one BlockMeta\n",
+        fprintf(stderr, "key %lu has zero or more than one BlockMeta\n",
                 rrc.key);
         throw;
       }

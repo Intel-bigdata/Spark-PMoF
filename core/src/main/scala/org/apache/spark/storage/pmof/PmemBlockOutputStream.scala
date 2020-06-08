@@ -12,8 +12,9 @@ import org.apache.spark.util.configuration.pmof.PmofConf
 
 import scala.collection.mutable.ArrayBuffer
 
-class PmemBlockId(stageId: Int, tmpId: Int) extends ShuffleBlockId(stageId, 0, tmpId) {
-  override def name: String = "reduce_spill_" + stageId + "_" + tmpId
+class PmemBlockId(executorId: String, stageId: Int, tmpId: Int)
+    extends ShuffleBlockId(stageId, 0, tmpId) {
+  override def name: String = s"reduce_spill_${executorId}_${stageId}_${tmpId}"
 
   override def isShuffle: Boolean = false
 }
@@ -21,10 +22,10 @@ class PmemBlockId(stageId: Int, tmpId: Int) extends ShuffleBlockId(stageId, 0, t
 object PmemBlockId {
   private var tempId: Int = 0
 
-  def getTempBlockId(stageId: Int): PmemBlockId = synchronized {
+  def getTempBlockId(executorId: String, stageId: Int): PmemBlockId = synchronized {
     val cur_tempId = tempId
     tempId += 1
-    new PmemBlockId(stageId, cur_tempId)
+    new PmemBlockId(executorId, stageId, cur_tempId)
   }
 }
 
@@ -56,6 +57,7 @@ private[spark] class PmemBlockOutputStream(
   val root_dir = Utils.getConfiguredLocalDirs(conf).toList(0)
   var persistentMemoryWriter: PersistentMemoryHandler = _
   var remotePersistentMemoryPool: RemotePersistentMemoryPool = _
+  val mapStatus: ArrayBuffer[(String, Long, Int)] = ArrayBuffer[(String, Long, Int)]()
 
   if (!pmofConf.enableRemotePmem) {
     persistentMemoryWriter = PersistentMemoryHandler.getPersistentMemoryHandler(
@@ -108,13 +110,16 @@ private[spark] class PmemBlockOutputStream(
   }
 
   def maybeSpill(force: Boolean = false): Unit = {
-    if (force == true) {
-      flush()
-    }
-    if ((pmofConf.spill_throttle != -1 && pmemOutputStream.remainingSize >= pmofConf.spill_throttle) || force == true) {
+    /*if (force == true) {
+    flush()
+
+    }*/
+    if ((pmofConf.spill_throttle != -1 && bs.available >= pmofConf.spill_throttle) || force == true) {
       val start = System.nanoTime()
-      pmemOutputStream.flush()
+      flush()
+      //  pmemOutputStream.flush()
       val bufSize = pmemOutputStream.flushedSize
+      mapStatus += ((pmemOutputStream.flushed_block_id, bufSize, recordsPerBlock))
       if (bufSize > 0) {
         recordsArray += recordsPerBlock
         recordsPerBlock = 0

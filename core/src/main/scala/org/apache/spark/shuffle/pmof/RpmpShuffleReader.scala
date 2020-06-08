@@ -30,10 +30,7 @@ private[spark] class RpmpShuffleReader[K, C](
 
   private[this] val dep = handle.dependency
   private[this] val serializerInstance: SerializerInstance = dep.serializer.newInstance()
-  private[this] val enable_pmem: Boolean =
-    SparkEnv.get.conf.getBoolean("spark.shuffle.pmof.enable_pmem", defaultValue = true)
-  private[this] val enable_rpmp: Boolean =
-    SparkEnv.get.conf.getBoolean("spark.shuffle.pmof.enable_remote_pmem", defaultValue = true)
+  private[this] val enable_rpmp_sort: Boolean = pmofConf.enableRemotePmemSort
 
   /** Read the combined key-values for this reduce task */
   override def read(): Iterator[Product2[K, C]] = {
@@ -90,18 +87,33 @@ private[spark] class RpmpShuffleReader[K, C](
     // Sort the output if there is a sort ordering defined.
     dep.keyOrdering match {
       case Some(keyOrd: Ordering[K]) =>
-        val sorter =
-          new ExternalSorter[K, C, C](
+        if (enable_rpmp_sort) {
+          val sorter = new PmemExternalSorter[K, C, C](
             context,
+            handle,
+            pmofConf,
+            blockManager,
             ordering = Some(keyOrd),
             serializer = dep.serializer)
-        sorter.insertAll(aggregatedIter)
-        context.taskMetrics().incMemoryBytesSpilled(sorter.memoryBytesSpilled)
-        context.taskMetrics().incDiskBytesSpilled(sorter.diskBytesSpilled)
-        context.taskMetrics().incPeakExecutionMemory(sorter.peakMemoryUsedBytes)
-        CompletionIterator[Product2[K, C], Iterator[Product2[K, C]]](
-          sorter.iterator,
-          sorter.stop())
+          sorter.insertAll(aggregatedIter)
+          CompletionIterator[Product2[K, C], Iterator[Product2[K, C]]](
+            sorter.iterator,
+            sorter.stop())
+        } else {
+
+          val sorter =
+            new ExternalSorter[K, C, C](
+              context,
+              ordering = Some(keyOrd),
+              serializer = dep.serializer)
+          sorter.insertAll(aggregatedIter)
+          context.taskMetrics().incMemoryBytesSpilled(sorter.memoryBytesSpilled)
+          context.taskMetrics().incDiskBytesSpilled(sorter.diskBytesSpilled)
+          context.taskMetrics().incPeakExecutionMemory(sorter.peakMemoryUsedBytes)
+          CompletionIterator[Product2[K, C], Iterator[Product2[K, C]]](
+            sorter.iterator,
+            sorter.stop())
+        }
       case None =>
         aggregatedIter
     }

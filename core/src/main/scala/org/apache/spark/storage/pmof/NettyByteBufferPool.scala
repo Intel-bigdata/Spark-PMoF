@@ -40,6 +40,10 @@ object NettyByteBufferPool extends Logging {
     }
   }
 
+  def allocateNewBuffer(): ByteBuf = synchronized {
+    allocator.directBuffer()
+  }
+
   def releaseBuffer(buf: ByteBuf): Unit = synchronized {
     allocatedBufRenCnt.getAndDecrement()
     val bufSize = bufferMap(buf)

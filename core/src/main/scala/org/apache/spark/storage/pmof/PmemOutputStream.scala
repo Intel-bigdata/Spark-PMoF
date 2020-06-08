@@ -18,12 +18,15 @@ class PmemOutputStream(
     with Logging {
   var set_clean = true
   var is_closed = false
+  var key_id = 0
 
   val length: Int = bufferSize
   var bufferFlushedSize: Int = 0
   var bufferRemainingSize: Int = 0
   val buf: ByteBuf = NettyByteBufferPool.allocateNewBuffer(length)
   val byteBuffer: ByteBuffer = buf.nioBuffer(0, length)
+  var flushed_block_id: String = _
+  var cur_block_id: String = _
 
   override def write(bytes: Array[Byte], off: Int, len: Int): Unit = {
     byteBuffer.put(bytes, off, len)
@@ -38,12 +41,15 @@ class PmemOutputStream(
   override def flush(): Unit = {
     if (bufferRemainingSize > 0) {
       if (remotePersistentMemoryPool != null) {
-        if (remotePersistentMemoryPool.put(blockId, byteBuffer, bufferRemainingSize) == -1) {
+        logWarning(s" [PUT Started]${cur_block_id}-${bufferRemainingSize}")
+        if (remotePersistentMemoryPool.put(cur_block_id, byteBuffer, bufferRemainingSize) == -1) {
           throw new IOException(
-            s"${blockId}-${bufferRemainingSize} RPMem put failed due to time out.")
+            s"${cur_block_id}-${bufferRemainingSize} RPMem put failed due to time out.")
         }
-        logDebug(s" [PUT Completed]${blockId}-${bufferRemainingSize}, ${NettyByteBufferPool
-          .dump(byteBuffer, bufferRemainingSize)}")
+        logWarning(s" [PUT Completed]${cur_block_id}-${bufferRemainingSize}")
+        key_id += 1
+        flushed_block_id = cur_block_id
+        cur_block_id = s"${blockId}_${key_id}"
       } else {
         persistentMemoryWriter.setPartition(
           numPartitions,
