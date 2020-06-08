@@ -88,11 +88,10 @@ inline void decode_(T* t, char* data, uint64_t size) {
 class RequestReply {
  public:
   RequestReply() = delete;
-  explicit RequestReply(
-      std::shared_ptr<RequestReplyContext> requestReplyContext);
+  explicit RequestReply(RequestReplyContext& requestReplyContext);
   RequestReply(char* data, uint64_t size, Connection* con);
   ~RequestReply();
-  std::shared_ptr<RequestReplyContext> get_rrc();
+  RequestReplyContext& get_rrc();
   void decode();
   void encode();
 
@@ -102,7 +101,7 @@ class RequestReply {
   char* data_ = nullptr;
   uint64_t size_ = 0;
   // RequestReplyMsg requestReplyMsg_;
-  std::shared_ptr<RequestReplyContext> requestReplyContext_;
+  RequestReplyContext requestReplyContext_;
 };
 
 typedef promise<RequestReplyContext> Promise;

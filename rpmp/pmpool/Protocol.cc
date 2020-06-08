@@ -225,7 +225,7 @@ void Protocol::handle_recv_msg(std::shared_ptr<Request> request) {
         num_requests_);
   }
   RequestContext rc = request->get_rc();
-  auto rrc = std::make_shared<RequestReplyContext>();
+  auto rrc = RequestReplyContext();
   switch (rc.type) {
     case ALLOC: {
       log_->get_console_log()->info(
@@ -234,50 +234,50 @@ void Protocol::handle_recv_msg(std::shared_ptr<Request> request) {
           rc.size, nullptr, rc.rid % config_->get_pool_size());
       auto wid = GET_WID(addr);
       assert(wid == rc.rid % config_->get_pool_size());
-      rrc->type = ALLOC_REPLY;
-      rrc->success = 0;
-      rrc->rid = rc.rid;
-      rrc->address = addr;
-      rrc->size = rc.size;
-      rrc->con = rc.con;
-      networkServer_->get_dram_buffer(rrc);
+      rrc.type = ALLOC_REPLY;
+      rrc.success = 0;
+      rrc.rid = rc.rid;
+      rrc.address = addr;
+      rrc.size = rc.size;
+      rrc.con = rc.con;
+      networkServer_->get_dram_buffer(&rrc);
       std::shared_ptr<RequestReply> requestReply =
           std::make_shared<RequestReply>(rrc);
-      rrc->ck->ptr = requestReply.get();
+      rrc.ck->ptr = requestReply.get();
       enqueue_finalize_msg(requestReply);
       break;
     }
     case FREE: {
       log_->get_console_log()->info("Protocol::handle_recv_msg Free request.");
-      rrc->type = FREE_REPLY;
-      rrc->success = allocatorProxy_->release(rc.address);
-      rrc->rid = rc.rid;
-      rrc->address = rc.address;
-      rrc->size = rc.size;
-      rrc->con = rc.con;
+      rrc.type = FREE_REPLY;
+      rrc.success = allocatorProxy_->release(rc.address);
+      rrc.rid = rc.rid;
+      rrc.address = rc.address;
+      rrc.size = rc.size;
+      rrc.con = rc.con;
       std::shared_ptr<RequestReply> requestReply =
           std::make_shared<RequestReply>(rrc);
-      rrc->ck->ptr = requestReply.get();
+      rrc.ck->ptr = requestReply.get();
       enqueue_finalize_msg(requestReply);
       break;
     }
     case WRITE: {
       log_->get_console_log()->info("Protocol::handle_recv_msg Write request.");
-      rrc->type = WRITE_REPLY;
-      rrc->success = 0;
-      rrc->rid = rc.rid;
-      rrc->address = rc.address;
-      rrc->src_address = rc.src_address;
-      rrc->src_rkey = rc.src_rkey;
-      rrc->size = rc.size;
-      rrc->con = rc.con;
-      networkServer_->get_dram_buffer(rrc);
+      rrc.type = WRITE_REPLY;
+      rrc.success = 0;
+      rrc.rid = rc.rid;
+      rrc.address = rc.address;
+      rrc.src_address = rc.src_address;
+      rrc.src_rkey = rc.src_rkey;
+      rrc.size = rc.size;
+      rrc.con = rc.con;
+      networkServer_->get_dram_buffer(&rrc);
       std::shared_ptr<RequestReply> requestReply =
           std::make_shared<RequestReply>(rrc);
-      rrc->ck->ptr = requestReply.get();
+      rrc.ck->ptr = requestReply.get();
 
       std::unique_lock<std::mutex> lk(rrcMtx_);
-      rrcMap_[rrc->ck->buffer_id] = requestReply;
+      rrcMap_[rrc.ck->buffer_id] = requestReply;
       lk.unlock();
       networkServer_->read(requestReply);
       break;
@@ -287,109 +287,93 @@ void Protocol::handle_recv_msg(std::shared_ptr<Request> request) {
       std::cout << "[Protocol::handle_recv_msg][READ], info is " << rc.address
                 << "-" << rc.size << std::endl;
 #endif
-      rrc->type = READ_REPLY;
-      rrc->success = 0;
-      rrc->rid = rc.rid;
-      rrc->address = rc.address;
-      rrc->src_address = rc.src_address;
-      rrc->src_rkey = rc.src_rkey;
-      rrc->size = rc.size;
-      rrc->con = rc.con;
-      rrc->dest_address = allocatorProxy_->get_virtual_address(rrc->address);
-      rrc->ck = nullptr;
-      Chunk *base_ck = allocatorProxy_->get_rma_chunk(rrc->address);
-      networkServer_->get_pmem_buffer(rrc, base_ck);
+      rrc.type = READ_REPLY;
+      rrc.success = 0;
+      rrc.rid = rc.rid;
+      rrc.address = rc.address;
+      rrc.src_address = rc.src_address;
+      rrc.src_rkey = rc.src_rkey;
+      rrc.size = rc.size;
+      rrc.con = rc.con;
+      rrc.dest_address = allocatorProxy_->get_virtual_address(rrc.address);
+      rrc.ck = nullptr;
+      Chunk *base_ck = allocatorProxy_->get_rma_chunk(rrc.address);
+      networkServer_->get_pmem_buffer(&rrc, base_ck);
       std::shared_ptr<RequestReply> requestReply =
           std::make_shared<RequestReply>(rrc);
-      rrc->ck->ptr = requestReply.get();
+      rrc.ck->ptr = requestReply.get();
 
       std::unique_lock<std::mutex> lk(rrcMtx_);
-      rrcMap_[rrc->ck->buffer_id] = requestReply;
+      rrcMap_[rrc.ck->buffer_id] = requestReply;
       lk.unlock();
       networkServer_->write(requestReply);
       break;
     }
     case PUT: {
-      rrc->type = PUT_REPLY;
-      rrc->success = 0;
-      rrc->rid = rc.rid;
-      rrc->src_address = rc.src_address;
-      rrc->src_rkey = rc.src_rkey;
-      rrc->size = rc.size;
-      rrc->key = rc.key;
-      rrc->con = rc.con;
+      rrc.type = PUT_REPLY;
+      rrc.success = 0;
+      rrc.rid = rc.rid;
+      rrc.src_address = rc.src_address;
+      rrc.src_rkey = rc.src_rkey;
+      rrc.size = rc.size;
+      rrc.key = rc.key;
+      rrc.con = rc.con;
       /////// Use Pmem Addr /////////
       uint64_t addr = allocatorProxy_->allocate_and_write(
           rc.size, nullptr, rc.rid % config_->get_pool_size());
-      rrc->address = addr;
-      rrc->dest_address = allocatorProxy_->get_virtual_address(addr);
+      rrc.address = addr;
+      rrc.dest_address = allocatorProxy_->get_virtual_address(addr);
       Chunk *base_ck = allocatorProxy_->get_rma_chunk(addr);
-      networkServer_->get_pmem_buffer(rrc, base_ck);
+      networkServer_->get_pmem_buffer(&rrc, base_ck);
       ///////////////////////////////
       std::shared_ptr<RequestReply> requestReply =
           std::make_shared<RequestReply>(rrc);
-      rrc->ck->ptr = requestReply.get();
+      rrc.ck->ptr = requestReply.get();
 
       std::unique_lock<std::mutex> lk(rrcMtx_);
-      rrcMap_[rrc->ck->buffer_id] = requestReply;
+      rrcMap_[rrc.ck->buffer_id] = requestReply;
       lk.unlock();
       networkServer_->read(requestReply);
       break;
     }
     case GET: {
-      rrc->type = GET_REPLY;
-      rrc->success = 0;
-      rrc->rid = rc.rid;
-      rrc->src_address = rc.src_address;
-      rrc->src_rkey = rc.src_rkey;
-      rrc->size = rc.size;
-      rrc->key = rc.key;
-      rrc->con = rc.con;
-      rrc->ck = nullptr;
-      auto bml = allocatorProxy_->get_cached_chunk(rrc->key);
+      rrc.type = GET_REPLY;
+      rrc.success = 0;
+      rrc.rid = rc.rid;
+      rrc.src_address = rc.src_address;
+      rrc.src_rkey = rc.src_rkey;
+      rrc.size = rc.size;
+      rrc.key = rc.key;
+      rrc.con = rc.con;
+      rrc.ck = nullptr;
+      auto bml = allocatorProxy_->get_cached_chunk(rrc.key);
       uint64_t wrote_size = 0;
       if (bml.size() == 1) {
-        rrc->address = bml[0].address;
-        rrc->dest_address = allocatorProxy_->get_virtual_address(rrc->address);
-        Chunk *base_ck = allocatorProxy_->get_rma_chunk(rrc->address);
-        networkServer_->get_pmem_buffer(rrc, base_ck);
+        rrc.address = bml[0].address;
+        rrc.dest_address = allocatorProxy_->get_virtual_address(rrc.address);
+        Chunk *base_ck = allocatorProxy_->get_rma_chunk(rrc.address);
+        networkServer_->get_pmem_buffer(&rrc, base_ck);
       } else {
         fprintf(stderr, "key %ld has zero or more than one BlockMeta\n",
-                rrc->key);
+                rrc.key);
         throw;
-        networkServer_->get_dram_buffer(rrc);
-        rrc->address = rrc->dest_address;
-        for (auto bm : bml) {
-          if ((wrote_size + bm.size) <= rrc->size) {
-            auto partition_data = reinterpret_cast<char *>(
-                allocatorProxy_->get_virtual_address(bm.address));
-            auto dest_address = reinterpret_cast<char *>(rrc->dest_address);
-            if ((wrote_size + bm.size) < rrc->size) {
-              printf("[GET]key is %ld, rrc->size is %ld, bm.size is %ld\n",
-                     rrc->key, rrc->size, bm.size);
-            }
-            memcpy((dest_address + wrote_size), partition_data, bm.size);
-            wrote_size += bm.size;
-          }
-        }
-        rrc->size = wrote_size;
       }
       std::shared_ptr<RequestReply> requestReply =
           std::make_shared<RequestReply>(rrc);
-      rrc->ck->ptr = requestReply.get();
+      rrc.ck->ptr = requestReply.get();
       std::unique_lock<std::mutex> lk(rrcMtx_);
-      rrcMap_[rrc->ck->buffer_id] = requestReply;
+      rrcMap_[rrc.ck->buffer_id] = requestReply;
       lk.unlock();
       networkServer_->write(requestReply);
       break;
     }
     case GET_META: {
-      rrc->type = GET_META_REPLY;
-      rrc->success = 0;
-      rrc->rid = rc.rid;
-      rrc->size = rc.size;
-      rrc->key = rc.key;
-      rrc->con = rc.con;
+      rrc.type = GET_META_REPLY;
+      rrc.success = 0;
+      rrc.rid = rc.rid;
+      rrc.size = rc.size;
+      rrc.key = rc.key;
+      rrc.con = rc.con;
       std::shared_ptr<RequestReply> requestReply =
           std::make_shared<RequestReply>(rrc);
       enqueue_finalize_msg(requestReply);
@@ -398,11 +382,11 @@ void Protocol::handle_recv_msg(std::shared_ptr<Request> request) {
     case DELETE: {
       log_->get_console_log()->info(
           "Protocol::handle_recv_msg Delete request.");
-      rrc->type = DELETE_REPLY;
-      rrc->key = rc.key;
-      rrc->con = rc.con;
-      rrc->rid = rc.rid;
-      rrc->success = 0;
+      rrc.type = DELETE_REPLY;
+      rrc.key = rc.key;
+      rrc.con = rc.con;
+      rrc.rid = rc.rid;
+      rrc.success = 0;
     }
     default: { break; }
   }
@@ -414,63 +398,63 @@ void Protocol::enqueue_finalize_msg(
 }
 
 void Protocol::handle_finalize_msg(std::shared_ptr<RequestReply> requestReply) {
-  std::shared_ptr<RequestReplyContext> rrc = requestReply->get_rrc();
-  if (rrc->type == PUT_REPLY) {
-    allocatorProxy_->cache_chunk(rrc->key, rrc->address, rrc->size,
+  auto rrc = requestReply->get_rrc();
+  if (rrc.type == PUT_REPLY) {
+    allocatorProxy_->cache_chunk(rrc.key, rrc.address, rrc.size,
                                  networkServer_->get_rkey());
-  } else if (rrc->type == GET_META_REPLY) {
-    auto bml = allocatorProxy_->get_cached_chunk(rrc->key);
-    requestReply->requestReplyContext_->bml = bml;
-  } else if (rrc->type == DELETE_REPLY) {
-    auto bml = allocatorProxy_->get_cached_chunk(rrc->key);
+  } else if (rrc.type == GET_META_REPLY) {
+    auto bml = allocatorProxy_->get_cached_chunk(rrc.key);
+    requestReply->requestReplyContext_.bml = bml;
+  } else if (rrc.type == DELETE_REPLY) {
+    auto bml = allocatorProxy_->get_cached_chunk(rrc.key);
     for (auto bm : bml) {
-      rrc->success = allocatorProxy_->release(bm.address);
-      if (rrc->success) {
+      rrc.success = allocatorProxy_->release(bm.address);
+      if (rrc.success) {
         break;
       }
     }
-    allocatorProxy_->del_chunk(rrc->key);
-  } else if (rrc->type == GET_REPLY) {
+    allocatorProxy_->del_chunk(rrc.key);
+  } else if (rrc.type == GET_REPLY) {
   } else {
   }
   requestReply->encode();
   networkServer_->send(reinterpret_cast<char *>(requestReply->data_),
-                       requestReply->size_, rrc->con);
+                       requestReply->size_, rrc.con);
 }
 
 void Protocol::enqueue_rma_msg(uint64_t buffer_id) {
   std::unique_lock<std::mutex> lk(rrcMtx_);
   auto requestReply = rrcMap_[buffer_id];
   lk.unlock();
-  std::shared_ptr<RequestReplyContext> rrc = requestReply->get_rrc();
-  if (rrc->address != 0) {
-    auto wid = GET_WID(rrc->address);
+  auto rrc = requestReply->get_rrc();
+  if (rrc.address != 0) {
+    auto wid = GET_WID(rrc.address);
     readWorkers_[wid]->addTask(requestReply);
   } else {
-    readWorkers_[rrc->rid % config_->get_pool_size()]->addTask(requestReply);
+    readWorkers_[rrc.rid % config_->get_pool_size()]->addTask(requestReply);
   }
 }
 
 void Protocol::handle_rma_msg(std::shared_ptr<RequestReply> requestReply) {
-  std::shared_ptr<RequestReplyContext> rrc = requestReply->get_rrc();
-  switch (rrc->type) {
+  auto rrc = requestReply->get_rrc();
+  switch (rrc.type) {
     case WRITE_REPLY: {
-      char *buffer = static_cast<char *>(rrc->ck->buffer);
-      if (rrc->address == 0) {
-        rrc->address = allocatorProxy_->allocate_and_write(
-            rrc->size, buffer, rrc->rid % config_->get_pool_size());
+      char *buffer = static_cast<char *>(rrc.ck->buffer);
+      if (rrc.address == 0) {
+        rrc.address = allocatorProxy_->allocate_and_write(
+            rrc.size, buffer, rrc.rid % config_->get_pool_size());
       } else {
-        allocatorProxy_->write(rrc->address, buffer, rrc->size);
+        allocatorProxy_->write(rrc.address, buffer, rrc.size);
       }
-      networkServer_->reclaim_dram_buffer(rrc);
+      networkServer_->reclaim_dram_buffer(&rrc);
       break;
     }
     case READ_REPLY: {
-      networkServer_->reclaim_pmem_buffer(rrc);
+      networkServer_->reclaim_pmem_buffer(&rrc);
       break;
     }
     case PUT_REPLY: {
-      char *buffer = static_cast<char *>(rrc->ck->buffer);
+      char *buffer = static_cast<char *>(rrc.ck->buffer);
 #ifdef DEBUG
       std::stringstream ss;
       char tmp[150] = {};
@@ -479,20 +463,20 @@ void Protocol::handle_rma_msg(std::shared_ptr<RequestReply> requestReply) {
       }
       ss << tmp;
       ss << " ... ";
-      auto start = rrc->size - 51;
+      auto start = rrc.size - 51;
       for (int i = 0; i < 50; i++) {
         sprintf(tmp + (i * 3), "%02X ", *(buffer + start + i) & 0xff);
       }
       ss << tmp;
       ss << std::endl;
-      fprintf(stderr, "key is %lu, size is %ld, content is %s\n", rrc->key,
-              rrc->size, ss.str().c_str());
+      fprintf(stderr, "key is %lu, size is %ld, content is %s\n", rrc.key,
+              rrc.size, ss.str().c_str());
 #endif
-      networkServer_->reclaim_pmem_buffer(rrc);
+      networkServer_->reclaim_pmem_buffer(&rrc);
       break;
     }
     case GET_REPLY: {
-      networkServer_->reclaim_pmem_buffer(rrc);
+      networkServer_->reclaim_pmem_buffer(&rrc);
       break;
     }
     default: { break; }

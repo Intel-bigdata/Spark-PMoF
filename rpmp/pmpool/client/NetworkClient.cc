@@ -103,13 +103,11 @@ uint64_t RequestHandler::wait(std::shared_ptr<Request> request) {
   if (ctx->op_failed) {
     res = -1;
   }
-  // res = ctx->requestReplyContext->size;
   inflight_erase(request);
   return res;
 }
 
-std::shared_ptr<RequestReplyContext> RequestHandler::get(
-    std::shared_ptr<Request> request) {
+RequestReplyContext &RequestHandler::get(std::shared_ptr<Request> request) {
   auto ctx = inflight_insert_or_get(request);
   unique_lock<mutex> lk(ctx->mtx_reply);
   while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request] {
@@ -126,7 +124,7 @@ std::shared_ptr<RequestReplyContext> RequestHandler::get(
     return ctx->op_finished;
   })) {
   }
-  auto res = std::move(ctx->requestReplyContext);
+  auto res = ctx->get_rrc();
   if (ctx->op_failed) {
     throw;
   }
@@ -136,14 +134,14 @@ std::shared_ptr<RequestReplyContext> RequestHandler::get(
 
 void RequestHandler::notify(std::shared_ptr<RequestReply> requestReply) {
   const std::lock_guard<std::mutex> lock(inflight_mtx_);
-  auto rid = requestReply->get_rrc()->rid;
+  auto rid = requestReply->get_rrc().rid;
   auto ctx = inflight_[rid];
   ctx->op_finished = true;
   auto rrc = requestReply->get_rrc();
-  ctx->requestReplyContext = std::move(rrc);
-  if (callback_map.count(ctx->requestReplyContext->rid) != 0) {
-    callback_map[ctx->requestReplyContext->rid]();
-    callback_map.erase(ctx->requestReplyContext->rid);
+  ctx->requestReplyContext = rrc;
+  if (callback_map.count(ctx->requestReplyContext.rid) != 0) {
+    callback_map[ctx->requestReplyContext.rid]();
+    callback_map.erase(ctx->requestReplyContext.rid);
   } else {
     ctx->cv_reply.notify_one();
   }
@@ -225,67 +223,11 @@ void ClientRecvCallback::operator()(void *param_1, void *param_2) {
   int mid = *static_cast<int *>(param_1);
   auto ck = chunkMgr_->get(mid);
 
-  // test start
-  // auto con = reinterpret_cast<Connection*>(ck->con);
-  // if (count_ == 0) {
-  //   start = timestamp_now();
-  // }
-  // count_++;
-  // if (count_ >= 1000000) {
-  //   end = timestamp_now();
-  //   std::cout << "consumes " << (end-start)/1000.0 << std::endl;
-  //   return;
-  // }
-  // RequestContext rc = {};
-  // rc.type = READ;
-  // rc.rid = 0;
-  // rc.size = 0;
-  // rc.address = 0;
-  // Request request(rc);
-  // request.encode();
-  // auto new_ck = chunkMgr_->get(con);
-  // memcpy(new_ck->buffer, request.data_, request.size_);
-  // new_ck->size = request.size_;
-  // con->send(new_ck);
-  // test end
-
   auto requestReply = std::make_shared<RequestReply>(
       reinterpret_cast<char *>(ck->buffer), ck->size,
       reinterpret_cast<Connection *>(ck->con));
   requestReply->decode();
   requestHandler_->notify(requestReply);
-  /*auto rrc = requestReply->get_rrc();
-  switch (rrc->type) {
-    case ALLOC_REPLY: {
-      requestHandler_->notify(requestReply);
-      break;
-    }
-    case FREE_REPLY: {
-      requestHandler_->notify(requestReply);
-      break;
-    }
-    case WRITE_REPLY: {
-      requestHandler_->notify(requestReply);
-      break;
-    }
-    case READ_REPLY: {
-      requestHandler_->notify(requestReply);
-      break;
-    }
-    case PUT_REPLY: {
-      requestHandler_->notify(requestReply);
-      break;
-    }
-    case GET_REPLY: {
-      requestHandler_->notify(requestReply);
-      break;
-    }
-    case GET_META_REPLY: {
-      requestHandler_->notify(requestReply);
-      break;
-    }
-    default: {}
-  }*/
   chunkMgr_->reclaim(ck, static_cast<Connection *>(ck->con));
 }
 

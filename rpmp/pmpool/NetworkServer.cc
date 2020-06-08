@@ -60,7 +60,7 @@ void NetworkServer::unregister_rma_buffer(int buffer_id) {
   server_->unreg_rma_buffer(buffer_id);
 }
 
-void NetworkServer::get_dram_buffer(std::shared_ptr<RequestReplyContext> rrc) {
+void NetworkServer::get_dram_buffer(RequestReplyContext *rrc) {
   char *buffer = circularBuffer_->get(rrc->size);
 #ifdef DEBUG
   fprintf(stderr, "[get_dram_buffer]key is %lu, start is %lu, end is %lu\n",
@@ -83,15 +83,13 @@ void NetworkServer::get_dram_buffer(std::shared_ptr<RequestReplyContext> rrc) {
   rrc->ck = ck;
 }
 
-void NetworkServer::reclaim_dram_buffer(
-    std::shared_ptr<RequestReplyContext> rrc) {
+void NetworkServer::reclaim_dram_buffer(RequestReplyContext *rrc) {
   char *buffer_tmp = reinterpret_cast<char *>(rrc->dest_address);
   circularBuffer_->put(buffer_tmp, rrc->size);
   delete rrc->ck;
 }
 
-void NetworkServer::get_pmem_buffer(std::shared_ptr<RequestReplyContext> rrc,
-                                    Chunk *base_ck) {
+void NetworkServer::get_pmem_buffer(RequestReplyContext *rrc, Chunk *base_ck) {
   Chunk *ck = new Chunk();
   ck->buffer = reinterpret_cast<char *>(rrc->dest_address);
   ck->capacity = rrc->size;
@@ -101,8 +99,7 @@ void NetworkServer::get_pmem_buffer(std::shared_ptr<RequestReplyContext> rrc,
   rrc->ck = ck;
 }
 
-void NetworkServer::reclaim_pmem_buffer(
-    std::shared_ptr<RequestReplyContext> rrc) {
+void NetworkServer::reclaim_pmem_buffer(RequestReplyContext *rrc) {
   if (rrc->ck != nullptr) {
     delete rrc->ck;
   }
@@ -143,7 +140,7 @@ void NetworkServer::read(std::shared_ptr<RequestReply> rr) {
   printf("[NetworkServer::read] dest is %ld-%d, src is %ld-%d\n",
          rrc->ck->buffer, rrc->ck->size, rrc->src_address, rrc->size);
 #endif
-  rrc->con->read(rrc->ck, 0, rrc->size, rrc->src_address, rrc->src_rkey);
+  rrc.con->read(rrc.ck, 0, rrc.size, rrc.src_address, rrc.src_rkey);
 }
 
 void NetworkServer::write(std::shared_ptr<RequestReply> rr) {
@@ -152,5 +149,5 @@ void NetworkServer::write(std::shared_ptr<RequestReply> rr) {
   printf("[NetworkServer::write] src is %ld-%d, dest is %ld-%d\n",
          rrc->ck->buffer, rrc->ck->size, rrc->src_address, rrc->size);
 #endif
-  rrc->con->write(rrc->ck, 0, rrc->size, rrc->src_address, rrc->src_rkey);
+  rrc.con->write(rrc.ck, 0, rrc.size, rrc.src_address, rrc.src_rkey);
 }

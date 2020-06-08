@@ -48,19 +48,19 @@ class NetworkServer : public RmaBufferRegister,
   void unregister_rma_buffer(int buffer_id) override;
 
   /// get DRAM buffer from circular buffer pool.
-  void get_dram_buffer(std::shared_ptr<RequestReplyContext> rrc);
+  void get_dram_buffer(RequestReplyContext *rrc);
 
   /// reclaim DRAM buffer from circular buffer pool.
-  void reclaim_dram_buffer(std::shared_ptr<RequestReplyContext> rrc);
+  void reclaim_dram_buffer(RequestReplyContext *rrc);
 
   /// get rdma registered memory key for client.
   uint64_t get_rkey();
 
   /// get Persistent Memory buffer from circular buffer pool
-  void get_pmem_buffer(std::shared_ptr<RequestReplyContext> rrc, Chunk *ck);
+  void get_pmem_buffer(RequestReplyContext *rrc, Chunk *ck);
 
   /// reclaim Persistent Memory buffer form circular buffer pool
-  void reclaim_pmem_buffer(std::shared_ptr<RequestReplyContext> rrc);
+  void reclaim_pmem_buffer(RequestReplyContext *rrc);
 
   /// return the pointer of chunk manager.
   std::shared_ptr<ChunkMgr> get_chunk_mgr();

@@ -59,16 +59,15 @@ void Request::decode() {
   requestContext_.key = requestMsg->key;
 }
 
-RequestReply::RequestReply(
-    std::shared_ptr<RequestReplyContext> requestReplyContext)
+RequestReply::RequestReply(RequestReplyContext &requestReplyContext)
     : data_(nullptr), size_(0), requestReplyContext_(requestReplyContext) {}
 
 RequestReply::RequestReply(char *data, uint64_t size, Connection *con)
     : size_(size) {
   data_ = static_cast<char *>(std::malloc(size_));
   memcpy(data_, data, size_);
-  requestReplyContext_ = std::make_shared<RequestReplyContext>();
-  requestReplyContext_->con = con;
+  requestReplyContext_ = RequestReplyContext();
+  requestReplyContext_.con = con;
 }
 
 RequestReply::~RequestReply() {
@@ -79,32 +78,30 @@ RequestReply::~RequestReply() {
   }
 }
 
-std::shared_ptr<RequestReplyContext> RequestReply::get_rrc() {
-  return requestReplyContext_;
-}
+RequestReplyContext &RequestReply::get_rrc() { return requestReplyContext_; }
 
 void RequestReply::encode() {
   const std::lock_guard<std::mutex> lock(data_lock_);
   RequestReplyMsg requestReplyMsg;
-  requestReplyMsg.type = (OpType)requestReplyContext_->type;
-  requestReplyMsg.success = requestReplyContext_->success;
-  requestReplyMsg.rid = requestReplyContext_->rid;
-  requestReplyMsg.address = requestReplyContext_->address;
-  requestReplyMsg.size = requestReplyContext_->size;
-  requestReplyMsg.key = requestReplyContext_->key;
+  requestReplyMsg.type = (OpType)requestReplyContext_.type;
+  requestReplyMsg.success = requestReplyContext_.success;
+  requestReplyMsg.rid = requestReplyContext_.rid;
+  requestReplyMsg.address = requestReplyContext_.address;
+  requestReplyMsg.size = requestReplyContext_.size;
+  requestReplyMsg.key = requestReplyContext_.key;
   auto msg_size = sizeof(requestReplyMsg);
   size_ = msg_size;
 
   /// copy data from block metadata list
   uint32_t bml_size = 0;
-  if (!requestReplyContext_->bml.empty()) {
-    bml_size = sizeof(block_meta) * requestReplyContext_->bml.size();
+  if (!requestReplyContext_.bml.empty()) {
+    bml_size = sizeof(block_meta) * requestReplyContext_.bml.size();
     size_ += bml_size;
   }
   data_ = static_cast<char *>(std::malloc(size_));
   memcpy(data_, &requestReplyMsg, msg_size);
   if (bml_size != 0) {
-    memcpy(data_ + msg_size, &requestReplyContext_->bml[0], bml_size);
+    memcpy(data_ + msg_size, &requestReplyContext_.bml[0], bml_size);
   }
 }
 
@@ -117,16 +114,16 @@ void RequestReply::decode() {
     throw;
   }
   RequestReplyMsg *requestReplyMsg = (RequestReplyMsg *)data_;
-  requestReplyContext_->type = (OpType)requestReplyMsg->type;
-  requestReplyContext_->success = requestReplyMsg->success;
-  requestReplyContext_->rid = requestReplyMsg->rid;
-  requestReplyContext_->address = requestReplyMsg->address;
-  requestReplyContext_->size = requestReplyMsg->size;
-  requestReplyContext_->key = requestReplyMsg->key;
+  requestReplyContext_.type = (OpType)requestReplyMsg->type;
+  requestReplyContext_.success = requestReplyMsg->success;
+  requestReplyContext_.rid = requestReplyMsg->rid;
+  requestReplyContext_.address = requestReplyMsg->address;
+  requestReplyContext_.size = requestReplyMsg->size;
+  requestReplyContext_.key = requestReplyMsg->key;
   if (size_ > sizeof(RequestReplyMsg)) {
     auto bml_size = size_ - sizeof(RequestReplyMsg);
-    requestReplyContext_->bml.resize(bml_size / sizeof(block_meta));
-    memcpy(&requestReplyContext_->bml[0], data_ + sizeof(RequestReplyMsg),
+    requestReplyContext_.bml.resize(bml_size / sizeof(block_meta));
+    memcpy(&requestReplyContext_.bml[0], data_ + sizeof(RequestReplyMsg),
            bml_size);
   }
 }

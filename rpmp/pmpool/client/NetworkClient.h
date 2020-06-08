@@ -59,7 +59,7 @@ class RequestHandler : public ThreadWrapper {
   void abort() override {}
   void notify(std::shared_ptr<RequestReply> requestReply);
   uint64_t wait(std::shared_ptr<Request> request);
-  std::shared_ptr<RequestReplyContext> get(std::shared_ptr<Request> request);
+  RequestReplyContext &get(std::shared_ptr<Request> request);
 
  private:
   std::shared_ptr<NetworkClient> networkClient_;
@@ -77,7 +77,8 @@ class RequestHandler : public ThreadWrapper {
     bool op_finished = false;
     bool op_failed = false;
     InflightRequestContext() { start = std::chrono::steady_clock::now(); }
-    std::shared_ptr<RequestReplyContext> requestReplyContext;
+    RequestReplyContext requestReplyContext;
+    RequestReplyContext &get_rrc() { return requestReplyContext; }
   };
   std::unordered_map<uint64_t, std::shared_ptr<InflightRequestContext>>
       inflight_;

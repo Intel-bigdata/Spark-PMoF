@@ -52,7 +52,7 @@ uint64_t PmPoolClient::alloc(uint64_t size) {
   rc.size = size;
   auto request = std::make_shared<Request>(rc);
   requestHandler_->addTask(request);
-  return requestHandler_->get(request)->address;
+  return requestHandler_->get(request).address;
 }
 
 int PmPoolClient::free(uint64_t address) {
@@ -62,7 +62,7 @@ int PmPoolClient::free(uint64_t address) {
   rc.address = address;
   auto request = std::make_shared<Request>(rc);
   requestHandler_->addTask(request);
-  return requestHandler_->get(request)->success;
+  return requestHandler_->get(request).success;
 }
 
 void PmPoolClient::shutdown() { networkClient_->shutdown(); }
@@ -80,7 +80,7 @@ int PmPoolClient::write(uint64_t address, const char *data, uint64_t size) {
   rc.src_rkey = networkClient_->get_rkey();
   auto request = std::make_shared<Request>(rc);
   requestHandler_->addTask(request);
-  auto res = requestHandler_->get(request)->success;
+  auto res = requestHandler_->get(request).success;
   networkClient_->reclaim_dram_buffer(rc.src_address, rc.size);
   return res;
 }
@@ -96,7 +96,7 @@ uint64_t PmPoolClient::write(const char *data, uint64_t size) {
   rc.src_rkey = networkClient_->get_rkey();
   auto request = std::make_shared<Request>(rc);
   requestHandler_->addTask(request);
-  auto res = requestHandler_->get(request)->address;
+  auto res = requestHandler_->get(request).address;
   networkClient_->reclaim_dram_buffer(rc.src_address, rc.size);
   return res;
 }
@@ -112,7 +112,7 @@ int PmPoolClient::read(uint64_t address, char *data, uint64_t size) {
   rc.src_rkey = networkClient_->get_rkey();
   auto request = std::make_shared<Request>(rc);
   requestHandler_->addTask(request);
-  auto res = requestHandler_->get(request)->success;
+  auto res = requestHandler_->get(request).success;
   if (!res) {
     memcpy(data, reinterpret_cast<char *>(rc.src_address), size);
   }
@@ -132,7 +132,7 @@ int PmPoolClient::read(uint64_t address, char *data, uint64_t size,
   rc.src_rkey = networkClient_->get_rkey();
   auto request = std::make_shared<Request>(rc);
   requestHandler_->addTask(request, [&] {
-    auto res = requestHandler_->get(request)->success;
+    auto res = requestHandler_->get(request).success;
     if (res) {
       memcpy(data, reinterpret_cast<char *>(rc.src_address), size);
     }
@@ -224,14 +224,7 @@ vector<block_meta> PmPoolClient::getMeta(const string &key) {
   auto request = std::make_shared<Request>(rc);
   requestHandler_->addTask(request);
   auto rrc = requestHandler_->get(request);
-  if (rrc->type == GET_META_REPLY) {
-    return rrc->bml;
-  } else {
-    std::string err_msg =
-        "GetMeta function got " + std::to_string(rrc->type) + " msg.";
-    std::cerr << err_msg << std::endl;
-    throw;
-  }
+  return rrc.bml;
 }
 
 int PmPoolClient::del(const string &key) {
@@ -243,6 +236,6 @@ int PmPoolClient::del(const string &key) {
   rc.key = key_uint;
   auto request = std::make_shared<Request>(rc);
   requestHandler_->addTask(request);
-  auto res = requestHandler_->get(request)->success;
+  auto res = requestHandler_->get(request).success;
   return res;
 }
