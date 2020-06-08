@@ -23,34 +23,39 @@ class PmemOutputStream(
   val length: Int = bufferSize
   var bufferFlushedSize: Int = 0
   var bufferRemainingSize: Int = 0
-  val buf: ByteBuf = NettyByteBufferPool.allocateNewBuffer(length)
-  val byteBuffer: ByteBuffer = buf.nioBuffer(0, length)
+  val buf: ByteBuf = NettyByteBufferPool.allocateFlexibleNewBuffer(length)
   var flushed_block_id: String = _
-  var cur_block_id: String = _
+  var cur_block_id: String = blockId
 
   override def write(bytes: Array[Byte], off: Int, len: Int): Unit = {
-    byteBuffer.put(bytes, off, len)
+    buf.writeBytes(bytes, off, len)
     bufferRemainingSize += len
   }
 
   override def write(byte: Int): Unit = {
-    byteBuffer.putInt(byte)
+    buf.writeInt(byte)
     bufferRemainingSize += 4
   }
 
   override def flush(): Unit = {
     if (bufferRemainingSize > 0) {
       if (remotePersistentMemoryPool != null) {
-        logWarning(s" [PUT Started]${cur_block_id}-${bufferRemainingSize}")
+        logDebug(s" [PUT Started]${cur_block_id}-${bufferRemainingSize}")
+        val byteBuffer: ByteBuffer = buf.nioBuffer()
         if (remotePersistentMemoryPool.put(cur_block_id, byteBuffer, bufferRemainingSize) == -1) {
-          throw new IOException(
-            s"${cur_block_id}-${bufferRemainingSize} RPMem put failed due to time out.")
+          logWarning(
+            s"${cur_block_id}-${bufferRemainingSize} RPMem put failed due to time out, try again")
+          if (remotePersistentMemoryPool.put(cur_block_id, byteBuffer, bufferRemainingSize) == -1) {
+            throw new IOException(
+              s"${cur_block_id}-${bufferRemainingSize} RPMem put failed due to time out.")
+          }
         }
-        logWarning(s" [PUT Completed]${cur_block_id}-${bufferRemainingSize}")
+        logDebug(s" [PUT Completed]${cur_block_id}-${bufferRemainingSize}")
         key_id += 1
         flushed_block_id = cur_block_id
         cur_block_id = s"${blockId}_${key_id}"
       } else {
+        val byteBuffer: ByteBuffer = buf.nioBuffer()
         persistentMemoryWriter.setPartition(
           numPartitions,
           blockId,
@@ -77,7 +82,7 @@ class PmemOutputStream(
   def reset(): Unit = {
     bufferRemainingSize = 0
     bufferFlushedSize = 0
-    byteBuffer.clear()
+    buf.clear()
   }
 
   override def close(): Unit = synchronized {

@@ -157,7 +157,11 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
   rc.rid = rid_++;
   rc.size = size;
   rc.address = 0;
-  // allocate memory for RMA read from client.
+// allocate memory for RMA read from client.
+#ifdef DEBUG
+  std::cout << "[PmPoolClient::put start] " << key << "-" << rc.size
+            << ", hashkey is " << key_uint << std::endl;
+#endif
   rc.src_address = networkClient_->get_dram_buffer(value, rc.size);
   rc.src_rkey = networkClient_->get_rkey();
 #ifdef DEBUG

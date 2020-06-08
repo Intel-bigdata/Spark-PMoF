@@ -92,6 +92,7 @@ class RequestReply {
   RequestReply(char* data, uint64_t size, Connection* con);
   ~RequestReply();
   RequestReplyContext& get_rrc();
+  void set_rrc(RequestReplyContext& rrc);
   void decode();
   void encode();
 

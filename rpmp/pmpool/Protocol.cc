@@ -318,13 +318,16 @@ void Protocol::handle_recv_msg(std::shared_ptr<Request> request) {
       rrc.size = rc.size;
       rrc.key = rc.key;
       rrc.con = rc.con;
+      /////// Use DRAM Addr ////////
+      rrc.address = rc.address;
+      networkServer_->get_dram_buffer(&rrc);
       /////// Use Pmem Addr /////////
-      uint64_t addr = allocatorProxy_->allocate_and_write(
+      /*uint64_t addr = allocatorProxy_->allocate_and_write(
           rc.size, nullptr, rc.rid % config_->get_pool_size());
       rrc.address = addr;
       rrc.dest_address = allocatorProxy_->get_virtual_address(addr);
       Chunk *base_ck = allocatorProxy_->get_rma_chunk(addr);
-      networkServer_->get_pmem_buffer(&rrc, base_ck);
+      networkServer_->get_pmem_buffer(&rrc, base_ck);*/
       ///////////////////////////////
       std::shared_ptr<RequestReply> requestReply =
           std::make_shared<RequestReply>(rrc);
@@ -408,7 +411,8 @@ void Protocol::handle_finalize_msg(std::shared_ptr<RequestReply> requestReply) {
   } else if (rrc.type == DELETE_REPLY) {
     auto bml = allocatorProxy_->get_cached_chunk(rrc.key);
     for (auto bm : bml) {
-      rrc.success = allocatorProxy_->release(bm.address);
+      requestReply->requestReplyContext_.success =
+          allocatorProxy_->release(bm.address);
       if (rrc.success) {
         break;
       }
@@ -472,7 +476,14 @@ void Protocol::handle_rma_msg(std::shared_ptr<RequestReply> requestReply) {
       fprintf(stderr, "key is %lu, size is %ld, content is %s\n", rrc.key,
               rrc.size, ss.str().c_str());
 #endif
-      networkServer_->reclaim_pmem_buffer(&rrc);
+      //////////// DRAM ////////////
+      rrc.address = allocatorProxy_->allocate_and_write(
+          rrc.size, buffer, rrc.rid % config_->get_pool_size());
+      networkServer_->reclaim_dram_buffer(&rrc);
+      requestReply->requestReplyContext_.address = rrc.address;
+      //////////// PMEM ////////////
+      // networkServer_->reclaim_pmem_buffer(&rrc);
+      //////////////////////////////
       break;
     }
     case GET_REPLY: {

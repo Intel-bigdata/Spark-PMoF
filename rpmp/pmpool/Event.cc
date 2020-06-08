@@ -80,6 +80,11 @@ RequestReply::~RequestReply() {
 
 RequestReplyContext &RequestReply::get_rrc() { return requestReplyContext_; }
 
+void RequestReply::set_rrc(RequestReplyContext &rrc) {
+  memcpy(&requestReplyContext_, &rrc, sizeof(RequestReplyContext));
+  uint32_t bml_size = 0;
+}
+
 void RequestReply::encode() {
   const std::lock_guard<std::mutex> lock(data_lock_);
   RequestReplyMsg requestReplyMsg;

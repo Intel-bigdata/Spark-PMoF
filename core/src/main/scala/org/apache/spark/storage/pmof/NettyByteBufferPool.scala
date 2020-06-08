@@ -31,6 +31,7 @@ object NettyByteBufferPool extends Logging {
         allocator.directBuffer(bufSize, bufSize)
       }*/
       val byteBuf = allocator.directBuffer(bufSize, bufSize)
+      //val byteBuf = allocator.directBuffer(65536, bufSize * 2)
       bufferMap += (byteBuf -> bufSize)
       byteBuf
     } catch {
@@ -39,15 +40,21 @@ object NettyByteBufferPool extends Logging {
         throw e
     }
   }
-
-  def allocateNewBuffer(): ByteBuf = synchronized {
-    allocator.directBuffer()
+  def allocateFlexibleNewBuffer(bufSize: Int): ByteBuf = synchronized {
+    val byteBuf = allocator.directBuffer(65536, bufSize * 2)
+    bufferMap += (byteBuf -> bufSize)
+    byteBuf
   }
 
   def releaseBuffer(buf: ByteBuf): Unit = synchronized {
     allocatedBufRenCnt.getAndDecrement()
-    val bufSize = bufferMap(buf)
-    allocatedBytes.getAndAdd(bufSize)
+    try {
+      val bufSize = bufferMap(buf)
+      allocatedBytes.getAndAdd(bufSize)
+
+    } catch {
+      case e: NoSuchElementException => {}
+    }
     buf.clear()
     //allocatedBufferPool.push(buf)
     buf.release(buf.refCnt())

@@ -12,9 +12,9 @@ import org.apache.spark.util.configuration.pmof.PmofConf
 
 import scala.collection.mutable.ArrayBuffer
 
-class PmemBlockId(executorId: String, stageId: Int, tmpId: Int)
+class PmemBlockId(executorId: String, stageId: Int, tmpName: String, tmpId: Int)
     extends ShuffleBlockId(stageId, 0, tmpId) {
-  override def name: String = s"reduce_spill_${executorId}_${stageId}_${tmpId}"
+  override def name: String = s"reduce_spill_${executorId}_${tmpName}_${tmpId}"
 
   override def isShuffle: Boolean = false
 }
@@ -22,11 +22,12 @@ class PmemBlockId(executorId: String, stageId: Int, tmpId: Int)
 object PmemBlockId {
   private var tempId: Int = 0
 
-  def getTempBlockId(executorId: String, stageId: Int): PmemBlockId = synchronized {
-    val cur_tempId = tempId
-    tempId += 1
-    new PmemBlockId(executorId, stageId, cur_tempId)
-  }
+  def getTempBlockId(executorId: String, tmpName: String, stageId: Int): PmemBlockId =
+    synchronized {
+      val cur_tempId = tempId
+      tempId += 1
+      new PmemBlockId(executorId, stageId, tmpName, cur_tempId)
+    }
 }
 
 private[spark] class PmemBlockOutputStream(
@@ -114,7 +115,7 @@ private[spark] class PmemBlockOutputStream(
     flush()
 
     }*/
-    if ((pmofConf.spill_throttle != -1 && bs.available >= pmofConf.spill_throttle) || force == true) {
+    if ((pmofConf.spill_throttle != -1 && pmemOutputStream.bufferRemainingSize >= pmofConf.spill_throttle) || force == true) {
       val start = System.nanoTime()
       flush()
       //  pmemOutputStream.flush()

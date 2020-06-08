@@ -1,6 +1,7 @@
 package org.apache.spark.util.collection.pmof
 
 import java.util.Comparator
+import java.util.UUID
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -24,6 +25,7 @@ private[spark] class PmemExternalSorter[K, V, C](
     serializer: Serializer = SparkEnv.get.serializer)
     extends ExternalSorter[K, V, C](context, aggregator, partitioner, ordering, serializer)
     with Logging {
+  logWarning(s"${blockManager.blockManagerId.executorId} PmemExternalSorter created.")
   private[this] val pmemBlockOutputStreamArray: ArrayBuffer[PmemBlockOutputStream] =
     ArrayBuffer[PmemBlockOutputStream]()
   private[this] var mapStage = false
@@ -62,9 +64,11 @@ private[spark] class PmemExternalSorter[K, V, C](
     if (mapStage) {
       pmemBlockOutputStreamArray(partitionId)
     } else {
+      val tmpBlockName = s"${UUID.randomUUID()}"
       pmemBlockOutputStreamArray += new PmemBlockOutputStream(
         context.taskMetrics(),
-        PmemBlockId.getTempBlockId(blockManager.blockManagerId.executorId, stageId),
+        PmemBlockId
+          .getTempBlockId(blockManager.blockManagerId.executorId, tmpBlockName, stageId),
         SparkEnv.get.serializerManager,
         serializer,
         SparkEnv.get.conf,

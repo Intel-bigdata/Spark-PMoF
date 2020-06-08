@@ -89,12 +89,12 @@ class RemotePmemBlockInputStream[K, C](
     } else {
       num_items = mapStatus(map_index)._3
       buf = new NioManagedBuffer(mapStatus(map_index)._2.toInt)
-      logWarning(s"[GET started] ${mapStatus(map_index)._1}-${mapStatus(map_index)._2}")
+      logDebug(s"[GET started] ${mapStatus(map_index)._1}-${mapStatus(map_index)._2}")
       val readed_len = remotePersistentMemoryPool.get(
         mapStatus(map_index)._1,
         mapStatus(map_index)._2,
         buf.nioByteBuffer)
-      logWarning(s"[GET Completed] ${mapStatus(map_index)._1}-${mapStatus(map_index)._2}")
+      logDebug(s"[GET Completed] ${mapStatus(map_index)._1}-${mapStatus(map_index)._2}")
       val in = buf.createInputStream()
       input = serializerManager.wrapStream(blockId, in)
       inObjStream = serInstance.deserializeStream(input)
