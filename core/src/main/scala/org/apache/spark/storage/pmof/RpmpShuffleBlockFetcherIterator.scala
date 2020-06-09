@@ -176,41 +176,44 @@ private[spark] final class RpmpShuffleBlockFetcherIterator(
     val (blockId, size) = iterator.next()
     var buf = new NioManagedBuffer(size.toInt)
     val startFetchWait = System.currentTimeMillis()
-    val readed_len = remotePersistentMemoryPool.get(blockId.name, size, buf.nioByteBuffer)
-    if (readed_len != -1) {
-      val stopFetchWait = System.currentTimeMillis()
-      shuffleMetrics.incFetchWaitTime(stopFetchWait - startFetchWait)
-      shuffleMetrics.incRemoteBytesRead(buf.size)
-      shuffleMetrics.incRemoteBlocksFetched(1)
-
-      val in = buf.createInputStream()
-      input = streamWrapper(blockId, in)
-      if (detectCorrupt && !input.eq(in)) {
-        val originalInput = input
-        val out = new ChunkedByteBufferOutputStream(64 * 1024, ByteBuffer.allocate)
-        try {
-          Utils.copyStream(input, out)
-          out.close()
-          input = out.toChunkedByteBuffer.toInputStream(dispose = true)
-          logDebug(
-            s"[GET] buf ${blockId}-${size} decompress succeeded, input is ${input}, ${NettyByteBufferPool
-              .dump(buf.nioByteBuffer)}")
-        } catch {
-          case e: IOException =>
-            logWarning(
-              s" buf ${blockId}-${size} decompress corrupted, input is ${input}, ${NettyByteBufferPool
-                .dump(buf.nioByteBuffer)}")
-            throw e
-
-        } finally {
-          originalInput.close()
-          in.close()
-          buf.release()
-        }
+    var retry = 0
+    while (remotePersistentMemoryPool.get(blockId.name, size, buf.nioByteBuffer) == -1) {
+      logWarning(s"${blockId}-${size} RPMem get failed due to time out, try again")
+      retry += 1
+      if (retry == 4) {
+        throw new IOException(s"${blockId}-${size} RPMem get failed due to time out.")
       }
-    } else {
-      throw new IOException(
-        s"remotePersistentMemoryPool.get(${blockId}, ${size}) failed due to timeout.");
+
+    }
+    val stopFetchWait = System.currentTimeMillis()
+    shuffleMetrics.incFetchWaitTime(stopFetchWait - startFetchWait)
+    shuffleMetrics.incRemoteBytesRead(buf.size)
+    shuffleMetrics.incRemoteBlocksFetched(1)
+
+    val in = buf.createInputStream()
+    input = streamWrapper(blockId, in)
+    if (detectCorrupt && !input.eq(in)) {
+      val originalInput = input
+      val out = new ChunkedByteBufferOutputStream(64 * 1024, ByteBuffer.allocate)
+      try {
+        Utils.copyStream(input, out)
+        out.close()
+        input = out.toChunkedByteBuffer.toInputStream(dispose = true)
+        logDebug(
+          s"[GET] buf ${blockId}-${size} decompress succeeded, input is ${input}, ${NettyByteBufferPool
+            .dump(buf.nioByteBuffer)}")
+      } catch {
+        case e: IOException =>
+          logWarning(
+            s" buf ${blockId}-${size} decompress corrupted, input is ${input}, ${NettyByteBufferPool
+              .dump(buf.nioByteBuffer)}")
+          throw e
+
+      } finally {
+        originalInput.close()
+        in.close()
+        buf.release()
+      }
     }
     (blockId, new RpmpBufferReleasingInputStream(input, null))
   }

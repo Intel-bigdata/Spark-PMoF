@@ -1,6 +1,7 @@
 package org.apache.spark.storage.pmof
 
 import java.io.InputStream
+import java.io.IOException
 import com.esotericsoftware.kryo.KryoException
 import org.apache.spark.internal.Logging
 import org.apache.spark.SparkEnv
@@ -90,10 +91,19 @@ class RemotePmemBlockInputStream[K, C](
       num_items = mapStatus(map_index)._3
       buf = new NioManagedBuffer(mapStatus(map_index)._2.toInt)
       logDebug(s"[GET started] ${mapStatus(map_index)._1}-${mapStatus(map_index)._2}")
-      val readed_len = remotePersistentMemoryPool.get(
-        mapStatus(map_index)._1,
-        mapStatus(map_index)._2,
-        buf.nioByteBuffer)
+      var retry = 0
+      while (remotePersistentMemoryPool.get(
+               mapStatus(map_index)._1,
+               mapStatus(map_index)._2,
+               buf.nioByteBuffer) == -1) {
+        logWarning(
+          s"${mapStatus(map_index)._1}-${mapStatus(map_index)._2} RPMem get failed due to time out, try again")
+        retry += 1
+        if (retry == 4) {
+          throw new IOException(
+            s"${mapStatus(map_index)._1}-${mapStatus(map_index)._2} RPMem get failed due to time out")
+        }
+      }
       logDebug(s"[GET Completed] ${mapStatus(map_index)._1}-${mapStatus(map_index)._2}")
       val in = buf.createInputStream()
       input = serializerManager.wrapStream(blockId, in)

@@ -88,7 +88,7 @@ uint64_t RequestHandler::wait(std::shared_ptr<Request> request) {
   while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request] {
     auto current = std::chrono::steady_clock::now();
     auto elapse = current - ctx->start;
-    if (elapse > 60s) {  // tried 10s and found 8 process * 8 threads request
+    if (elapse > 10s) {  // tried 10s and found 8 process * 8 threads request
                          // will still go timeout, need to fix
       ctx->op_failed = true;
       fprintf(stderr, "Request [TYPE %ld][Key %ld] spent %ld s, time out\n",
@@ -113,7 +113,7 @@ RequestReplyContext &RequestHandler::get(std::shared_ptr<Request> request) {
   while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request] {
     auto current = std::chrono::steady_clock::now();
     auto elapse = current - ctx->start;
-    if (elapse > 60s) {  // tried 10s and found 8 process * 8 threads request
+    if (elapse > 10s) {  // tried 10s and found 8 process * 8 threads request
                          // will still go timeout, need to fix
       ctx->op_failed = true;
       fprintf(stderr, "Request [TYPE %ld] spent %ld s, time out\n",
@@ -135,6 +135,9 @@ RequestReplyContext &RequestHandler::get(std::shared_ptr<Request> request) {
 void RequestHandler::notify(std::shared_ptr<RequestReply> requestReply) {
   const std::lock_guard<std::mutex> lock(inflight_mtx_);
   auto rid = requestReply->get_rrc().rid;
+  if (inflight_.count(rid) == 0) {
+    return;
+  }
   auto ctx = inflight_[rid];
   ctx->op_finished = true;
   auto rrc = requestReply->get_rrc();

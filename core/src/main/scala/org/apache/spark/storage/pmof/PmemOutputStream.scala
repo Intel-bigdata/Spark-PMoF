@@ -42,10 +42,12 @@ class PmemOutputStream(
       if (remotePersistentMemoryPool != null) {
         logDebug(s" [PUT Started]${cur_block_id}-${bufferRemainingSize}")
         val byteBuffer: ByteBuffer = buf.nioBuffer()
-        if (remotePersistentMemoryPool.put(cur_block_id, byteBuffer, bufferRemainingSize) == -1) {
+        var retry = 0
+        while (remotePersistentMemoryPool.put(cur_block_id, byteBuffer, bufferRemainingSize) == -1) {
           logWarning(
             s"${cur_block_id}-${bufferRemainingSize} RPMem put failed due to time out, try again")
-          if (remotePersistentMemoryPool.put(cur_block_id, byteBuffer, bufferRemainingSize) == -1) {
+          retry += 1
+          if (retry == 4) {
             throw new IOException(
               s"${cur_block_id}-${bufferRemainingSize} RPMem put failed due to time out.")
           }
