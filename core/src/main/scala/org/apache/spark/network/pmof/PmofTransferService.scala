@@ -5,7 +5,7 @@ import java.util.Random
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 
 import org.apache.spark.network.BlockDataManager
-import org.apache.spark.network.shuffle.{BlockFetchingListener, TempFileManager}
+import org.apache.spark.network.shuffle.{BlockFetchingListener, DownloadFileManager}
 import org.apache.spark.shuffle.pmof.{MetadataResolver, PmofShuffleManager}
 import org.apache.spark.storage.{BlockId, BlockManager, ShuffleBlockId}
 import org.apache.spark.util.configuration.pmof.PmofConf
@@ -24,7 +24,7 @@ class PmofTransferService(val pmofConf: PmofConf, val shuffleManager: PmofShuffl
                            executId: String,
                            blockIds: Array[String],
                            blockFetchingListener: BlockFetchingListener,
-                           tempFileManager: TempFileManager): Unit = {}
+                           downloadFileManager: DownloadFileManager): Unit = {}
 
   def fetchBlock(reqHost: String, reqPort: Int, rmaAddress: Long, rmaLength: Int,
                  rmaRkey: Long, localAddress: Int, shuffleBuffer: ShuffleBuffer,
