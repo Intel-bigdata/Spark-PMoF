@@ -186,16 +186,16 @@ This part is vendor specific, please check your switch menu accordingly.
 Below example is Arista 7060 CX2 100Gb Switch, it is to configure the
 100Gb port to work at 40Gb.
 
-# Connect the console port to PC. Username is admin. No password. Enter
+Connect the console port to PC. Username is admin. No password. Enter
 global configuration mode.
 
-# Config Switch Speed to 40Gb/s
+Config Switch Speed to 40Gb/s
 ```
 switch\# enable
 switch\# config
 switch(config)\# show interface status
 ```
-**Configure corresponding port to 40 Gb/s to match the NIC speed.(can be skiped)**
+*Configure corresponding port to 40 Gb/s to match the NIC speed.(can be skiped)*
 ```
 switch(config)\# interface Et(num_of_port)/1
 switch(config)\# speed forced 40gfull
@@ -261,7 +261,6 @@ Make sure the that the field link_layer is “Ethernet”.
 #### B. Enable PFC (Priority Flow Control) to guarantee stable performance. 
 
 Then you can use following command to get the device name.
-
 If you’re using Mellanox NIC, PFC is a must to guarantee stable
 performance.
 
@@ -313,7 +312,7 @@ client interface. 
 
 Example:
 
-On the service side:
+On the server side:
 ```bash 
 rping -sda 172.168.0.209
 created cm_id 0x17766d0
@@ -346,9 +345,7 @@ ping data: rdma-ping-3: DEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstu
 
 Notes:
 ------
-
 Detail official guide: 
------------------------
 
 Please refer to the document from Mellanox. Here is the detailed
 configuration.
@@ -384,7 +381,7 @@ libpmemobj to access the persistent media.
 [PMDK](https://github.com/pmem/pmdk), a library to manage and access
 persistent memory devices is required to be installed.
 
-5.1.2 Build and install HPNL
+#### 5.1.2 Build and install HPNL
 
 *Project_root_path* is HPNL folder’s path.
 ```bash
@@ -406,9 +403,7 @@ mvn install
 
 ### 5.2 Install RPMem extension for spark shuffle
 ---------------------------------------------
-
 #### 5.2.1 install dependencies
---------------------------
 ```bash
 yum install -y autoconf asciidoctor kmod-devel.x86\_64 libudev-devel
     libuuid-devel json-c-devel jemalloc-devel
@@ -416,7 +411,6 @@ yum groupinstall -y "Development Tools"
 ```
 
 #### 5.2.2 install ndctl
--------------------
 This can be installed with your package managmenet tool as well. 
 ```bash
 git clone https://github.com/pmem/ndctl.git
@@ -433,8 +427,6 @@ mvn install
 ```
  
 #### 5.2.3 install PMDK
-------------------
-
 ```bash
 yum install -y pandoc
 git clone https://github.com/pmem/pmdk.git
@@ -447,7 +439,6 @@ echo “export PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig/:$PKG_CONFIG_PATH” >
 ```
 
 #### 5.2.4 Install RPMem extension for spark shuffle
------------------------------------------------
 ```bash
 git clone  https://github.com/efficient/libcuckoo
 mkdir build
@@ -516,7 +507,7 @@ spark.io.compression.codec                  			snappy
 ```
 #### Memory configuration suggestion**
 
-For any release before v1.0.3
+**For any release before v1.0.3:**
 
 Spark.executor.memory must be greater than shuffle\_block\_size \*
 numPartitions \* numCores \* 2, for example, default HiBench Terasort
@@ -764,7 +755,7 @@ spark.driver.rport                                          61000
 If you do not have BKC access, please following below official guide:
 (this is official PMEMM guide, it is a pre-request for PMoF deployment)
 
-(1): General PMEMM support: PMEMM support
+(1) General PMEMM support: PMEMM support
 <https://www.intel.com/content/www/us/en/support/products/190349/memory-and-storage/data-center-persistent-memory/intel-optane-dc-persistent-memory.html>
 
 \(2) PMEMM population rule: Module DIMM Population for Intel® Optane™ DC
@@ -775,5 +766,5 @@ Persistent Memory
 Persistent Memory
 <https://www.intel.com/content/www/us/en/support/articles/000032860/memory-and-storage/data-center-persistent-memory.html?productId=190349&localeCode=us_en>
 
-(4): Quick Start Guide: Provision Intel® Optane™ DC Persistent Memory
+(4) Quick Start Guide: Provision Intel® Optane™ DC Persistent Memory
 <https://software.intel.com/en-us/articles/quick-start-guide-configure-intel-optane-dc-persistent-memory-on-linux>
