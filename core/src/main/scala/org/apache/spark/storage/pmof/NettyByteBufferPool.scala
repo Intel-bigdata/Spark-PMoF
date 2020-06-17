@@ -15,6 +15,7 @@ object NettyByteBufferPool extends Logging {
   private val allocatedBufferPool: Stack[ByteBuf] = Stack[ByteBuf]() 
   private var reachRead = false
   private val allocator = UnpooledByteBufAllocator.DEFAULT
+  private var bufferMap: Map[ByteBuf, Long] = Map()
 
   def allocateNewBuffer(bufSize: Int): ByteBuf = synchronized {
     if (fixedBufferSize == 0) {
@@ -34,11 +35,20 @@ object NettyByteBufferPool extends Logging {
         allocator.directBuffer(bufSize, bufSize)
       }*/
       allocator.directBuffer(bufSize, bufSize)
+
     } catch {
       case e : Throwable =>
         logError(s"allocateNewBuffer size is ${bufSize}")
         throw e
     }
+  }
+
+  def allocateFlexibleNewBuffer(bufSize: Int): ByteBuf = synchronized {
+    val initialCapacity = 65536
+    val maxCapacity = bufSize * 2
+    val byteBuf = allocator.directBuffer(initialCapacity, maxCapacity)
+    bufferMap += (byteBuf -> bufSize)
+    byteBuf
   }
 
   def releaseBuffer(buf: ByteBuf): Unit = synchronized {
