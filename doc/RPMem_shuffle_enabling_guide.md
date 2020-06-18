@@ -25,7 +25,6 @@ The benchmark is for reference only.
 
 ## 1. RPMem shuffle extension introduction
 
-
 Intel Optane DC persistent memory is the next-generation storage
 at memory speed. It fills the large performance gap between DRAM memory
 technology and the highest performance block device in the form of
@@ -59,7 +58,6 @@ plugin.
 
 ![architecture](./images/RPMem_shuffle_architecture.png)
 
-
 Figure 1: RPMem extension for spark shuffle design
 
 ## 2. Recommended HW environment
@@ -67,16 +65,13 @@ Figure 1: RPMem extension for spark shuffle design
 
 ### 2.1. System Configuration 
 --------------------------
-
 #### 2.1.1 HW and SW Configuration 
 --------------------------
-
 A 4x or 3x Node cluster is recommended for a proof of concept tests, depending your
 system configurations, if using 3 nodes cluster, the Name node and Spark
 Master node can be co-located with one of the Hadoop data nodes.
 
 **Hardware:**
-
 -   Intel® Xeon™ processor Gold 6240 CPU @ 2.60GHz, 384GB Memory (12x
     32GB 2666 MT/s) or 192GB Memory (12x 16GB 2666MT/s)
 -   An RDMA capable NIC, 40Gb+ is preferred. e.g., 1x Intel X722 NIC or
@@ -87,12 +82,10 @@ Master node can be co-located with one of the Hadoop data nodes.
     -   1x 1TB HDD for shuffle (baseline)
     -   4x 128GB Persistent Memory for shuffle
 -   4x 1T NVMe for HDFS
-
--   **Switch**:
+**Switch**:
     -   Arista 7060 CX2 (7060CX2-32S-F) 100Gb switches was used, but the
         port was configured to 40Gb for the Mellanox NICs
 -   Please refer to section 4.2 for configurations
-
 **Software:**
 -   Hadoop 2.7
 -   Spark 2.4.4
@@ -143,6 +136,8 @@ installation/enabling without BKC is out of the scope of this guide.
 
 ## 4. Configure and Validate RDMA
 ------------------------
+**Notes**
+This part is vendor specific, it might NOT applied to your environment, please check your switch, NIC mannuals accordingly. 
 
 ### 4.1 Configure and test iWARP RDMA
 ---------------------------------
@@ -171,23 +166,24 @@ dnf install cmake gcc libnl3-devel libudev-devel pkgconfig
 ``` 
 ####  4.1.2 Switch Configuration
 
-This part is vendor specific, **please check your switch menu accordingly.** 
+This part is vendor specific, **please check your switch mannual accordingly.** 
 Connect the console port to PC. Username is admin. No password. Enter
 global configuration mode.
 
 Below example is based on Arista 7060 CX2 100Gb Switch, it is to configure the
 100Gb port to work at 40Gb to match the NIC speed. *It is NOT required if your NIC and calbes are match.*
+
 **Config Switch Speed to 40Gb/s**
 
 ```
-switch\# enable
-switch\# config
-switch(config)\# show interface status
+switch# enable
+switch# config
+switch(config)# show interface status
 ```
 **Configure corresponding port to 40 Gb/s to match the NIC speed.(can be skiped)**
 ```
-switch(config)\# interface Et(num_of_port)/1
-switch(config)\# speed forced 40gfull
+switch(config)# interface Et(num_of_port)/1
+switch(config)# speed forced 40gfull
 ```
 RoCE might have performance issues, so PFC configuration is strongly
 suggested. You will need to check the RDMA NIC driver manual and switch
@@ -197,14 +193,14 @@ manual to configure PFC. Below is the example for ConnectX-4 and Arista
 Below is to set the two connection ports in the same vlan and
 configure it in trunk mode.
 
-\# Configure interface as trunk mode and add to vlan
+**Configure interface as trunk mode and add to vlan**
 ```bash
-switch(config)\# vlan 1
-switch(config-vlan-1)\#
-switch(config)\# interface ethernet 12-16
-switch(config-if-Et12-16)\# switchport trunk allowed vlan 1
-switch (config-if-et1) \# **priority-flow-control on**
-switch (config-if-et1) \# **priority-flow-control priority 3 no-drop**
+switch(config)# vlan 1
+switch(config-vlan-1)#
+switch(config)# interface ethernet 12-16
+switch(config-if-Et12-16)# switchport trunk allowed vlan 1
+switch (config-if-et1) # **priority-flow-control on**
+switch (config-if-et1) # **priority-flow-control priority 3 no-drop**
 ```
 
 #### 4.1.3 Download and install drivers
@@ -319,27 +315,26 @@ Received rkey 96b40 addr 17ce1e0 len 64 from peer
 server received sink adv
 rdma write from lkey 143c0 laddr 1771190 len 64
 rdma write completion
--   rping -sda 172.168.0.209
-    created cm_id 0x17766d0
-    rdma_bind_addr successful
-    rdma_listen
-    …
+rping -sda 172.168.0.209
+created cm_id 0x17766d0
+rdma_bind_addr successful
+rdma_listen
+…
 
-    accepting client connection request
-    cq_thread started.
-    recv completion
-    Received rkey 97a4f addr 17ce190 len 64 from peer
-    cma_event type RDMA_CM_EVENT_ESTABLISHED cma_id 0x7fe9ec000c90
-    (child)
-    ESTABLISHED
-    …
-    Received rkey 96b40 addr 17ce1e0 len 64 from peer
-    server received sink adv
-    rdma write from lkey 143c0 laddr 1771190 len 64
-    rdma write completion
-    …
+accepting client connection request
+cq_thread started.
+recv completion
+Received rkey 97a4f addr 17ce190 len 64 from peer
+cma_event type RDMA_CM_EVENT_ESTABLISHED cma_id 0x7fe9ec000c90
+(child)
+ESTABLISHED
+…
+Received rkey 96b40 addr 17ce1e0 len 64 from peer
+server received sink adv
+rdma write from lkey 143c0 laddr 1771190 len 64
+rdma write completion
+…
  ```
-
 On Client run: rping -cdVa &lt;Target IP&gt;
 
 ```bash 
@@ -350,15 +345,7 @@ ping data: rdma-ping-1: BCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrs
 ping data: rdma-ping-2: CDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrst
 ping data: rdma-ping-3: DEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstu
 ```
-
-Notes:
-------
-
-Detail official guide: 
-
-Please refer to the document from Mellanox. Here is the detailed
-configuration.
-(<https://community.mellanox.com/s/article/howto-enable--verify-and-troubleshoot-rdma>).
+Please refer to your NIC manuual for detail instructions on how to validate RDMA works. 
 
 ## 5. Install RPMem extension for spark shuffle
 ---------------------------
