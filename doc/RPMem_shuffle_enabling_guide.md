@@ -713,10 +713,10 @@ Check the result at spark history server to see the execution time and
 other spark metrics like spark shuffle spill status. (Need to start
 history server by *\$SPARK\_HOME/sbin/start-history-server.sh*)
 
-## Backup: 
+## Reference 
 ----------------------------
 
-**RPMemShuffle Spark configuration **
+### RPMemShuffle Spark configuration
 ---------------------------------
 ```bash 
 Before running Spark workload, add following contents in
