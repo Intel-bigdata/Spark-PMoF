@@ -582,7 +582,7 @@ Please check script below as a sample.
 import com.databricks.spark.sql.perf.tpcds.TPCDSTables
 import org.apache.spark.sql.\_
 // Set:
-val rootDir: String = "hdfs://sr143:9000/tpcds_1T" 		// root directory of location to create data in.
+val rootDir: String = "hdfs://${ip}:9000/tpcds_1T" 		// root directory of location to create data in.
 val databaseName: String = "tpcds_1T" 				// name of database to create.
 val scaleFactor: String = "1024" 				// scaleFactor defines the size of the dataset to generate (in GB).
 val format: String = "parquet" 					// valid spark format like parquet "parquet".
@@ -626,8 +626,8 @@ val query_filter = Seq("q64-v2.4")
 val randomizeQueries = false
 def queries = {
 val filtered_queries = query_filter match {
-case Seq() =&gt; tpcds.tpcds2_4Queries
-case _ =&gt; tpcds.tpcds2_4Queries.filter(q =&gt;
+case Seq() => tpcds.tpcds2_4Queries
+case _=>  tpcds.tpcds2_4Queries.filter(q =>
     query_filter.contains(q.name))
  }
 filtered_queries
