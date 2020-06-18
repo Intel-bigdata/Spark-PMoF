@@ -57,6 +57,7 @@ RPMem extension for spark shuffle and Vanilla Spark. In this guide, we
 will introduce how to deploy and use RPMem extension for spark shuffle
 plugin.
 
+![](./images/RPMem_shuffle_architecutre.jpeg)
 
 
 Figure 1: RPMem extension for spark shuffle design
@@ -132,14 +133,12 @@ Please refer to backup if you do not have BKC access. BKC
 installation/enabling without BKC is out of the scope of this guide.
 
 ## 3. Install and configure PMEM (example) 
-------------------------
 
 1)  Please install *ipmctl* and *ndctl* according to your OS version
 2)  Run *ipmctl show -dimm* to check whether dimms can be recognized
 3)  Run *ipmctl create -goal PersistentMemoryType=AppDirect* to create AD
     mode
-4)  Run *ndctl list -R*, you will see **region0** and **region1** in
-    screen
+4)  Run *ndctl list -R*, you will see **region0** and **region1**. 
 5)  Suppose we have 4x PMEM on two sockets.
     a.  Run ndctl create-namespace –m devdax -r region0 -s 120g
     b.  Run ndctl create-namespace –m devdax –r region0 –s 120g
@@ -255,12 +254,12 @@ Restart the driver:
 /etc/init.d/openibd restart
 ```
 Might need to unload the modules if it is in use.
-
 Make sure the that the field link_layer is “Ethernet”. 
+Then you can use following command to get the device name.
 
 #### B. Enable PFC (Priority Flow Control) to guarantee stable performance. 
 
-Then you can use following command to get the device name.
+Then you can use following command to gett he device name
 
 If you’re using Mellanox NIC, PFC is a must to guarantee stable
 performance.
@@ -279,6 +278,7 @@ lspci | grep Mellanox
 
 ```
 Set PFC: 
+
 ```bash 
 /etc/init.d/openibd restart
 mlnx_qos -i ens803f1 --pfc 0,0,0,1,0,0,0,0
@@ -313,7 +313,7 @@ client interface. 
 
 Example:
 
-On the service side:
+On the server side:
 ```bash 
 rping -sda 172.168.0.209
 created cm_id 0x17766d0
@@ -331,6 +331,25 @@ Received rkey 96b40 addr 17ce1e0 len 64 from peer
 server received sink adv
 rdma write from lkey 143c0 laddr 1771190 len 64
 rdma write completion
+-   rping -sda 172.168.0.209
+    created cm_id 0x17766d0
+    rdma_bind_addr successful
+    rdma_listen
+    …
+
+    accepting client connection request
+    cq_thread started.
+    recv completion
+    Received rkey 97a4f addr 17ce190 len 64 from peer
+    cma_event type RDMA_CM_EVENT_ESTABLISHED cma_id 0x7fe9ec000c90
+    (child)
+    ESTABLISHED
+    …
+    Received rkey 96b40 addr 17ce1e0 len 64 from peer
+    server received sink adv
+    rdma write from lkey 143c0 laddr 1771190 len 64
+    rdma write completion
+    …
  ```
 
 On Client run: rping -cdVa &lt;Target IP&gt;
