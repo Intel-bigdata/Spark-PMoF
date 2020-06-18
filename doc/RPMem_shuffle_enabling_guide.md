@@ -57,7 +57,7 @@ RPMem extension for spark shuffle and Vanilla Spark. In this guide, we
 will introduce how to deploy and use RPMem extension for spark shuffle
 plugin.
 
-![](./images/RPMem_shuffle_architecutre.jpeg)
+![architecture](./images/RPMem_shuffle_architecture.png)
 
 
 Figure 1: RPMem extension for spark shuffle design
@@ -94,17 +94,9 @@ Master node can be co-located with one of the Hadoop data nodes.
 -   Please refer to section 4.2 for configurations
 
 **Software:**
-
 -   Hadoop 2.7
 -   Spark 2.4.4
 -   Fedora 29 with ww08.2019 BKC
-
-#### 2.1.2 System Diagram 
----------------------
-
-
-
-Figure 2: 4-node and 3-node System Diagram
 
 ### 2.2. Recommended RDMA NIC
 -------------------------
@@ -177,18 +169,16 @@ dnf install cmake gcc libnl3-devel libudev-devel pkgconfig
  yum install epel-release
  yum install cmake3 ninja-build pandoc
 ``` 
-
 ####  4.1.2 Switch Configuration
 
-This part is vendor specific, please check your switch menu accordingly.
-
-Below example is Arista 7060 CX2 100Gb Switch, it is to configure the
-100Gb port to work at 40Gb.
-
-# Connect the console port to PC. Username is admin. No password. Enter
+This part is vendor specific, **please check your switch menu accordingly.** 
+Connect the console port to PC. Username is admin. No password. Enter
 global configuration mode.
 
-# Config Switch Speed to 40Gb/s
+Below example is based on Arista 7060 CX2 100Gb Switch, it is to configure the
+100Gb port to work at 40Gb to match the NIC speed. *It is NOT required if your NIC and calbes are match.*
+**Config Switch Speed to 40Gb/s**
+
 ```
 switch\# enable
 switch\# config
@@ -217,17 +207,15 @@ switch (config-if-et1) \# **priority-flow-control on**
 switch (config-if-et1) \# **priority-flow-control priority 3 no-drop**
 ```
 
-#### 4.1.3 Download and install drivers per guide
+#### 4.1.3 Download and install drivers
 
-#### A. (Optional) Mellanox Enabling RoCE V2 RDMA
+#### A. (Optional) Example: Mellanox Enabling RoCE V2 RDMA
 
-Below Firmware is required when you are using Mellanox RoCE V2 RDMA
-
-There are lots of packages needs to be installed for dependency:
+There are lots of packages needs to be installed for dependency, please refer to your RDMA NIC's mannualls to installed it correctlyu. 
 ``` bash
 yum install atk gcc-gfortran tcsh gtk2 tcl tk
 ```
-please install accordingly.
+please install NIC drivers accordingly.
 ``` bash
 # Download MLNX_OFED_LINUX-4.7-3.2.9.0-* from https://community.mellanox.com/s/article/howto-install-mlnx-ofed-driver 
 # e.g., wget http://www.mellanox.com/downloads/ofed/MLNX_OFED-<version>/MLNX_OFED_LINUX-<version>-<distribution>-<arch>.tgz . 
@@ -367,7 +355,6 @@ Notes:
 ------
 
 Detail official guide: 
------------------------
 
 Please refer to the document from Mellanox. Here is the detailed
 configuration.
@@ -786,11 +773,11 @@ If you do not have BKC access, please following below official guide:
 (1): General PMEMM support: PMEMM support
 <https://www.intel.com/content/www/us/en/support/products/190349/memory-and-storage/data-center-persistent-memory/intel-optane-dc-persistent-memory.html>
 
-\(2) PMEMM population rule: Module DIMM Population for Intel® Optane™ DC
+(2) PMEMM population rule: Module DIMM Population for Intel® Optane™ DC
 Persistent Memory
 <https://www.intel.com/content/www/us/en/support/articles/000032932/memory-and-storage/data-center-persistent-memory.html?productId=190349&localeCode=us_en>
 
-\(3) OS support requirement: Operating System OS for Intel® Optane™ DC
+(3) OS support requirement: Operating System OS for Intel® Optane™ DC
 Persistent Memory
 <https://www.intel.com/content/www/us/en/support/articles/000032860/memory-and-storage/data-center-persistent-memory.html?productId=190349&localeCode=us_en>
 
