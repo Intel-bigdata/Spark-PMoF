@@ -12,7 +12,7 @@ Please be noted the this project will be migrated to OAP
 <https://github.com/intel-bigdata/oap>, the enabling guide might be not
 up to date.
 
-Shuffle RRPMem extension for Spark  (AKA. RPMem shuffle) depends on multiple
+Shuffle RPMem extension for Spark  (AKA. RPMem shuffle) depends on multiple
 native libraries like libfabrics, libcuckoo, PMDK. This enabling guide
 covers the installing process for the time being, but it might change as
 the install commands and related dependency packages for the 3^rd^ party
@@ -524,8 +524,10 @@ Yarn.executor.cores  18                                     	// total core numbe
 spark.executor.memory  15g                                      // 2MB * numPartition(200) * 18 * 2
 spark.yarn.executor.memoryOverhead 5g                        	// 30% of  spark.executor.memory
 spark.shuffle.pmof.shuffle_block_size   2096128          	// 2MB – 1024 Bytes
-spark.shuffle.pmof.spill_throttle       2096128                 // 2MB – 1024 Bytes
-
+spark.shuffle.pmof.spill_throttle       2096128                 // 2MB – 1024 Bytes, spill_throttle is used to
+                                                                // set throttle by when spill buffer data to
+								// Persistent Memory, must set spill_throttle
+								// equal to shuffle_block_size
 spark.driver.memory    						10g
 spark.yarn.driver.memoryOverhead 				5g
 
