@@ -499,7 +499,7 @@ spark.io.compression.codec: use “snappy” to do shuffle data and spilling
 data compression, this is a MUST when enabled PMem due to a default LZ4
 + ByteBuffer incompatible issue.
 ```bash
-spark.shuffle.pmof.pmem_capacity    				${total_size_of_one_device}
+spark.shuffle.pmof.pmem_capacity    				${total_size_of_one_pmem_device}
 spark.shuffle.pmof.pmem_list              			${device_name},${device_name},…
 spark.shuffle.pmof.dev_core_set         			${device_name}:${core_range};…
 #example: 
@@ -519,7 +519,7 @@ executor must has memory capacity greater than
 
 Recommendation configuration as below:
 ```bash 
-Yarn.executor.num    4                                          // same as PMem devices number
+Yarn.executor.num    4                                          // pmem_devices_number_on_one_node * nodes_number
 Yarn.executor.cores  18                                     	// total core number divide executor number
 spark.executor.memory  15g                                      // 2MB * numPartition(200) * 18 * 2
 spark.yarn.executor.memoryOverhead 5g                        	// 30% of  spark.executor.memory
