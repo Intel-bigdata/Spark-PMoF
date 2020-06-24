@@ -15,7 +15,7 @@ Make sure you got [HPNL](https://github.com/Intel-bigdata/HPNL) installed.
 
 ```shell
 git clone https://github.com/Intel-bigdata/Spark-PMoF.git
-cd Spark-PMoF; mvn package
+cd Spark-PMoF; mvn package -DskipTests
 ```
 
 ## Benchmark
@@ -26,7 +26,7 @@ This plugin current supports Spark 2.3 and works well on various Network fabrics
 ```shell
 spark.driver.extraClassPath Spark-PMoF-PATH/target/sso-0.1-jar-with-dependencies.jar
 spark.executor.extraClassPath Spark-PMoF-PATH/target/sso-0.1-jar-with-dependencies.jar
-spark.shuffle.manager org.apache.spark.shuffle.pmof.RdmaShuffleManager
+spark.shuffle.manager org.apache.spark.shuffle.pmof.PmofShuffleManager
 ```
 
 ## Contact
