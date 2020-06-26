@@ -18,6 +18,12 @@ git clone https://github.com/Intel-bigdata/Spark-PMoF.git
 cd Spark-PMoF; mvn package -DskipTests
 ```
 
+If the pmem hardware is ready,it's useful to test by removing the `-DskipTests` option:
+
+```shell
+mvn package
+```
+
 ## Benchmark
 
 ## Usage
