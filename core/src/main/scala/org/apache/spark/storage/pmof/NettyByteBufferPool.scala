@@ -18,11 +18,6 @@ object NettyByteBufferPool extends Logging {
   private var bufferMap: Map[ByteBuf, Long] = Map()
 
   def allocateNewBuffer(bufSize: Int): ByteBuf = synchronized {
-    if (fixedBufferSize == 0) {
-      fixedBufferSize = bufSize
-    } else if (bufSize > fixedBufferSize) {
-      throw new RuntimeException(s"allocateNewBuffer, expected size is ${fixedBufferSize}, actual size is ${bufSize}")
-    }
     allocatedBufRenCnt.getAndIncrement()
     allocatedBytes.getAndAdd(bufSize)
     if (allocatedBytes.get > peakAllocatedBytes.get) {
@@ -34,7 +29,10 @@ object NettyByteBufferPool extends Logging {
       } else {
         allocator.directBuffer(bufSize, bufSize)
       }*/
-      allocator.directBuffer(bufSize, bufSize)
+
+      val byteBuf = allocator.directBuffer(bufSize, bufSize)
+      bufferMap += (byteBuf -> bufSize)
+      byteBuf
 
     } catch {
       case e : Throwable =>
@@ -53,7 +51,13 @@ object NettyByteBufferPool extends Logging {
 
   def releaseBuffer(buf: ByteBuf): Unit = synchronized {
     allocatedBufRenCnt.getAndDecrement()
-    allocatedBytes.getAndAdd(0 - fixedBufferSize)
+    try {
+      val bufSize = bufferMap(buf)
+      allocatedBytes.getAndAdd(bufSize)
+
+    } catch {
+      case e: NoSuchElementException => {}
+    }
     buf.clear()
     //allocatedBufferPool.push(buf)
     buf.release(buf.refCnt())
