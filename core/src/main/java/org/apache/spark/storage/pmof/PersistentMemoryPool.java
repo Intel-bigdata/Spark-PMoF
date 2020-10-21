@@ -4,7 +4,7 @@ import java.nio.ByteBuffer;
 
 public class PersistentMemoryPool {
     static {
-        System.load("/usr/local/lib/libjnipmdk.so");
+	 System.load("/usr/local/lib/libjnipmdk.so");
     }
     private static native long nativeOpenDevice(String path, long size);
     private static native void nativeSetBlock(long deviceHandler, String key, ByteBuffer byteBuffer, int size, boolean clean);
@@ -13,6 +13,7 @@ public class PersistentMemoryPool {
     private static native void nativeDeleteBlock(long deviceHandler, String key);
     private static native long nativeGetRoot(long deviceHandler);
     private static native int nativeCloseDevice(long deviceHandler);
+    private static native long nativeRemoveBlock(long deviceHandler, String key);
   
     private static final long DEFAULT_PMPOOL_SIZE = 0L;
 
@@ -39,6 +40,10 @@ public class PersistentMemoryPool {
 
     public void deletePartition(String key) {
       nativeDeleteBlock(this.deviceHandler, key);
+    }
+
+    public long removeBlock(String key) {
+        return nativeRemoveBlock(this.deviceHandler, key);
     }
 
     public long getRootAddr() {
