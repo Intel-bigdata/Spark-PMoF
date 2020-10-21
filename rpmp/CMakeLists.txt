@@ -42,4 +42,6 @@ add_subdirectory(test)
 add_subdirectory(benchmark)
 
 add_executable(main main.cc)
+add_executable(chashtest test/chash_test.cc)
+target_link_libraries(chashtest pmpool spdlog)
 target_link_libraries(main pmpool spdlog)
