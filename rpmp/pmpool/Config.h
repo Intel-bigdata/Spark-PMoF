@@ -65,7 +65,7 @@ class Config {
 
       if (vm.count("help")) {
         std::cout << desc << '\n';
-        return -1;
+        throw;
       }
       set_ip(vm["address"].as<string>());
       set_port(vm["port"].as<string>());
@@ -79,7 +79,8 @@ class Config {
       if (vm.count("paths")) {
         set_pool_paths(vm["paths"].as<vector<string>>());
       } else {
-        std::cerr << "No input device!!" << std::endl;
+        std::cerr << "No PMem devices input, check '--paths' pls" << std::endl;
+        std::cout << desc << '\n';
         throw;
       }
       if (pool_paths_.size() != sizes_.size()) {
@@ -89,7 +90,9 @@ class Config {
         } else if (sizes_.size() > pool_paths_.size()) {
           sizes_.resize(pool_paths_.size());
         } else {
-          throw 1;
+          std::cerr << "No size of PMem devices, check '--sizes' pls" << std::endl; 
+          std::cout << desc << '\n';
+          throw;
         }
       }
       if (vm.count("task_set")) {
