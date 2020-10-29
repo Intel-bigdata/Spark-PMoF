@@ -19,7 +19,7 @@ uint64_t timestamp_now() {
          std::chrono::milliseconds(1);
 }
 
-std::atomic<uint64_t> count = {0};
+std::atomic<uint64_t> counter = {0};
 std::mutex mtx;
 char str[1048576];
 std::vector<std::shared_ptr<PmPoolClient>> clients;
@@ -27,7 +27,7 @@ std::map<int, std::vector<uint64_t>> addresses;
 
 void func1(int i) {
   while (true) {
-    auto count_ = count++;
+    auto count_ = counter++;
     if (count_ < 20480) {
       clients[i]->begin_tx();
       if (addresses.count(i) != 0) {
@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
   int num = 0;
   std::cout << "start write." << std::endl;
   num = 0;
-  count = 0;
+  counter = 0;
   for (int i = 0; i < 4; i++) {
     auto client =
         std::make_shared<PmPoolClient>(config->get_ip(), config->get_port());

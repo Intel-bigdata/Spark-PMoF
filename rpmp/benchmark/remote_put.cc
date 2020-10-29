@@ -19,7 +19,7 @@ uint64_t timestamp_now() {
          std::chrono::milliseconds(1);
 }
 
-int count = 0;
+int counter = 0;
 std::mutex mtx;
 std::vector<std::string> keys;
 char str[1048576];
@@ -28,7 +28,7 @@ int numReqs = 2048;
 void func1(std::shared_ptr<PmPoolClient> client) {
   while (true) {
     std::unique_lock<std::mutex> lk(mtx);
-    uint64_t count_ = count++;
+    uint64_t count_ = counter++;
     lk.unlock();
     if (count_ < numReqs) {
       char str_read[1048576];

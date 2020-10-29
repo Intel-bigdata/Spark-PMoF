@@ -15,7 +15,7 @@
 
 char str[1048576];
 char str_read[1048576];
-std::atomic<uint64_t> count = {0};
+std::atomic<uint64_t> counter = {0};
 std::mutex mtx;
 std::vector<PmPoolClient *> clients;
 std::vector<uint64_t> addresses;
@@ -30,7 +30,7 @@ uint64_t timestamp_now() {
 
 void func(uint64_t i) {
   while (true) {
-    uint64_t count_ = count++;
+    uint64_t count_ = counter++;
     if (count_ < buffer_num) {
       clients[i]->begin_tx();
       clients[i]->read(addresses[i], str_read, buffer_size);
