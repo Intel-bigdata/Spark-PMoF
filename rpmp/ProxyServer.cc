@@ -5,23 +5,28 @@
 
 #include <iostream>
 #include <string>
+#include "pmpool/proxy/ConsistentHash.h"
+#include "ProxyServer.h"
 
 using namespace std;
 
-#define MSG_SIZE 4096
+ConsistentHash<PhysicalNode> *consistentHash;
 
 class ShutdownCallback:public Callback{
-  public:
+public:
     ShutdownCallback() = default;
     ~ShutdownCallback() override = default;
 
+    /**
+     * Currently, nothing to be done when proxy is shutdown
+     */
     void operator()(void* param_1, void* param_2) override{
       cout<<"ProxyServer::ShutdownCallback::operator"<<endl;
     }
 };
 
 class RecvCallback : public Callback {
-  public:
+public:
     explicit RecvCallback(ChunkMgr* chunkMgr_) : chunkMgr(chunkMgr_) {}
     ~RecvCallback() override = default;
     void operator()(void* param_1, void* param_2) override {
@@ -29,40 +34,63 @@ class RecvCallback : public Callback {
       int mid = *static_cast<int*>(param_1);
       auto chunk = chunkMgr->get(mid);
       auto connection = static_cast<Connection*>(chunk->con);
-      chunk->size = MSG_SIZE;
       cout<<(char*)chunk->buffer<<endl;
-      //connection->send(chunk);
+      unsigned long key_long = stoull((char*)chunk->buffer);
+
+      string node = consistentHash->getNode(key_long).getKey();
+      cout<<"The node got from consistent_hash is: "<<node<<endl;
+      chunk->size = node.length();
+      memcpy(chunk->buffer,node.c_str(),chunk->size);
+      connection->send(chunk);
     }
 
-  private:
+private:
     ChunkMgr* chunkMgr;
 };
 
+/**
+ * The SendCallback is mainly for the reclaim of chunk
+ */
 class SendCallback : public Callback {
-  public:
+public:
     explicit SendCallback(ChunkMgr* chunkMgr_) : chunkMgr(chunkMgr_) {}
     ~SendCallback() override = default;
     void operator()(void* param_1, void* param_2) override {
-      cout<<"ProxyServer::SendCallback::operator"<<endl;
       int mid = *static_cast<int*>(param_1);
       Chunk* chunk = chunkMgr->get(mid);
       auto connection = static_cast<Connection*>(chunk->con);
       chunkMgr->reclaim(chunk, connection);
     }
 
-  private:
+private:
     ChunkMgr* chunkMgr;
 };
 
-int main(int argc, char* argv[]){
+bool ProxyServer::launchServer() {
+  /**
+   * Set the number of virtual nodes for load balance
+   */
+  int loadBalanceFactor = 5;
+  /**
+   * The nodes should be come from config, hard code for temp use
+   */
+  consistentHash = new ConsistentHash<PhysicalNode>();
+  PhysicalNode *physicalNode = new PhysicalNode("172.168.0.40");
+  consistentHash->addNode(*physicalNode, loadBalanceFactor);
+
+  PhysicalNode *physicalNode2 = new PhysicalNode("172.168.0.209");
+  consistentHash->addNode(*physicalNode2, loadBalanceFactor);
+
   int worker_number = 1;
-  int initial_buffer_number = 16; 
+  int initial_buffer_number = 16;
 
   int buffer_size = 65536;
   int buffer_number = 128;
   auto server = new Server(worker_number, initial_buffer_number);
-  int res = server->init();
-  cout << res << endl;
+  if(server->init() != 0){
+    cout<<"HPNL server init failed"<<endl;
+    return false;
+  }
 
   ChunkMgr* chunkMgr = new ChunkPool(server, buffer_size, buffer_number);
   server->set_chunk_mgr(chunkMgr);
@@ -77,9 +105,16 @@ int main(int argc, char* argv[]){
   server->set_shutdown_callback(shutdownCallback);
 
   server->start();
-  server->listen("172.168.0.209", "12346");
-  cout<<"before wait..."<<endl;
+  char* testIP = "192.168.124.12";
+  char* IP = "172.168.0.609";
+  server->listen(testIP, "12346");
+  cout<<"RPMP proxy started"<<endl;
   server->wait();
-  cout<<"after wait..."<<endl;
+  return true;
+}
+
+int main(int argc, char* argv[]){
+  ProxyServer* proxyServer;
+  proxyServer->launchServer();
   return 0;
 }

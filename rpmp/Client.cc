@@ -5,7 +5,11 @@
 #include "HPNL/Client.h"
 #include "HPNL/Connection.h"
 
+#include "Client.h"
+
 #include <iostream>
+#include <thread>
+#include <unistd.h>
 
 #define MSG_SIZE 4096
 
@@ -14,15 +18,7 @@
 #define BUFFER_NUM 128
 
 using namespace std;
-
-int counter = 0;
-uint64_t start_time, end_time = 0;
-std::mutex mtx;
-
-uint64_t timestamp_now() {
-  return std::chrono::high_resolution_clock::now().time_since_epoch() /
-    std::chrono::milliseconds(1);
-}
+Connection *connection_;
 
 class ShutdownCallback : public Callback {
   public:
@@ -37,17 +33,16 @@ class ShutdownCallback : public Callback {
     Client* client;
 };
 
+
 class ConnectedCallback : public Callback {
   public:
     explicit ConnectedCallback(ChunkMgr* chunkMgr_) : chunkMgr(chunkMgr_) {}
     ~ConnectedCallback() override = default;
     void operator()(void* param_1, void* param_2) override {
       cout<<"Client::ConnectedCallback::operator"<<endl;
-      auto connection = static_cast<Connection*>(param_1);
-      Chunk* chunk = chunkMgr->get(connection);
-      chunk->size = MSG_SIZE;
-      memset(chunk->buffer, '1', MSG_SIZE);
-      connection->send(chunk);
+      connection_ = static_cast<Connection*>(param_1);
+      thread t1(MessageSender(), connection_, chunkMgr);
+      t1.detach();
     }
 
   private:
@@ -63,8 +58,7 @@ class RecvCallback : public Callback {
       int mid = *static_cast<int*>(param_1);
       Chunk* chunk = chunkMgr->get(mid);
       auto connection = static_cast<Connection*>(chunk->con);
-      chunk->size = MSG_SIZE;
-      //connection->send(chunk);
+      cout<<"The node got from server is: "<<(char*)chunk->buffer<<endl;
     }
 
   private:
@@ -89,6 +83,14 @@ class SendCallback : public Callback {
     ChunkMgr* chunkMgr;
 };
 
+void MessageSender::operator()(Connection* connection, ChunkMgr* chunkMgr)
+{
+    auto chunk = chunkMgr->get(connection);
+    chunk->size = 8;
+    memcpy(chunk->buffer,"12345678", 8);
+    connection->send(chunk);
+}
+
 int main(int argc, char* argv[]){
   auto client = new Client(1, 16);
   client->init();
@@ -109,10 +111,9 @@ int main(int argc, char* argv[]){
   client->set_shutdown_callback(shutdownCallback);
 
   client->start();
-  client->connect("172.168.0.209", "12346");
+  client->connect("192.168.124.12", "12346");
   cout<<"Client::wait"<<endl;
   client->wait();
-  cout<<"Client::after wait"<<endl;
 
   delete shutdownCallback;
   delete connectedCallback;

@@ -28,8 +28,7 @@ class ConsistentHash {
         cout << '\t' << itr->first << '\t' << itr->second.getKey() << '\n';
       }
 
-      cout<<(unsigned long) - 1<<endl;
-    };                                                            
+    };
 
     void removeNode(T physicalNode){           
 
@@ -54,24 +53,23 @@ class ConsistentHash {
       **/
     };                                                 
 
+    PhysicalNode getNode(unsigned long hashValue){
+        map<unsigned long, VirtualNode>::iterator itr = ring.lower_bound(hashValue);
+        if (itr == ring.end()){
+            PhysicalNode pTarget = ring.begin()->second.getPhysicalNode();
+            unsigned long original_key = ring.begin()->first;
+            return pTarget;
+        }else{
+            VirtualNode vTarget = itr->second;
+            PhysicalNode pTarget = vTarget.getPhysicalNode();
+            return pTarget;
+        }
+    }
 
     PhysicalNode getNode(std::string key){   
       unsigned long hashValue = hashFactory->hash(key);
-
-      map<unsigned long, VirtualNode>::iterator itr = ring.lower_bound(hashValue);
-       
-      
-      if (itr == ring.end()){
-        PhysicalNode pTarget = ring.begin()->second.getPhysicalNode();
-        unsigned long original_key = ring.begin()->first;
-        return pTarget;
-      }else{
-        VirtualNode vTarget = itr->second;
-        PhysicalNode pTarget = vTarget.getPhysicalNode();
-        return pTarget;
-      }
-     
-    };                                                 
+      return getNode(hashValue);
+    };
 
   private:
     map<unsigned long, VirtualNode> ring;
