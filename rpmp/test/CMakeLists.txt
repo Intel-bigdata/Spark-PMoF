@@ -3,5 +3,5 @@
 
 add_test(NAME unit_tests COMMAND unit_tests)
 
-add_executable(RemoteRead integration_test/RemoteRead.cc)
-target_link_libraries(RemoteRead pmpool)
+#add_executable(RemoteRead integration_test/RemoteRead.cc)
+#target_link_libraries(RemoteRead pmpool)

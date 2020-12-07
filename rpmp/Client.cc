@@ -4,6 +4,7 @@
 #include "HPNL/ChunkMgr.h"
 #include "HPNL/Client.h"
 #include "HPNL/Connection.h"
+#include "pmpool/Digest.h"
 
 #include "Client.h"
 
@@ -75,6 +76,9 @@ class SendCallback : public Callback {
       cout<<"Client::SendCallback::operator"<<endl;
       int mid = *static_cast<int*>(param_1);
       Chunk* chunk = chunkMgr->get(mid);
+      if(chunk == nullptr){
+          return;
+      }
       auto connection = static_cast<Connection*>(chunk->con);
       chunkMgr->reclaim(chunk, connection);
     }
@@ -86,9 +90,13 @@ class SendCallback : public Callback {
 void MessageSender::operator()(Connection* connection, ChunkMgr* chunkMgr)
 {
     auto chunk = chunkMgr->get(connection);
-    chunk->size = 8;
-    memcpy(chunk->buffer,"12345678", 8);
-    connection->send(chunk);
+    for (int i = 0; i < 10; ++i) {
+        chunk->size = 20;
+        string src = "1234567" + to_string(i);
+
+        memcpy(chunk->buffer,src.c_str(), 8);
+        connection->send(chunk);
+    }
 }
 
 int main(int argc, char* argv[]){
@@ -111,7 +119,7 @@ int main(int argc, char* argv[]){
   client->set_shutdown_callback(shutdownCallback);
 
   client->start();
-  client->connect("192.168.124.12", "12346");
+  client->connect("172.168.0.209", "12348");
   cout<<"Client::wait"<<endl;
   client->wait();
 

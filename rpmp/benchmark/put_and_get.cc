@@ -16,19 +16,21 @@
 
 uint64_t timestamp_now() {
   return std::chrono::high_resolution_clock::now().time_since_epoch() /
-         std::chrono::milliseconds(1);
+    std::chrono::milliseconds(1);
 }
 
-char str[1048576];
+const int char_size = 1048576;
+
+char str[char_size];
 int numReqs = 2048;
 
 bool comp(char* str, char* str_read, uint64_t size) {
   auto res = memcmp(str, str_read, size);
   if (res != 0) {
     fprintf(stderr,
-            "** strcmp is %d, read res is not aligned with wrote. **\nreaded "
-            "content is \n",
-            res);
+        "** strcmp is %d, read res is not aligned with wrote. **\nreaded "
+        "content is \n",
+        res);
     for (int i = 0; i < 100; i++) {
       fprintf(stderr, "%X ", *(str_read + i));
     }
@@ -45,12 +47,12 @@ void get(int map_id, int start, int end, std::shared_ptr<PmPoolClient> client) {
   int count = start;
   while (count < end) {
     std::string key =
-        "block_" + std::to_string(map_id) + "_" + std::to_string(count++);
-    char str_read[1048576];
+      "block_" + std::to_string(map_id) + "_" + std::to_string(count++);
+    char str_read[char_size];
     client->begin_tx();
-    client->get(key, str_read, 1048576);
+    client->get(key, str_read, char_size);
     client->end_tx();
-    if (comp(str, str_read, 1048576) == false) {
+    if (comp(str, str_read, char_size) == false) {
       throw;
     }
   }
@@ -60,9 +62,9 @@ void put(int map_id, int start, int end, std::shared_ptr<PmPoolClient> client) {
   int count = start;
   while (count < end) {
     std::string key =
-        "block_" + std::to_string(map_id) + "_" + std::to_string(count++);
+      "block_" + std::to_string(map_id) + "_" + std::to_string(count++);
     client->begin_tx();
-    client->put(key, str, 1048576);
+    client->put(key, str, char_size);
     client->end_tx();
   }
 }
@@ -73,11 +75,17 @@ int main(int argc, char** argv) {
   CHK_ERR("config init", config->init(argc, argv));
 
   char temp[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
-                 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
-                 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f'};
-  for (int i = 0; i < 1048576 / 32; i++) {
+    'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
+    'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f'};
+  for (int i = 0; i < char_size/ 32; i++) {
     memcpy(str + i * 32, temp, 32);
   }
+
+  /**
+  for (int i = 0; i < sizeof(str); i++){
+    std::cout<<str[i]<<std::endl; 
+  }
+  **/
 
   int threads = config->get_num_threads();
   int map_id = config->get_map_id();
@@ -86,12 +94,12 @@ int main(int argc, char** argv) {
   std::string port = config->get_port();
 
   std::cout << "=================== Put and get ======================="
-            << std::endl;
+    << std::endl;
   std::cout << "RPMP server is " << host << ":" << port << std::endl;
   std::cout << "Total Num Requests is " << numReqs << std::endl;
   std::cout << "Total Num Threads is " << threads << std::endl;
   std::cout << "Block key pattern is "
-            << "block_" << map_id << "_*" << std::endl;
+    << "block_" << map_id << "_*" << std::endl;
 
   auto client = std::make_shared<PmPoolClient>(host, port);
   client->init();
@@ -102,7 +110,7 @@ int main(int argc, char** argv) {
   uint64_t begin = timestamp_now();
   for (int i = 0; i < threads; i++) {
     auto t =
-        std::make_shared<std::thread>(put, map_id, start, start + step, client);
+      std::make_shared<std::thread>(put, map_id, start, start + step, client);
     threads_1.push_back(t);
     start += step;
   }
@@ -111,10 +119,10 @@ int main(int argc, char** argv) {
   }
   uint64_t end = timestamp_now();
   std::cout << "[block_" << map_id << "_*]"
-            << "pmemkv put test: 1048576 "
-            << " bytes test, consumes " << (end - begin) / 1000.0
-            << "s, throughput is " << numReqs / ((end - begin) / 1000.0)
-            << "MB/s" << std::endl;
+    << "pmemkv put test:  " << std::to_string(char_size) <<" "
+    << " bytes test, consumes " << (end - begin) / 1000.0
+    << "s, throughput is " << numReqs / ((end - begin) / 1000.0)
+    << "MB/s" << std::endl;
 
   std::cout << "start get." << std::endl;
   std::vector<std::shared_ptr<std::thread>> threads_2;
@@ -122,7 +130,7 @@ int main(int argc, char** argv) {
   start = 0;
   for (int i = 0; i < threads; i++) {
     auto t =
-        std::make_shared<std::thread>(get, map_id, start, start + step, client);
+      std::make_shared<std::thread>(get, map_id, start, start + step, client);
     threads_2.push_back(t);
     start += step;
   }
@@ -131,10 +139,10 @@ int main(int argc, char** argv) {
   }
   end = timestamp_now();
   std::cout << "[block_" << map_id << "_*]"
-            << "pmemkv get test: 1048576 "
-            << " bytes test, consumes " << (end - begin) / 1000.0
-            << "s, throughput is " << numReqs / ((end - begin) / 1000.0)
-            << "MB/s" << std::endl;
+    << "pmemkv get test: " << std::to_string(char_size) << " "
+    << " bytes test, consumes " << (end - begin) / 1000.0
+    << "s, throughput is " << numReqs / ((end - begin) / 1000.0)
+    << "MB/s" << std::endl;
 
   client.reset();
   return 0;

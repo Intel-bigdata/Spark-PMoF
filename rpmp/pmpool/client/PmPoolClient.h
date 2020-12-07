@@ -28,6 +28,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <map>
 
 #include "pmpool/Base.h"
 #include "pmpool/Common.h"
@@ -36,12 +37,18 @@
 class NetworkClient;
 class RequestHandler;
 class Function;
+class ProxyClient;
 
 using std::atomic;
 using std::make_shared;
 using std::shared_ptr;
 using std::string;
 using std::vector;
+
+struct Channel{
+  std::shared_ptr<NetworkClient> networkClient;
+  std::shared_ptr<RequestHandler> requestHandler;
+};
 
 class PmPoolClient {
  public:
@@ -88,14 +95,19 @@ class PmPoolClient {
   void wait();
 
  private:
+  std::map<string, Channel> channels;
+  /**
   shared_ptr<RequestHandler> requestHandler_;
   shared_ptr<NetworkClient> networkClient_;
+  **/
+  shared_ptr<ProxyClient> proxyClient_;
   atomic<uint64_t> rid_ = {0};
   std::mutex tx_mtx;
   std::condition_variable tx_con;
   bool tx_finished;
   std::mutex op_mtx;
   bool op_finished;
+  std::mutex mtx;
 };
 
 #endif  // PMPOOL_CLIENT_PMPOOLCLIENT_H_

@@ -5,7 +5,7 @@
 
 class IHash{
   public:
-    virtual unsigned long hash(string key){}
+    virtual uint64_t hash(string key){}
 };
 
 #endif

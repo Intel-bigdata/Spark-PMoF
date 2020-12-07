@@ -282,6 +282,7 @@ int NetworkClient::init(std::shared_ptr<RequestHandler> requestHandler) {
   int res = client_->connect(remote_address_.c_str(), remote_port_.c_str());
   unique_lock<mutex> lk(con_mtx);
   while (!connected_) {
+    std::cout<<"NetworkClient from " <<this->getRemoteAddress()<<" wait to be connected to server"<<std::endl;
     con_v.wait(lk);
   }
 
@@ -336,6 +337,7 @@ uint64_t NetworkClient::get_rkey() {
 }
 
 void NetworkClient::connected(Connection *con) {
+  std::cout<<"NetworkClient from "<<this->getRemoteAddress()<<" connected to server"<<std::endl;
   std::unique_lock<std::mutex> lk(con_mtx);
   con_ = con;
   connected_ = true;
@@ -362,3 +364,12 @@ void NetworkClient::send(char *data, uint64_t size) {
 void NetworkClient::read(std::shared_ptr<Request> request) {
   RequestContext rc = request->get_rc();
 }
+
+string NetworkClient::getRemoteAddress(){
+  return remote_address_;
+}
+
+string NetworkClient::getRemotePort(){
+  return remote_port_;
+}
+

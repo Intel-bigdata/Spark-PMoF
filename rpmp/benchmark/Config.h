@@ -34,9 +34,9 @@ class Config {
     try {
       options_description desc{"Options"};
       desc.add_options()("help,h", "Help screen")(
-          "address,a", value<string>()->default_value("172.168.0.40"),
+          "address,a", value<string>()->default_value("172.168.0.209"),
           "set the rdma server address")(
-          "port,p", value<string>()->default_value("12346"),
+          "port,p", value<string>()->default_value("12348"),
           "set the rdma server port")(
           "log,l", value<string>()->default_value("/tmp/rpmp.log"),
           "set rpmp log file path")("map_id,m", value<int>()->default_value(0),

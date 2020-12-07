@@ -8,8 +8,7 @@
 class XXHash: public IHash{
   public:
     unsigned long hash(string key){
-      xxh::hash64_t key_i = xxh::xxhash<64>(key);
-
+      uint64_t key_i = xxh::xxhash<64>(key);
       return key_i;
     }
 };

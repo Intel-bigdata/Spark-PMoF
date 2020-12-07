@@ -164,6 +164,8 @@ class NetworkClient : public RmaBufferRegister,
   void read(std::shared_ptr<Request> request);
   std::shared_ptr<ChunkMgr> get_chunkMgr();
   void reset();
+  string getRemoteAddress();
+  string getRemotePort();
 
  private:
   string remote_address_;

@@ -30,17 +30,27 @@ public:
     explicit RecvCallback(ChunkMgr* chunkMgr_) : chunkMgr(chunkMgr_) {}
     ~RecvCallback() override = default;
     void operator()(void* param_1, void* param_2) override {
-      cout<<"ProxyServer::RecvCallback::operator"<<endl;
       int mid = *static_cast<int*>(param_1);
       auto chunk = chunkMgr->get(mid);
       auto connection = static_cast<Connection*>(chunk->con);
-      cout<<(char*)chunk->buffer<<endl;
-      unsigned long key_long = stoull((char*)chunk->buffer);
+      /**
+      cout<<"The buffer got from client is: "<<(char*)chunk->buffer<<endl;
+      cout<<"The buffer size is: "<<to_string(chunk->size)<<endl;
+      **/
+      char* char_chunk = (char*)chunk->buffer;
+      string s_temp = "";
+      for(int i = 0; i < chunk->size; i++){
+        s_temp = s_temp + char_chunk[i];
+      }
+      unsigned long key_long = stoull(s_temp);
 
       string node = consistentHash->getNode(key_long).getKey();
+      /**
       cout<<"The node got from consistent_hash is: "<<node<<endl;
+       **/
       chunk->size = node.length();
       memcpy(chunk->buffer,node.c_str(),chunk->size);
+
       connection->send(chunk);
     }
 
@@ -76,7 +86,7 @@ bool ProxyServer::launchServer() {
    */
   consistentHash = new ConsistentHash<PhysicalNode>();
   PhysicalNode *physicalNode = new PhysicalNode("172.168.0.40");
-  consistentHash->addNode(*physicalNode, loadBalanceFactor);
+  consistentHash->addNode(*physicalNode, loadBalanceFactor + 5);
 
   PhysicalNode *physicalNode2 = new PhysicalNode("172.168.0.209");
   consistentHash->addNode(*physicalNode2, loadBalanceFactor);
@@ -106,9 +116,9 @@ bool ProxyServer::launchServer() {
 
   server->start();
   char* testIP = "192.168.124.12";
-  char* IP = "172.168.0.609";
-  server->listen(testIP, "12346");
-  cout<<"RPMP proxy started"<<endl;
+  char* IP = "172.168.0.209";
+  server->listen(IP, "12348");
+  cout<<"RPMP proxy started with IP: " << IP <<endl;
   server->wait();
   return true;
 }
