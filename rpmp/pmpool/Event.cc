@@ -33,7 +33,7 @@ RequestContext &Request::get_rc() { return requestContext_; }
 void Request::encode() {
   const std::lock_guard<std::mutex> lock(data_lock_);
   OpType rt = requestContext_.type;
-  assert(rt == ALLOC || rt == FREE || rt == WRITE || rt == READ);
+  // assert(rt == ALLOC || rt == FREE || rt == WRITE || rt == READ);
   size_ = sizeof(RequestMsg);
   data_ = static_cast<char *>(std::malloc(sizeof(RequestMsg)));
   RequestMsg *requestMsg = (RequestMsg *)data_;
@@ -94,6 +94,8 @@ void RequestReply::encode() {
   requestReplyMsg.address = requestReplyContext_.address;
   requestReplyMsg.size = requestReplyContext_.size;
   requestReplyMsg.key = requestReplyContext_.key;
+  // requestReplyMsg.host = requestReplyContext_.host;
+  // memcpy(requestReplyMsg.host, requestReplyContext_.host.c_str(), requestReplyContext_.host.length());
   auto msg_size = sizeof(requestReplyMsg);
   size_ = msg_size;
 
@@ -103,8 +105,14 @@ void RequestReply::encode() {
     bml_size = sizeof(block_meta) * requestReplyContext_.bml.size();
     size_ += bml_size;
   }
+  // size_ += requestReplyContext_.host.length();
   data_ = static_cast<char *>(std::malloc(size_));
   memcpy(data_, &requestReplyMsg, msg_size);
+  // cout << "encode host" << endl;
+  // memcpy(data_ + msg_size, requestReplyContext_.host.c_str(), requestReplyContext_.host.length());
+  // char* tmp;
+  // memcpy(tmp, requestReplyContext_.host.c_str(), requestReplyContext_.host.length());
+  // cout << "encode host: " << string(tmp) << "origin: " << requestReplyContext_.host.c_str() << endl;
   if (bml_size != 0) {
     memcpy(data_ + msg_size, &requestReplyContext_.bml[0], bml_size);
   }
@@ -125,7 +133,14 @@ void RequestReply::decode() {
   requestReplyContext_.address = requestReplyMsg->address;
   requestReplyContext_.size = requestReplyMsg->size;
   requestReplyContext_.key = requestReplyMsg->key;
-  if (size_ > sizeof(RequestReplyMsg)) {
+  // requestReplyContext_.host = requestReplyMsg->host;
+  // uint64_t host_size = size_ - sizeof(RequestReplyMsg);
+  // char* tmp = static_cast<char*>(malloc(host_size));
+  // memcpy(tmp, data_ + sizeof(RequestReplyMsg), host_size);
+  // cout << "decode: " << string(tmp) << endl;
+  // memcpy(&requestReplyContext_.host, data_ + sizeof(RequestReplyMsg), 5);
+  // requestReplyContext_.host = string(tmp);
+  if (size_ > sizeof(RequestReplyMsg) + 5) {
     auto bml_size = size_ - sizeof(RequestReplyMsg);
     requestReplyContext_.bml.resize(bml_size / sizeof(block_meta));
     memcpy(&requestReplyContext_.bml[0], data_ + sizeof(RequestReplyMsg),

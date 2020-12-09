@@ -26,6 +26,10 @@ using std::vector;
 class RequestHandler;
 class ClientRecvCallback;
 class Protocol;
+class ProxyClient;
+class ProxyRequestHandler;
+class ProxyServer;
+class RecvCallback;
 
 enum OpType : uint32_t {
   ALLOC = 1,
@@ -69,6 +73,7 @@ struct RequestReplyContext {
   Connection* con;
   Chunk* ck;
   vector<block_meta> bml;
+  // string host;
 };
 
 template <class T>
@@ -99,6 +104,8 @@ class RequestReply {
  private:
   std::mutex data_lock_;
   friend Protocol;
+  friend RecvCallback;
+  friend ProxyServer;
   char* data_ = nullptr;
   uint64_t size_ = 0;
   // RequestReplyMsg requestReplyMsg_;
@@ -137,6 +144,8 @@ class Request {
   std::mutex data_lock_;
   friend RequestHandler;
   friend ClientRecvCallback;
+  friend ProxyRequestHandler;
+  friend ProxyClient;
   char* data_;
   uint64_t size_;
   RequestContext requestContext_;

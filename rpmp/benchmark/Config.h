@@ -41,7 +41,7 @@ class Config {
           "log,l", value<string>()->default_value("/tmp/rpmp.log"),
           "set rpmp log file path")("map_id,m", value<int>()->default_value(0),
                                     "map id")(
-          "req_num,r", value<int>()->default_value(2048), "number of requests")(
+          "req_num,r", value<int>()->default_value(8), "number of requests")(
           "threads,t", value<int>()->default_value(8), "number of threads");
 
       variables_map vm;
@@ -92,7 +92,7 @@ class Config {
   string log_level_;
   int map_id_ = 0;
   int num_threads_ = 8;
-  int num_reqs_ = 2048;
+  int num_reqs_ = 8;
 };
 
 #endif  // PMPOOL_CONFIG_H_

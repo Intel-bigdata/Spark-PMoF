@@ -41,6 +41,7 @@ struct RequestReplyMsg {
   uint64_t address;
   uint64_t size;
   uint64_t key;
+  // char* host;
 };
 
 struct block_meta {
@@ -57,6 +58,19 @@ struct block_meta {
   uint64_t address;
   uint64_t size;
   int r_key;
+};
+
+struct ProxyRequestMsg {
+  uint32_t type;
+  uint64_t rid;
+  uint64_t key;
+};
+
+struct ProxyRequestReplyMsg {
+  uint32_t type;
+  uint32_t success;
+  uint64_t rid;
+  uint64_t key;
 };
 
 #endif  // PMPOOL_BASE_H_

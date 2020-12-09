@@ -33,11 +33,13 @@
 #include "pmpool/Base.h"
 #include "pmpool/Common.h"
 #include "pmpool/ThreadWrapper.h"
+#include "pmpool/Config.h"
 
 class NetworkClient;
 class RequestHandler;
 class Function;
 class ProxyClient;
+class ProxyRequestHandler;
 
 using std::atomic;
 using std::make_shared;
@@ -93,13 +95,15 @@ class PmPoolClient {
 
   void shutdown();
   void wait();
+  Channel getChannel(string node);
 
  private:
   std::map<string, Channel> channels;
-  /**
-  shared_ptr<RequestHandler> requestHandler_;
-  shared_ptr<NetworkClient> networkClient_;
-  **/
+
+  shared_ptr<ProxyRequestHandler> proxyRequestHandler_;
+  // shared_ptr<RequestHandler> requestHandler_;
+  // shared_ptr<NetworkClient> networkClient_;
+
   shared_ptr<ProxyClient> proxyClient_;
   atomic<uint64_t> rid_ = {0};
   std::mutex tx_mtx;
@@ -107,7 +111,8 @@ class PmPoolClient {
   bool tx_finished;
   std::mutex op_mtx;
   bool op_finished;
-  std::mutex mtx;
+  std::mutex channel_mtx;
+  shared_ptr<Config> config_;
 };
 
 #endif  // PMPOOL_CLIENT_PMPOOLCLIENT_H_

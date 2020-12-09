@@ -148,6 +148,7 @@ void RequestHandler::notify(std::shared_ptr<RequestReply> requestReply) {
   } else {
     ctx->cv_reply.notify_one();
   }
+  // std::cout << "NetworkClient: returned data host is: " << string((char*)requestReply->get_rrc().ck->buffer) << std::endl;
 }
 
 void RequestHandler::handleRequest(std::shared_ptr<Request> request) {
@@ -205,6 +206,7 @@ void RequestHandler::handleRequest(std::shared_ptr<Request> request) {
     }
     default: {}
   }
+  // networkClient_->addTask(request);
 }
 
 ClientConnectedCallback::ClientConnectedCallback(
@@ -282,7 +284,7 @@ int NetworkClient::init(std::shared_ptr<RequestHandler> requestHandler) {
   int res = client_->connect(remote_address_.c_str(), remote_port_.c_str());
   unique_lock<mutex> lk(con_mtx);
   while (!connected_) {
-    std::cout<<"NetworkClient from " <<this->getRemoteAddress()<<" wait to be connected to server"<<std::endl;
+    std::cout<<"NetworkClient from " <<this->getRemoteAddress() << ":" << this->getRemotePort()<<" wait to be connected to server"<<std::endl;
     con_v.wait(lk);
   }
 
@@ -373,3 +375,6 @@ string NetworkClient::getRemotePort(){
   return remote_port_;
 }
 
+void NetworkClient::addTask(std::shared_ptr<Request> request) {
+  requestHandler_->addTask(request);
+}

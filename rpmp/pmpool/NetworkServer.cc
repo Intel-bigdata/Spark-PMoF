@@ -44,7 +44,6 @@ int NetworkServer::start() {
   server_->start();
   CHK_ERR("hpnl server listen", server_->listen(config_->get_ip().c_str(),
                                                 config_->get_port().c_str()));
-
   circularBuffer_ = std::make_shared<CircularBuffer>(1024 * 1024, 10240, true,
                                                      shared_from_this());
   return 0;

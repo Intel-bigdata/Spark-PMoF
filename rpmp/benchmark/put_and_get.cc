@@ -88,8 +88,10 @@ int main(int argc, char** argv) {
   **/
 
   int threads = config->get_num_threads();
+  // threads = 1;
   int map_id = config->get_map_id();
   numReqs = config->get_num_reqs();
+  numReqs = 2048;
   std::string host = config->get_ip();
   std::string port = config->get_port();
 
