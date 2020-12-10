@@ -91,49 +91,6 @@ class RequestHandler : public ThreadWrapper {
   void handleRequest(std::shared_ptr<Request> request);
 };
 
-class TaskRequestHandler : public ThreadWrapper {
- public:
-  ~TaskRequestHandler();
-  void addTask(std::shared_ptr<Request> request);
-  void addTask(std::shared_ptr<Request> request, std::function<void()> func);
-  void reset();
-  int entry() override;
-  void abort() override {}
-  void notify(std::shared_ptr<RequestReply> requestReply);
-  uint64_t wait(std::shared_ptr<Request> request);
-  RequestReplyContext &get(std::shared_ptr<Request> request);
-
- private:
-  vector<std::shared_ptr<NetworkClient>> networkClients_;
-  BlockingConcurrentQueue<std::shared_ptr<Request>> pendingRequestQueue_;
-  unordered_map<uint64_t, std::function<void()>> callback_map;
-  uint64_t total_num = 0;
-  uint64_t begin = 0;
-  uint64_t end = 0;
-  uint64_t time = 0;
-  struct InflightRequestContext {
-    std::mutex mtx_reply;
-    std::condition_variable cv_reply;
-    std::mutex mtx_returned;
-    std::chrono::time_point<std::chrono::steady_clock> start;
-    bool op_finished = false;
-    bool op_failed = false;
-    InflightRequestContext() { start = std::chrono::steady_clock::now(); }
-    RequestReplyContext requestReplyContext;
-    RequestReplyContext &get_rrc() { return requestReplyContext; }
-  };
-  std::unordered_map<uint64_t, std::shared_ptr<InflightRequestContext>>
-      inflight_;
-  std::mutex inflight_mtx_;
-  long expectedReturnType;
-
-  std::shared_ptr<InflightRequestContext> inflight_insert_or_get(
-      std::shared_ptr<Request>);
-  void inflight_erase(std::shared_ptr<Request> request);
-  void handleRequest(std::shared_ptr<Request> request);
-  std::shared_ptr<NetworkClient> getClient(const string &remote_address, const string &remote_port);
-};
-
 class ClientShutdownCallback : public Callback {
  public:
   ClientShutdownCallback() {}
@@ -209,7 +166,6 @@ class NetworkClient : public RmaBufferRegister,
   void reset();
   string getRemoteAddress();
   string getRemotePort();
-  void addTask(std::shared_ptr<Request> request);
 
  private:
   string remote_address_;
@@ -230,7 +186,6 @@ class NetworkClient : public RmaBufferRegister,
   condition_variable con_v;
   shared_ptr<CircularBuffer> circularBuffer_;
   atomic<uint64_t> buffer_id_{0};
-  std::shared_ptr<RequestHandler> requestHandler_;
 };
 
 #endif  // PMPOOL_CLIENT_NETWORKCLIENT_H_
