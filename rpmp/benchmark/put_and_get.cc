@@ -91,7 +91,7 @@ int main(int argc, char** argv) {
   // threads = 1;
   int map_id = config->get_map_id();
   numReqs = config->get_num_reqs();
-  numReqs = 2048;
+  // numReqs = 2048;
   std::string host = config->get_ip();
   std::string port = config->get_port();
 
@@ -125,7 +125,6 @@ int main(int argc, char** argv) {
     << " bytes test, consumes " << (end - begin) / 1000.0
     << "s, throughput is " << numReqs / ((end - begin) / 1000.0)
     << "MB/s" << std::endl;
-
   std::cout << "start get." << std::endl;
   std::vector<std::shared_ptr<std::thread>> threads_2;
   begin = timestamp_now();

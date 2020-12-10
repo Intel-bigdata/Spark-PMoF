@@ -23,16 +23,20 @@ PmPoolClient::PmPoolClient(const string &proxy_address,
   op_finished = false;
 
   proxyClient_ = make_shared<ProxyClient>(proxy_address, proxy_port);
+  proxyRequestHandler_ = make_shared<ProxyRequestHandler>(proxyClient_);
 }
 
 PmPoolClient::~PmPoolClient() {
   std::cout<<"PmPoolClient::Destroy PmPoolclient: start"<<endl;
-  proxyClient_->reset();
+  std::cout<<"PmPoolClient::Destroy Channels"<<endl;
   map<string, Channel>::iterator itr;
   for (itr = channels.begin(); itr != channels.end(); ++itr){
     itr->second.requestHandler->reset();
     itr->second.networkClient->reset();
   }
+  std::cout<<"PmPoolClient::Destroy ProxyClient"<<endl;
+  proxyRequestHandler_->reset();
+  proxyClient_->reset();
   std::cout<<"PmPoolClient::Destroy PmPoolclient: end"<<endl;
 
 #ifdef DEBUG
@@ -57,7 +61,8 @@ Channel PmPoolClient::getChannel(string node) {
 }
 
 int PmPoolClient::init() {
-  int res = proxyClient_->initProxyClient();
+  int res = proxyClient_->initProxyClient(proxyRequestHandler_);
+  proxyRequestHandler_->start();
   return res;                                                        
 }
 
@@ -213,7 +218,15 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
   rc.rid = rid_++;
   rc.size = size;
   rc.key = key_uint;
-  string node = proxyClient_->getAddress(key_uint);
+
+  ProxyRequestContext prc = {};
+  prc.type = GET_HOSTS;
+  prc.rid = rc.rid;
+  prc.key = key_uint;
+  auto pRequest = std::make_shared<ProxyRequest>(prc);
+  proxyRequestHandler_->addTask(pRequest);
+  string node = proxyRequestHandler_->get(pRequest).host;
+
   Channel channel = getChannel(node);
   std::shared_ptr<NetworkClient> networkClient = channel.networkClient;
   std::shared_ptr<RequestHandler> requestHandler = channel.requestHandler;
@@ -244,16 +257,22 @@ uint64_t PmPoolClient::get(const string &key, char *value, uint64_t size) {
   uint64_t key_uint;
   Digest::computeKeyHash(key, &key_uint);
 
-  string node = proxyClient_->getAddress(key_uint);
-  Channel channel = getChannel(node);
-  std::shared_ptr<NetworkClient> networkClient = channel.networkClient;
-  std::shared_ptr<RequestHandler> requestHandler = channel.requestHandler;
 
   RequestContext rc = {};
   rc.type = GET;
   rc.rid = rid_++;
   rc.size = size;
   rc.address = 0;
+  ProxyRequestContext prc = {};
+  prc.type = GET_HOSTS;
+  prc.rid = rc.rid;
+  prc.key = key_uint;
+  auto pRequest = std::make_shared<ProxyRequest>(prc);
+  proxyRequestHandler_->addTask(pRequest);
+  string node = proxyRequestHandler_->get(pRequest).host;
+  Channel channel = getChannel(node);
+  std::shared_ptr<NetworkClient> networkClient = channel.networkClient;
+  std::shared_ptr<RequestHandler> requestHandler = channel.requestHandler;
   // allocate memory for RMA read from client.
   rc.src_address = networkClient->get_dram_buffer(nullptr, rc.size);
   rc.src_rkey = networkClient->get_rkey();
@@ -282,17 +301,24 @@ uint64_t PmPoolClient::get(const string &key, char *value, uint64_t size) {
 vector<block_meta> PmPoolClient::getMeta(const string &key) {
   uint64_t key_uint;
   Digest::computeKeyHash(key, &key_uint);
-
-  string address = proxyClient_->getAddress(key_uint); 
-  map<string, Channel>::iterator itr = channels.find(address);
-  shared_ptr<NetworkClient> networkClient = itr->second.networkClient;
-  shared_ptr<RequestHandler> requestHandler = itr->second.requestHandler;
-
   RequestContext rc = {};
   rc.type = GET_META;
   rc.rid = rid_++;
   rc.address = 0;
   rc.key = key_uint;
+
+  ProxyRequestContext prc = {};
+  prc.type = GET_HOSTS;
+  prc.rid = rc.rid;
+  prc.key = key_uint;
+  auto pRequest = std::make_shared<ProxyRequest>(prc);
+  proxyRequestHandler_->addTask(pRequest);
+  string node = proxyRequestHandler_->get(pRequest).host;
+
+  Channel channel = getChannel(node);
+  std::shared_ptr<NetworkClient> networkClient = channel.networkClient;
+  std::shared_ptr<RequestHandler> requestHandler = channel.requestHandler;
+
   auto request = std::make_shared<Request>(rc);
   requestHandler->addTask(request);
   auto rrc = requestHandler->get(request);
@@ -302,16 +328,22 @@ vector<block_meta> PmPoolClient::getMeta(const string &key) {
 int PmPoolClient::del(const string &key) {
   uint64_t key_uint;
   Digest::computeKeyHash(key, &key_uint);
-
-  string address = proxyClient_->getAddress(key_uint); 
-  map<string, Channel>::iterator itr = channels.find(address);
-  shared_ptr<NetworkClient> networkClient = itr->second.networkClient;
-  shared_ptr<RequestHandler> requestHandler = itr->second.requestHandler;
-
   RequestContext rc = {};
   rc.type = DELETE;
   rc.rid = rid_++;
   rc.key = key_uint;
+
+  ProxyRequestContext prc = {};
+  prc.type = GET_HOSTS;
+  prc.rid = rc.rid;
+  prc.key = key_uint;
+  auto pRequest = std::make_shared<ProxyRequest>(prc);
+  proxyRequestHandler_->addTask(pRequest);
+  string node = proxyRequestHandler_->get(pRequest).host;
+  Channel channel = getChannel(node);
+  std::shared_ptr<NetworkClient> networkClient = channel.networkClient;
+  std::shared_ptr<RequestHandler> requestHandler = channel.requestHandler;
+
   auto request = std::make_shared<Request>(rc);
   requestHandler->addTask(request);
   auto res = requestHandler->get(request).success;

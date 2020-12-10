@@ -169,20 +169,19 @@ void ProxyClient::send(const char *data, uint64_t size) {
 }
 
 
-string ProxyClient::getAddress(uint64_t hashValue){
-  ProxyRequestContext rc = {};
-  rc.type = GET_HOSTS;
-  rc.rid = rid_++;
-  rc.key = hashValue;
-  auto request = std::make_shared<ProxyRequest>(rc);
-  requestHandler_->addTask(request);
-  auto res = requestHandler_->get(request);
-  return res.host;
+// string ProxyRequestHandler::getAddress(uint64_t hashValue){
+//   ProxyRequestContext rc = {};
+//   rc.type = GET_HOSTS;
+//   rc.rid = rid_++;
+//   rc.key = hashValue;
+//   auto request = std::make_shared<ProxyRequest>(rc);
+//   requestHandler_->addTask(request);
+//   auto res = requestHandler_->get(request);
+//   return res.host;
 
-}
+// }
 
-int ProxyClient::initProxyClient() {
-  requestHandler_ = std::make_shared<ProxyRequestHandler>(shared_from_this());
+int ProxyClient::initProxyClient(std::shared_ptr<ProxyRequestHandler> requestHandler) {
   client_ = std::make_shared<Client>(1, 16);
   if ((client_->init()) != 0) {
     return -1;
@@ -197,7 +196,7 @@ int ProxyClient::initProxyClient() {
   shutdownCallback = std::make_shared<ProxyClientShutdownCallback>();
   connectedCallback =
       std::make_shared<ProxyClientConnectedCallback>(shared_from_this());
-  recvCallback = std::make_shared<ProxyClientRecvCallback>(chunkMgr_, requestHandler_);
+  recvCallback = std::make_shared<ProxyClientRecvCallback>(chunkMgr_, requestHandler);
   sendCallback = std::make_shared<ProxyClientSendCallback>(chunkMgr_);
 
   client_->set_shutdown_callback(shutdownCallback.get());
@@ -214,7 +213,7 @@ int ProxyClient::initProxyClient() {
 
   circularBuffer_ =
       make_shared<CircularBuffer>(1024 * 1024, 512, false);
-  requestHandler_->start();
+  // requestHandler_->start();
   return 0;
 }
 
@@ -231,7 +230,7 @@ void ProxyClient::reset(){
   connectedCallback.reset();
   recvCallback.reset();
   sendCallback.reset();
-  requestHandler_->reset();
+  // requestHandler_->reset();
   if (proxy_connection_ != nullptr) {
     proxy_connection_->shutdown();
   }

@@ -44,6 +44,7 @@ class ProxyRequestHandler : public ThreadWrapper {
   void notify(std::shared_ptr<ProxyRequestReply> requestReply);
   // string wait(std::shared_ptr<ProxyRequest> request);
   ProxyRequestReplyContext get(std::shared_ptr<ProxyRequest> request);
+  string getAddress(uint64_t hashValue);
 
  private:
   std::shared_ptr<ProxyClient> proxyClient_;
@@ -125,13 +126,13 @@ private:
 class ProxyClient : public std::enable_shared_from_this<ProxyClient> {
  public:
   ProxyClient(const string& proxy_address, const string& proxy_port);
-  int initProxyClient();
-  string getAddress(uint64_t hashValue);
-  string getAddress(string key);
+  int initProxyClient(std::shared_ptr<ProxyRequestHandler> requestHandler);
+  // string getAddress(uint64_t hashValue);
+  // string getAddress(string key);
   void send(const char* data, uint64_t size);
   void received(char* data);
   void setConnection(Connection* connection);
-  void addTask(std::shared_ptr<ProxyRequest> request);
+  // void addTask(std::shared_ptr<ProxyRequest> request);
   void shutdown();
   void wait();
   void reset();
@@ -156,7 +157,7 @@ class ProxyClient : public std::enable_shared_from_this<ProxyClient> {
   shared_ptr<CircularBuffer> circularBuffer_;
   atomic<uint64_t> buffer_id_{0};
   atomic<uint64_t> rid_ = {0};
-  std::shared_ptr<ProxyRequestHandler> requestHandler_;
+  // std::shared_ptr<ProxyRequestHandler> requestHandler_;
 };
 
 #endif //RPMP_PROXYCLIENT_H
