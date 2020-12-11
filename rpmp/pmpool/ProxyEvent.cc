@@ -63,7 +63,6 @@ ProxyRequestReplyContext &ProxyRequestReply::get_rrc() { return requestReplyCont
 
 void ProxyRequestReply::set_rrc(ProxyRequestReplyContext &rrc) {
   memcpy(&requestReplyContext_, &rrc, sizeof(ProxyRequestReplyContext));
-  uint32_t bml_size = 0;
 }
 
 void ProxyRequestReply::encode() {
@@ -80,7 +79,6 @@ void ProxyRequestReply::encode() {
   size_ += host_length;
   data_ = static_cast<char *>(std::malloc(size_));
   memcpy(data_, &requestReplyMsg, msg_size);
-  cout << "encode host: " << requestReplyContext_.host << endl;
   memcpy(data_ + msg_size, requestReplyContext_.host.c_str(), host_length);
 }
 
@@ -100,6 +98,6 @@ void ProxyRequestReply::decode() {
   uint64_t host_size = size_ - sizeof(ProxyRequestReplyMsg);
   char* tmp = static_cast<char*>(malloc(host_size));
   memcpy(tmp, data_ + sizeof(ProxyRequestReplyMsg), host_size);
-  cout << "decode: " << string(tmp) << " host length: " << host_size << endl;
   requestReplyContext_.host = string(tmp);
+  std::free(tmp);
 }

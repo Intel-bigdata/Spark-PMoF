@@ -18,7 +18,6 @@
 
 PmPoolClient::PmPoolClient(const string &proxy_address,
     const string &proxy_port) {
-  std::cout<<"PmPoolClient::PmPoolclient: start"<<endl;
   tx_finished = true;
   op_finished = false;
 
@@ -27,17 +26,13 @@ PmPoolClient::PmPoolClient(const string &proxy_address,
 }
 
 PmPoolClient::~PmPoolClient() {
-  std::cout<<"PmPoolClient::Destroy PmPoolclient: start"<<endl;
-  std::cout<<"PmPoolClient::Destroy Channels"<<endl;
   map<string, Channel>::iterator itr;
   for (itr = channels.begin(); itr != channels.end(); ++itr){
     itr->second.requestHandler->reset();
     itr->second.networkClient->reset();
   }
-  std::cout<<"PmPoolClient::Destroy ProxyClient"<<endl;
   proxyRequestHandler_->reset();
   proxyClient_->reset();
-  std::cout<<"PmPoolClient::Destroy PmPoolclient: end"<<endl;
 
 #ifdef DEBUG
   std::cout << "PmPoolClient destructed" << std::endl;
@@ -101,23 +96,19 @@ int PmPoolClient::free(uint64_t address) {
 }
 
 void PmPoolClient::shutdown() {
-  std::cout<<"PmPoolClient::shutdown: start"<<endl;
   map<string, Channel>::iterator itr;                              
   for (itr = channels.begin(); itr != channels.end(); ++itr){      
     itr->second.networkClient->shutdown(); 
-  }                                                                
-  std::cout<<"PmPoolClient::shutdown: end"<<endl;
+  }
+  proxyClient_->shutdown();
 }
 
-void PmPoolClient::wait() { 
-  std::cout<<"PmPoolClient::init: start"<<endl;
-
+void PmPoolClient::wait() {
   map<string, Channel>::iterator itr;
   for (itr = channels.begin(); itr != channels.end(); ++itr){
-    //itr->second.networkClient->wait();
+    itr->second.networkClient->wait();
   }
-
-  std::cout<<"PmPoolClient::init: end"<<endl;
+  proxyClient_->wait();
 }
 
 int PmPoolClient::write(uint64_t address, const char *data, uint64_t size) {

@@ -14,10 +14,11 @@
 #include <mutex>
 #include <condition_variable>
 
-#include "pmpool/buffer/CircularBuffer.h"
+// #include "pmpool/buffer/CircularBuffer.h"
 #include "pmpool/ThreadWrapper.h"
 #include "pmpool/ProxyEvent.h"
 #include "pmpool/queue/blockingconcurrentqueue.h"
+#include "pmpool/queue/concurrentqueue.h"
 
 class ProxyClient;
 class Connection;

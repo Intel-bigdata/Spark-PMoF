@@ -1,6 +1,6 @@
 
 #include "pmpool/client/ProxyClient.h"
-#include "pmpool/client/NetworkClient.h"
+// #include "pmpool/client/NetworkClient.h"
 
 ProxyRequestHandler::ProxyRequestHandler(std::shared_ptr<ProxyClient> proxyClient)
     : proxyClient_(proxyClient) {}
@@ -112,12 +112,10 @@ void ProxyRequestHandler::handleRequest(std::shared_ptr<ProxyRequest> request) {
 }
 
 void ProxyClientShutdownCallback::operator()(void *param_1, void *param_2) {
-  cout<<"PRoxyClient::ProxyClientShutdownCallback::operator"<<endl;
   client->shutdown();
 }
 
 void ProxyClientConnectedCallback::operator()(void *param_1, void *param_2) {
-  cout<<"ProxyClient::ProxyClientConnectedCallback::operator"<<endl;
   auto connection = static_cast<Connection*>(param_1);
   proxyClient_->setConnection(connection);
 }
@@ -125,7 +123,6 @@ void ProxyClientConnectedCallback::operator()(void *param_1, void *param_2) {
 int counter2 = 0;
 
 void ProxyClientRecvCallback::operator()(void *param_1, void *param_2) {
-  cout<<"ProxyClient::ProxyClientRecvCallback::operator"<<endl;
   int mid = *static_cast<int*>(param_1);
   Chunk* ck = chunkMgr_->get(mid);
   auto requestReply = std::make_shared<ProxyRequestReply>(
@@ -137,20 +134,16 @@ void ProxyClientRecvCallback::operator()(void *param_1, void *param_2) {
 }
 
 void ProxyClientSendCallback::operator()(void *param_1, void *param_2) {
-  cout<<"Client::SendCallback::operator"<<endl;
-  /**
   int mid = *static_cast<int*>(param_1);
   Chunk* chunk = chunkMgr->get(mid);
   auto connection = static_cast<Connection*>(chunk->con);
   chunkMgr->reclaim(chunk, connection);
-   **/
 }
 
 ProxyClient::ProxyClient(const string &proxy_address, const string &proxy_port) 
 :proxy_address_(proxy_address), proxy_port_(proxy_port) {}
 
 void ProxyClient::setConnection(Connection *connection) {
-  std::cout<<"connected to proxy server" << proxy_address_ <<std::endl;
   std::unique_lock<std::mutex> lk(mtx);
   proxy_connection_ = connection;
   connected_ = true;
@@ -211,9 +204,6 @@ int ProxyClient::initProxyClient(std::shared_ptr<ProxyRequestHandler> requestHan
     cv.wait(lk);
   }
 
-  circularBuffer_ =
-      make_shared<CircularBuffer>(1024 * 1024, 512, false);
-  // requestHandler_->start();
   return 0;
 }
 
@@ -230,7 +220,6 @@ void ProxyClient::reset(){
   connectedCallback.reset();
   recvCallback.reset();
   sendCallback.reset();
-  // requestHandler_->reset();
   if (proxy_connection_ != nullptr) {
     proxy_connection_->shutdown();
   }
