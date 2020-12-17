@@ -17,6 +17,8 @@
 #include <map>
 
 #include <boost/program_options.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
 
 using namespace boost::program_options;
 using namespace std;
@@ -43,7 +45,9 @@ class Config {
     int setDefault(){
       configs.insert(pair<string,string>(RPMP_NODE_LIST, DEFAULT_RPMP_NODE_LIST));  
       configs.insert(pair<string,string>(RPMP_NETWORK_HEARTBEAT_INTERVAL, DEFAULT_RPMP_NETWORK_HEARTBEAT_INTERVAL));  
-      configs.insert(pair<string,string>(RPMP_NETWORK_SERVER_ADDRESS, DEFAULT_RPMP_NETWORK_SERVER_ADDRESS));  
+      configs.insert(pair<string,string>(RPMP_NETWORK_PROXY_ADDRESS, DEFAULT_RPMP_NETWORK_PROXY_ADDRESS));  
+      configs.insert(pair<string,string>(RPMP_NETWORK_PROXY_PORT, DEFAULT_RPMP_NETWORK_PROXY_PORT));
+      configs.insert(pair<string,string>(RPMP_NETWORK_SERVER_ADDRESS, DEFAULT_RPMP_NETWORK_SERVER_ADDRESS));
       configs.insert(pair<string,string>(RPMP_NETWORK_SERVER_PORT, DEFAULT_RPMP_NETWORK_SERVER_PORT));  
       configs.insert(pair<string,string>(RPMP_NETWORK_WORKER, DEFAULT_RPMP_NETWORK_WORKER));  
       configs.insert(pair<string,string>(RPMP_STORAGE_NAMESPACE_SIZE, DEFAULT_RPMP_STORAGE_NAMESPACE_SIZE));  
@@ -56,9 +60,9 @@ class Config {
       return 0;
     }
 
-    int readFromFile(){
+    int readFromFile(string file = "../config/rpmp.conf"){
       setDefault();
-      std::ifstream infile("../config/rpmp.conf");
+      std::ifstream infile(file);
       if (infile.is_open()){
         std::string line;
         while (std::getline(infile, line)){
@@ -78,10 +82,20 @@ class Config {
           }
         }
 
-        std::map<std::string, std::string>::iterator it;
-        it = configs.find("rpmp.node.list");
+        vector<string> nodes;
+        boost::split(nodes, configs.find(RPMP_NODE_LIST)->second, boost::is_any_of(","), boost::token_compress_on);
+        set_nodes(nodes);
+        for (auto node : nodes) {
+          cout << "get node from config: " << node << endl;
+        }
+
+        set_heartbeat_interval(stoi(configs.find(RPMP_NETWORK_HEARTBEAT_INTERVAL)->second));
+
+        set_proxy_ip(configs.find(RPMP_NETWORK_PROXY_ADDRESS)->second);
 
         set_ip(configs.find(RPMP_NETWORK_SERVER_ADDRESS)->second);
+
+        set_proxy_port(configs.find(RPMP_NETWORK_PROXY_PORT)->second);
 
         set_port(configs.find(RPMP_NETWORK_SERVER_PORT)->second);
 
@@ -284,6 +298,18 @@ class Config {
     string get_log_level() { return log_level_; }
     void set_log_level(string log_level) { log_level_ = log_level; }
 
+    void set_nodes(vector<string> nodes) {nodes_ = nodes;}
+    vector<string> get_nodes() {return nodes_;}
+
+    void set_heartbeat_interval(int heatbeatInterval) {heatbeat_interval_ = heatbeatInterval;}
+    int get_heartbeat_interval() {return heatbeat_interval_;}
+
+    void set_proxy_port(string port) {proxy_port_ = port;}
+    string get_proxy_port() {return proxy_port_;}
+
+    void set_proxy_ip(string ip) {proxy_ip_ = ip;}
+    string get_proxy_ip() {return proxy_ip_;}
+
   private:
     string ip_;
     string port_;
@@ -295,32 +321,39 @@ class Config {
     vector<int> affinities_;
     string log_path_;
     string log_level_;
+    vector<string> nodes_;
+    int heatbeat_interval_;
+    string proxy_port_;
+    string proxy_ip_;
 
-    const string RPMP_NODE_LIST = "rpmp.node.list";
-    const string RPMP_NETWORK_HEARTBEAT_INTERVAL = "rpmp.network.heartbeat-interval";
-    const string RPMP_NETWORK_SERVER_ADDRESS = "rpmp.network.server.address";
-    const string RPMP_NETWORK_SERVER_PORT = "rpmp.network.server.port";
-    const string RPMP_NETWORK_WORKER = "rpmp.network.worker";
-    const string RPMP_STORAGE_NAMESPACE_SIZE = "rpmp.storage.namespace.size";
-    const string RPMP_STORAGE_NAMESPACE_LIST = "rpmp.storage.namespace.list";
-    const string RPMP_TASK_LIST = "rpmp.task.set";
-    const string RPMP_NETWORK_BUFFER_NUMBER = "rpmp.network.buffer.number";
-    const string RPMP_NETWORK_BUFFER_SIZE = "rpmp.network.buffer.size";
-    const string RPMP_LOG_LEVEL = "rpmp.log.level";
-    const string RPMP_LOG_PATH = "rpmp.log.path";
-
-    const string DEFAULT_RPMP_NODE_LIST = "172.168.0.40";
-    const string DEFAULT_RPMP_NETWORK_HEARTBEAT_INTERVAL = "5";
-    const string DEFAULT_RPMP_NETWORK_SERVER_ADDRESS = "172.168.0.40";
-    const string DEFAULT_RPMP_NETWORK_SERVER_PORT = "12346";
-    const string DEFAULT_RPMP_NETWORK_WORKER = "10";
-    const string DEFAULT_RPMP_STORAGE_NAMESPACE_SIZE = "rpmp.storage.namespace.list";
-    const string DEFAULT_RPMP_STORAGE_NAMESPACE_LIST = "/dev/dax0.0,/dev/dax0.1,/dev/dax1.0,/dev/dax1.1";
-    const string DEFAULT_RPMP_TASK_LIST = "2,38,20,56";
-    const string DEFAULT_RPMP_NETWORK_BUFFER_NUMBER = "16";
-    const string DEFAULT_RPMP_NETWORK_BUFFER_SIZE = "65536";
-    const string DEFAULT_RPMP_LOG_LEVEL = "warn";
-    const string DEFAULT_RPMP_LOG_PATH = "/tmp/rpmp.log";
+const string RPMP_NODE_LIST = "rpmp.node.list";
+const string RPMP_NETWORK_HEARTBEAT_INTERVAL = "rpmp.network.heartbeat-interval";
+const string RPMP_NETWORK_PROXY_ADDRESS = "rpmp.network.proxy.address";
+const string RPMP_NETWORK_PROXY_PORT = "rpmp.network.proxy.port";
+const string RPMP_NETWORK_SERVER_ADDRESS = "rpmp.network.server.address";
+const string RPMP_NETWORK_SERVER_PORT = "rpmp.network.server.port";
+const string RPMP_NETWORK_WORKER = "rpmp.network.worker";
+const string RPMP_STORAGE_NAMESPACE_SIZE = "rpmp.storage.namespace.size";
+const string RPMP_STORAGE_NAMESPACE_LIST = "rpmp.storage.namespace.list";
+const string RPMP_TASK_LIST = "rpmp.task.set";
+const string RPMP_NETWORK_BUFFER_NUMBER = "rpmp.network.buffer.number";
+const string RPMP_NETWORK_BUFFER_SIZE = "rpmp.network.buffer.size";
+const string RPMP_LOG_LEVEL = "rpmp.log.level";
+const string RPMP_LOG_PATH = "rpmp.log.path";
+const string DEFAULT_RPMP_NODE_LIST = "172.168.0.209,172.168.0.40";
+const string DEFAULT_RPMP_NETWORK_HEARTBEAT_INTERVAL = "5";
+const string DEFAULT_RPMP_NETWORK_PROXY_ADDRESS = "172.168.0.209";
+const string DEFAULT_RPMP_NETWORK_PROXY_PORT = "12348";
+const string DEFAULT_RPMP_NETWORK_SERVER_ADDRESS = "172.168.0.209";
+const string DEFAULT_RPMP_NETWORK_SERVER_PORT = "12346";
+const string DEFAULT_RPMP_NETWORK_WORKER = "10";
+const string DEFAULT_RPMP_STORAGE_NAMESPACE_SIZE = "rpmp.storage.namespace.list";
+const string DEFAULT_RPMP_STORAGE_NAMESPACE_LIST = "/dev/dax0.0,/dev/dax0.1,/dev/dax1.0,/dev/dax1.1";
+const string DEFAULT_RPMP_TASK_LIST = "2,38,20,56";
+const string DEFAULT_RPMP_NETWORK_BUFFER_NUMBER = "16";
+const string DEFAULT_RPMP_NETWORK_BUFFER_SIZE = "65536";
+const string DEFAULT_RPMP_LOG_LEVEL = "warn";
+const string DEFAULT_RPMP_LOG_PATH = "/tmp/rpmp.log";
 };
 
 #endif  // PMPOOL_CONFIG_H_
