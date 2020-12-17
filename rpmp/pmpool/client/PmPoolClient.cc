@@ -184,7 +184,8 @@ void PmPoolClient::end_tx() {
 }
 
 uint64_t PmPoolClient::put(const string &key, const char *value,
-    uint64_t size) {
+                           uint64_t size) {
+  std::lock_guard<std::mutex> lk(op_mtx);
   uint64_t key_uint;
   Digest::computeKeyHash(key, &key_uint);
 
@@ -232,6 +233,7 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
 }
 
 uint64_t PmPoolClient::get(const string &key, char *value, uint64_t size) {
+  std::lock_guard<std::mutex> lk(op_mtx);
   uint64_t key_uint;
   Digest::computeKeyHash(key, &key_uint);
 

@@ -153,8 +153,7 @@ class ProxyClient : public std::enable_shared_from_this<ProxyClient> {
   std::condition_variable con_v;
 
   bool connected_;
-  atomic<uint64_t> buffer_id_{0};
-  atomic<uint64_t> rid_ = {0};
+  std::mutex op_mtx;
 };
 
 #endif //RPMP_PROXYCLIENT_H

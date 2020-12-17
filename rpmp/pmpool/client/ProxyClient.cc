@@ -72,7 +72,8 @@ string ProxyRequestHandler::get(std::shared_ptr<ProxyRequest> request) {
     return ctx->op_finished;
   })) {
   }
-//   cout << "host get 1: " << ctx->requestReplyContext.rid << endl;
+  cout << "rid get: " << ctx->requestReplyContext.rid << endl;
+  cout << "rid from request: " << request->get_rc().rid << endl;
   auto res = ctx->get_rrc();
   if (ctx->op_failed) {
     throw;
@@ -89,10 +90,11 @@ void ProxyRequestHandler::notify(std::shared_ptr<ProxyRequestReply> requestReply
     return;
   }
   auto ctx = inflight_[rid];
+  unique_lock<mutex> lk(ctx->mtx_reply);
   ctx->op_finished = true;
   auto rrc = requestReply->get_rrc();
-//   cout << "notify node get: " << rrc.host << endl;
   ctx->requestReplyContext = rrc;
+  cout << "notify rid get: " << ctx->requestReplyContext.rid << endl;
   ctx->cv_reply.notify_one();
 }
 
