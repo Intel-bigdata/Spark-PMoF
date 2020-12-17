@@ -1,6 +1,5 @@
 
 #include "pmpool/client/ProxyClient.h"
-// #include "pmpool/client/NetworkClient.h"
 
 ProxyRequestHandler::ProxyRequestHandler(std::shared_ptr<ProxyClient> proxyClient)
     : proxyClient_(proxyClient) {}
@@ -72,14 +71,11 @@ string ProxyRequestHandler::get(std::shared_ptr<ProxyRequest> request) {
     return ctx->op_finished;
   })) {
   }
-  cout << "rid get: " << ctx->requestReplyContext.rid << endl;
-  cout << "rid from request: " << request->get_rc().rid << endl;
   auto res = ctx->get_rrc();
   if (ctx->op_failed) {
     throw;
   }
   inflight_erase(request);
-//   cout << "host get: " << res.host << endl;
   return res.host;
 }
 
@@ -94,7 +90,6 @@ void ProxyRequestHandler::notify(std::shared_ptr<ProxyRequestReply> requestReply
   ctx->op_finished = true;
   auto rrc = requestReply->get_rrc();
   ctx->requestReplyContext = rrc;
-  cout << "notify rid get: " << ctx->requestReplyContext.rid << endl;
   ctx->cv_reply.notify_one();
 }
 

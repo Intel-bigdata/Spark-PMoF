@@ -13,7 +13,6 @@
 #include <unordered_map>
 #include <utility>
 
-// #include "pmpool/buffer/CircularBuffer.h"
 #include "pmpool/ThreadWrapper.h"
 #include "pmpool/ProxyEvent.h"
 #include "pmpool/queue/blockingconcurrentqueue.h"
@@ -151,9 +150,7 @@ class ProxyClient : public std::enable_shared_from_this<ProxyClient> {
   Connection* proxy_connection_;
   std::mutex con_mtx;
   std::condition_variable con_v;
-
   bool connected_;
-  std::mutex op_mtx;
 };
 
 #endif //RPMP_PROXYCLIENT_H

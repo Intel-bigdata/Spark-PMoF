@@ -61,7 +61,6 @@ ProxyRequestReply::~ProxyRequestReply() {
 
 ProxyRequestReplyContext &ProxyRequestReply::get_rrc() { return requestReplyContext_; }
 
-//TODO is sizeof(class) correct?
 void ProxyRequestReply::set_rrc(ProxyRequestReplyContext &rrc) {
   memcpy(&requestReplyContext_, &rrc, sizeof(ProxyRequestReplyContext));
 }
@@ -80,7 +79,6 @@ void ProxyRequestReply::encode() {
   size_ += host_length;
   data_ = static_cast<char *>(std::malloc(size_));
   memcpy(data_, &requestReplyMsg, msg_size);
-//   std::cout << "encode host: " << requestReplyContext_.host << std::endl;
   memcpy(data_ + msg_size, requestReplyContext_.host.c_str(), host_length);
 }
 
@@ -101,6 +99,5 @@ void ProxyRequestReply::decode() {
   char* tmp = static_cast<char*>(malloc(host_size));
   memcpy(tmp, data_ + sizeof(ProxyRequestReplyMsg), host_size);
   requestReplyContext_.host = std::string(tmp);
-//   std::cout << "decode: " << requestReplyContext_.host << std::endl;
   std::free(tmp);
 }

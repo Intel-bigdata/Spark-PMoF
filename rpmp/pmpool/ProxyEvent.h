@@ -11,10 +11,8 @@
 using std::vector;
 
 class ProxyClientRecvCallback;
-// class ProxyClient;
 class ProxyRequestHandler;
 class ProxyServer;
-// class ProxyRecvCallback;
 
 enum ProxyOpType : uint32_t {
   GET_HOSTS = 1
@@ -33,7 +31,6 @@ struct ProxyRequestReplyContext {
   uint64_t rid;
   uint64_t key;
   Connection* con;
-//   Chunk* ck;
   std::string host;
 };
 
@@ -50,11 +47,9 @@ class ProxyRequestReply {
 
  private:
   std::mutex data_lock_;
-//   friend ProxyRecvCallback;
   friend ProxyServer;
   char* data_ = nullptr;
   uint64_t size_ = 0;
-  // RequestReplyMsg requestReplyMsg_;
   ProxyRequestReplyContext requestReplyContext_;
 };
 
@@ -83,7 +78,6 @@ class ProxyRequest {
   std::mutex data_lock_;
   friend ProxyClientRecvCallback;
   friend ProxyRequestHandler;
-//   friend ProxyClient;
   char* data_;
   uint64_t size_;
   ProxyRequestContext requestContext_;

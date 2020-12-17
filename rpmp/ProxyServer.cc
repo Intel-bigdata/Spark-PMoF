@@ -5,9 +5,7 @@
 
 #include <iostream>
 #include <string>
-// #include "pmpool/proxy/ConsistentHash.h"
 #include "ProxyServer.h"
-// #include "pmpool/Event.h"
 
 using namespace std;
 
@@ -16,7 +14,6 @@ ProxyRecvCallback::ProxyRecvCallback(std::shared_ptr<ProxyServer> proxyServer,
     : proxyServer_(proxyServer), chunkMgr_(chunkMgr) {}
 
 void ProxyRecvCallback::operator()(void* param_1, void* param_2) {
-  cout << "ProxyRecvCallback::operator()" <<endl;
   int mid = *static_cast<int*>(param_1);
   auto chunk = chunkMgr_->get(mid);
   auto request = std::make_shared<ProxyRequest>(
@@ -44,7 +41,6 @@ ProxySendCallback::ProxySendCallback(std::shared_ptr<ChunkMgr> chunkMgr)
     : chunkMgr_(chunkMgr) {}
 
 void ProxySendCallback::operator()(void* param_1, void* param_2) {
-  cout << "ProxySendCallback::operator()" << endl;
   int mid = *static_cast<int*>(param_1);
   auto chunk = chunkMgr_->get(mid);
   auto connection = static_cast<Connection*>(chunk->con);
@@ -84,17 +80,13 @@ void ProxyServer::enqueue_recv_msg(std::shared_ptr<ProxyRequest> request) {
 void ProxyServer::handle_recv_msg(std::shared_ptr<ProxyRequest> request) {
   ProxyRequestContext rc = request->get_rc();
   string node = consistentHash_->getNode(rc.key).getKey();
-//   cout << "get node from consistent hash: " << node << endl;
   auto rrc = ProxyRequestReplyContext();
   rrc.type = rc.type;
   rrc.success = 0;
   rrc.rid = rc.rid;
   rrc.host = node;
-//   rrc.host = const_cast<char*> (node.c_str());
-  // memcpy(rrc.host, node.c_str(), node.length());
   rrc.con = rc.con;
   std::shared_ptr<ProxyRequestReply> requestReply = std::make_shared<ProxyRequestReply>(rrc);
-  // rrc.ck->ptr = requestReply.get();
 
   requestReply->encode();
   auto ck = chunkMgr_->get(rrc.con);
