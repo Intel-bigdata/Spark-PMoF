@@ -14,6 +14,7 @@ ProxyRecvCallback::ProxyRecvCallback(std::shared_ptr<ProxyServer> proxyServer,
     : proxyServer_(proxyServer), chunkMgr_(chunkMgr) {}
 
 void ProxyRecvCallback::operator()(void* param_1, void* param_2) {
+  cout << "ProxyRecvCallback " << endl;
   int mid = *static_cast<int*>(param_1);
   auto chunk = chunkMgr_->get(mid);
   auto request = std::make_shared<ProxyRequest>(
@@ -79,12 +80,12 @@ void ProxyServer::enqueue_recv_msg(std::shared_ptr<ProxyRequest> request) {
 
 void ProxyServer::handle_recv_msg(std::shared_ptr<ProxyRequest> request) {
   ProxyRequestContext rc = request->get_rc();
-  string node = consistentHash_->getNode(rc.key).getKey();
+  vector<string> nodes = consistentHash_->getNodes(rc.key, dataReplica_);
   auto rrc = ProxyRequestReplyContext();
   rrc.type = rc.type;
   rrc.success = 0;
   rrc.rid = rc.rid;
-  rrc.host = node;
+  rrc.hosts = nodes;
   rrc.con = rc.con;
   std::shared_ptr<ProxyRequestReply> requestReply = std::make_shared<ProxyRequestReply>(rrc);
 
@@ -103,12 +104,14 @@ bool ProxyServer::launchServer() {
   /**
    * The nodes should be come from config, hard code for temp use
    */
-  consistentHash_ = std::make_shared<ConsistentHash<PhysicalNode>>();
+  consistentHash_ = std::make_shared<ConsistentHash>();
   vector<string> nodes = config_->get_nodes();
   for (string node : nodes) {
     PhysicalNode* physicalNode = new PhysicalNode(node);
     consistentHash_->addNode(*physicalNode, loadBalanceFactor);
   }
+  dataServerPort_ = config_->get_port();
+  dataReplica_ = config_->get_data_replica();
 
   int worker_number = config_->get_network_worker_num();
   int buffer_number = config_->get_network_buffer_num();
@@ -136,7 +139,7 @@ bool ProxyServer::launchServer() {
 
   server_->start();
   server_->listen(config_->get_proxy_ip().c_str(), config_->get_proxy_port().c_str());
-  log_->get_file_log()->info("Proxy server started at ", config_->get_proxy_ip(), ":", config_->get_proxy_port());
+  log_->get_console_log()->info("Proxy server started at {0}:{1}", config_->get_proxy_ip(), config_->get_proxy_port());
   server_->wait();
   return true;
 }

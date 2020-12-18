@@ -5,6 +5,9 @@
 #include <HPNL/Connection.h>
 
 #include <vector>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/serialization/vector.hpp>
 
 #include "pmpool/Base.h"
 
@@ -16,6 +19,34 @@ class ProxyServer;
 
 enum ProxyOpType : uint32_t {
   GET_HOSTS = 1
+};
+
+struct ProxyRequestMsg {
+  template<class Archive>
+  void serialize(Archive& ar, const unsigned int version) {
+    ar &type;
+    ar &rid;
+    ar &key;
+  }
+  uint32_t type;
+  uint64_t rid;
+  uint64_t key;
+};
+
+struct ProxyRequestReplyMsg {
+  template<class Archive>
+  void serialize(Archive& ar, const unsigned int version) {
+    ar &type;
+    ar &success;
+    ar &rid;
+    ar &key;
+    ar &hosts;
+  }
+  uint32_t type;
+  uint32_t success;
+  uint64_t rid;
+  uint64_t key;
+  vector<std::string> hosts;
 };
 
 /**
@@ -31,7 +62,7 @@ struct ProxyRequestReplyContext {
   uint64_t rid;
   uint64_t key;
   Connection* con;
-  std::string host;
+  vector<std::string> hosts;
 };
 
 class ProxyRequestReply {

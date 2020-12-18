@@ -3,20 +3,20 @@
 
 #include <map>
 #include <string>
+#include <vector>
 #include "pmpool/proxy/Node.h"
 #include "pmpool/proxy/VirtualNode.h"
 #include "pmpool/proxy/XXHash.h"
 
 using namespace std;
 
-template <class T> 
 class ConsistentHash {
   public:
-    ConsistentHash<T>(){
-    };
+    ConsistentHash(){};
 
-    void addNode(T physicalNode, int loadBalanceFactor){                         
-      Node *node2 = new VirtualNode(physicalNode, 1);
+    void addNode(PhysicalNode physicalNode, int loadBalanceFactor){
+      uint64_t pHash = hashFactory->hash(physicalNode.getKey());
+      pRing.insert(pair<uint64_t, PhysicalNode>(pHash, physicalNode));
       for (int i = 0; i < loadBalanceFactor; i++){
         VirtualNode *virtualNode = new VirtualNode(physicalNode, i);
         uint64_t hashValue = hashFactory->hash(virtualNode->getKey());
@@ -30,8 +30,9 @@ class ConsistentHash {
 
     };
 
-    void removeNode(T physicalNode){           
-
+    void removeNode(PhysicalNode physicalNode){  
+      uint64_t pHash = hashFactory->hash(physicalNode.getKey());         
+      pRing.erase(pHash);
       map<uint64_t, VirtualNode>::iterator itr3;
       for (itr3 = ring.begin(); itr3 != ring.end(); ++itr3){
           cout << '\t' << itr3->first << '\t' << itr3->second.getKey() << '\n';
@@ -71,8 +72,35 @@ class ConsistentHash {
       return getNode(hashValue);
     };
 
+    vector<string> getNodes(uint64_t hashValue, uint32_t num) {
+      uint32_t node_num = num < pRing.size() ? num : pRing.size();
+      vector<string> pNodes;
+      PhysicalNode pNode = getNode(hashValue);
+      pNodes.push_back(pNode.getKey());
+      for (int i = 1; i < node_num; i++) {
+        PhysicalNode node = getNextNode(pNode);
+        pNodes.push_back(node.getKey());
+        pNode = node;
+      }
+      return pNodes;
+    }
+
+    vector<string> getNodes(string key, uint32_t num) {
+      uint64_t hashValue = hashFactory->hash(key);
+      return getNodes(hashValue, num);
+    }
+
   private:
+    PhysicalNode getNextNode(PhysicalNode node) {
+      map<uint64_t, PhysicalNode>::iterator itr = pRing.find(hashFactory->hash(node.getKey()));
+      if (++itr == pRing.end()) {
+        return pRing.begin()->second;
+      } else {
+        return itr->second;
+      }
+    }
     map<uint64_t, VirtualNode> ring;
+    map<uint64_t, PhysicalNode> pRing;
     IHash *hashFactory = new XXHash();      
 };
 

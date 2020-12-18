@@ -85,12 +85,14 @@ public:
     std::shared_ptr<ChunkMgr> chunkMgr_;
     std::shared_ptr<Config> config_;
     std::shared_ptr<Log> log_;
-    std::shared_ptr<ConsistentHash<PhysicalNode>> consistentHash_;
+    std::shared_ptr<ConsistentHash> consistentHash_;
     std::shared_ptr<Server> server_;
     std::shared_ptr<ProxyRecvCallback> recvCallback_;
     std::shared_ptr<ProxySendCallback> sendCallback_;
     std::shared_ptr<ProxyConnectCallback> connectCallback_;
     std::shared_ptr<ProxyShutdownCallback> shutdownCallback_;
+    std::string dataServerPort_;
+    uint32_t dataReplica_;
 };
 
 #endif //RPMP_PROXYSERVER_H

@@ -24,7 +24,7 @@ fetch_googletest(
   ${PROJECT_BINARY_DIR}/googletest
 )
 
-find_package(Boost REQUIRED COMPONENTS program_options)
+find_package(Boost REQUIRED COMPONENTS program_options serialization)
 if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
 endif()

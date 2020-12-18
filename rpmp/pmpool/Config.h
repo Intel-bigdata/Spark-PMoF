@@ -57,6 +57,7 @@ class Config {
       configs.insert(pair<string,string>(RPMP_NETWORK_BUFFER_SIZE, DEFAULT_RPMP_NETWORK_BUFFER_SIZE));
       configs.insert(pair<string,string>(RPMP_LOG_LEVEL, DEFAULT_RPMP_LOG_LEVEL));
       configs.insert(pair<string,string>(RPMP_LOG_PATH, DEFAULT_RPMP_LOG_PATH));
+      configs.insert(pair<string,string>(RPMP_DATA_REPLICA, DEFAULT_RPMP_DATA_REPLICA));
       return 0;
     }
 
@@ -88,6 +89,8 @@ class Config {
         for (auto node : nodes) {
           cout << "get node from config: " << node << endl;
         }
+
+        set_data_replica(stoi(configs.find(RPMP_DATA_REPLICA)->second));
 
         set_heartbeat_interval(stoi(configs.find(RPMP_NETWORK_HEARTBEAT_INTERVAL)->second));
 
@@ -310,6 +313,9 @@ class Config {
     void set_proxy_ip(string ip) {proxy_ip_ = ip;}
     string get_proxy_ip() {return proxy_ip_;}
 
+    void set_data_replica(uint32_t replica) {replica_ = replica;}
+    uint32_t get_data_replica() {return replica_;}
+
   private:
     string ip_;
     string port_;
@@ -325,6 +331,7 @@ class Config {
     int heatbeat_interval_;
     string proxy_port_;
     string proxy_ip_;
+    uint32_t replica_;
 
 const string RPMP_NODE_LIST = "rpmp.node.list";
 const string RPMP_NETWORK_HEARTBEAT_INTERVAL = "rpmp.network.heartbeat-interval";
@@ -340,6 +347,7 @@ const string RPMP_NETWORK_BUFFER_NUMBER = "rpmp.network.buffer.number";
 const string RPMP_NETWORK_BUFFER_SIZE = "rpmp.network.buffer.size";
 const string RPMP_LOG_LEVEL = "rpmp.log.level";
 const string RPMP_LOG_PATH = "rpmp.log.path";
+const string RPMP_DATA_REPLICA = "rpmp.data.replica";
 const string DEFAULT_RPMP_NODE_LIST = "172.168.0.209,172.168.0.40";
 const string DEFAULT_RPMP_NETWORK_HEARTBEAT_INTERVAL = "5";
 const string DEFAULT_RPMP_NETWORK_PROXY_ADDRESS = "172.168.0.209";
@@ -354,6 +362,7 @@ const string DEFAULT_RPMP_NETWORK_BUFFER_NUMBER = "16";
 const string DEFAULT_RPMP_NETWORK_BUFFER_SIZE = "65536";
 const string DEFAULT_RPMP_LOG_LEVEL = "warn";
 const string DEFAULT_RPMP_LOG_PATH = "/tmp/rpmp.log";
+const string DEFAULT_RPMP_DATA_REPLICA = "3";
 };
 
 #endif  // PMPOOL_CONFIG_H_
