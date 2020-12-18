@@ -1,8 +1,8 @@
-add_library(pmpool_client_jni SHARED Event.cc client/PmPoolClient.cc client/NetworkClient.cc client/native/com_intel_rpmp_PmPoolClient.cc client/ProxyClient.cc)
+add_library(pmpool_client_jni SHARED Event.cc ProxyEvent.cc client/PmPoolClient.cc client/NetworkClient.cc client/native/com_intel_rpmp_PmPoolClient.cc client/ProxyClient.cc)
 target_link_libraries(pmpool_client_jni LINK_PUBLIC ${Boost_LIBRARIES} hpnl)
 set_target_properties(pmpool_client_jni PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
-add_library(pmpool SHARED DataServer.cc Protocol.cc Event.cc NetworkServer.cc hash/xxhash.cc client/PmPoolClient.cc client/NetworkClient.cc client/ProxyClient.cc)
+add_library(pmpool SHARED DataServer.cc Protocol.cc Event.cc ProxyEvent.cc NetworkServer.cc hash/xxhash.cc client/PmPoolClient.cc client/NetworkClient.cc client/ProxyClient.cc)
 target_link_libraries(pmpool LINK_PUBLIC ${Boost_LIBRARIES} hpnl pmemobj)
 set_target_properties(pmpool PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
