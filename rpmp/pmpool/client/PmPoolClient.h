@@ -103,7 +103,6 @@ class PmPoolClient {
   std::mutex tx_mtx;
   std::condition_variable tx_con;
   bool tx_finished;
-  std::mutex op_mtx;
   bool op_finished;
   std::map<string, std::shared_ptr<Channel>> channels;
   std::mutex channel_mtx;
