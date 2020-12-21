@@ -194,32 +194,35 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
   auto pRequest = std::make_shared<ProxyRequest>(prc);
   proxyRequestHandler_->addTask(pRequest);
   ProxyRequestReplyContext prrc = proxyRequestHandler_->get(pRequest);
-  std::shared_ptr<Channel> channel = getChannel(prrc.hosts[0], prrc.dataServerPort);
-  std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
-  std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
 
-  RequestContext rc = {};
-  rc.type = PUT;
-  rc.rid = rid_++;
-  rc.size = size;
-  rc.address = 0;
-  // allocate memory for RMA read from client.
+  uint64_t result = 0;
+  for (auto node : prrc.hosts) {
+    std::shared_ptr<Channel> channel = getChannel(node, prrc.dataServerPort);
+    std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
+    std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
+
+    RequestContext rc = {};
+    rc.type = PUT;
+    rc.rid = rid_++;
+    rc.size = size;
+    rc.address = 0;
+    // allocate memory for RMA read from client.
+    rc.src_address = networkClient->get_dram_buffer(value, rc.size);
+    rc.src_rkey = networkClient->get_rkey();
+    rc.key = key_uint;
+    auto request = std::make_shared<Request>(rc);
+    requestHandler->addTask(request);
+    auto res = requestHandler->wait(request);
+    if (!res) {
+      result = -1;
+    }
+    networkClient->reclaim_dram_buffer(rc.src_address, rc.size);
+  }
 #ifdef DEBUG
   std::cout << "[PmPoolClient::put start] " << key << "-" << rc.size
     << ", hashkey is " << key_uint << std::endl;
-#endif
-  rc.src_address = networkClient->get_dram_buffer(value, rc.size);
-  rc.src_rkey = networkClient->get_rkey();
-#ifdef DEBUG
   std::cout << "[PmPoolClient::put] " << key << "-" << rc.size
     << ", hashkey is " << key_uint << std::endl;
-#endif
-  rc.key = key_uint;
-  auto request = std::make_shared<Request>(rc);
-  requestHandler->addTask(request);
-  auto res = requestHandler->wait(request);
-  networkClient->reclaim_dram_buffer(rc.src_address, rc.size);
-#ifdef DEBUG
   fprintf(stderr, "[PUT]key is %s, length is %ld, content is \n", key.c_str(),
       size);
   for (int i = 0; i < 100; i++) {
@@ -227,7 +230,7 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
   }
   fprintf(stderr, " ...\n");
 #endif
-  return res;
+  return result;
 }
 
 uint64_t PmPoolClient::get(const string &key, char *value, uint64_t size) {
@@ -312,16 +315,23 @@ int PmPoolClient::del(const string &key) {
   auto pRequest = std::make_shared<ProxyRequest>(prc);
   proxyRequestHandler_->addTask(pRequest);
   ProxyRequestReplyContext prrc = proxyRequestHandler_->get(pRequest);
-  std::shared_ptr<Channel> channel = getChannel(prrc.hosts[0], prrc.dataServerPort);
-  std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
-  std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
 
-  RequestContext rc = {};
-  rc.type = DELETE;
-  rc.rid = rid_++;
-  rc.key = key_uint;
-  auto request = std::make_shared<Request>(rc);
-  requestHandler->addTask(request);
-  auto res = requestHandler->get(request).success;
-  return res;
+  int result = 0;
+  for (auto node : prrc.hosts) {
+    std::shared_ptr<Channel> channel = getChannel(node, prrc.dataServerPort);
+    std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
+    std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
+
+    RequestContext rc = {};
+    rc.type = DELETE;
+    rc.rid = rid_++;
+    rc.key = key_uint;
+    auto request = std::make_shared<Request>(rc);
+    requestHandler->addTask(request);
+    auto res = requestHandler->get(request).success;
+    if (!res) {
+      result = -1;
+    }
+  }
+  return result;
 }
