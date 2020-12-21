@@ -86,6 +86,7 @@ void ProxyServer::handle_recv_msg(std::shared_ptr<ProxyRequest> request) {
   rrc.success = 0;
   rrc.rid = rc.rid;
   rrc.hosts = nodes;
+  rrc.dataServerPort = dataServerPort_;
   rrc.con = rc.con;
   std::shared_ptr<ProxyRequestReply> requestReply = std::make_shared<ProxyRequestReply>(rrc);
 

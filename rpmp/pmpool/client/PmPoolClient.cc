@@ -38,14 +38,13 @@ PmPoolClient::~PmPoolClient() {
 #endif
 }
 
-std::shared_ptr<Channel> PmPoolClient::getChannel(string node) {
+std::shared_ptr<Channel> PmPoolClient::getChannel(string node, string port) {
   std::lock_guard<std::mutex> lk(channel_mtx);
   if (channels.count(node)) {
     return channels.find(node)->second;
   } else {
     std::shared_ptr<Channel> channel = std::make_shared<Channel>();
-    //TODO get port from proxy server
-    channel->networkClient = std::make_shared<NetworkClient>(node, "12346");
+    channel->networkClient = std::make_shared<NetworkClient>(node, port);
     channel->requestHandler = std::make_shared<RequestHandler>(channel->networkClient);
     channel->networkClient->init(channel->requestHandler);
     channel->requestHandler->start();
@@ -194,8 +193,8 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
   prc.key = key_uint;
   auto pRequest = std::make_shared<ProxyRequest>(prc);
   proxyRequestHandler_->addTask(pRequest);
-  string node = proxyRequestHandler_->get(pRequest);
-  std::shared_ptr<Channel> channel = getChannel(node);
+  ProxyRequestReplyContext prrc = proxyRequestHandler_->get(pRequest);
+  std::shared_ptr<Channel> channel = getChannel(prrc.hosts[0], prrc.dataServerPort);
   std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
   std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
 
@@ -241,8 +240,8 @@ uint64_t PmPoolClient::get(const string &key, char *value, uint64_t size) {
   prc.key = key_uint;
   auto pRequest = std::make_shared<ProxyRequest>(prc);
   proxyRequestHandler_->addTask(pRequest);
-  string node = proxyRequestHandler_->get(pRequest);
-  std::shared_ptr<Channel> channel = getChannel(node);
+  ProxyRequestReplyContext prrc = proxyRequestHandler_->get(pRequest);
+  std::shared_ptr<Channel> channel = getChannel(prrc.hosts[0], prrc.dataServerPort);
   std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
   std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
 
@@ -286,8 +285,8 @@ vector<block_meta> PmPoolClient::getMeta(const string &key) {
   prc.key = key_uint;
   auto pRequest = std::make_shared<ProxyRequest>(prc);
   proxyRequestHandler_->addTask(pRequest);
-  string node = proxyRequestHandler_->get(pRequest);
-  std::shared_ptr<Channel> channel = getChannel(node);
+  ProxyRequestReplyContext prrc = proxyRequestHandler_->get(pRequest);
+  std::shared_ptr<Channel> channel = getChannel(prrc.hosts[0], prrc.dataServerPort);
   std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
   std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
 
@@ -312,8 +311,8 @@ int PmPoolClient::del(const string &key) {
   prc.key = key_uint;
   auto pRequest = std::make_shared<ProxyRequest>(prc);
   proxyRequestHandler_->addTask(pRequest);
-  string node = proxyRequestHandler_->get(pRequest);
-  std::shared_ptr<Channel> channel = getChannel(node);
+  ProxyRequestReplyContext prrc = proxyRequestHandler_->get(pRequest);
+  std::shared_ptr<Channel> channel = getChannel(prrc.hosts[0], prrc.dataServerPort);
   std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
   std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
 

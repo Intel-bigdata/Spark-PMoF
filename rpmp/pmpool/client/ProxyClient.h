@@ -45,7 +45,7 @@ class ProxyRequestHandler : public ThreadWrapper {
   int entry() override;
   void abort() override {}
   void notify(std::shared_ptr<ProxyRequestReply> requestReply);
-  string get(std::shared_ptr<ProxyRequest> request);
+  ProxyRequestReplyContext get(std::shared_ptr<ProxyRequest> request);
   string getAddress(uint64_t hashValue);
 
  private:

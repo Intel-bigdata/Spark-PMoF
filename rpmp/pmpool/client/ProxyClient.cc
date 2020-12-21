@@ -55,7 +55,7 @@ void ProxyRequestHandler::inflight_erase(std::shared_ptr<ProxyRequest> request) 
   inflight_.erase(request->requestContext_.rid);
 }
 
-string ProxyRequestHandler::get(std::shared_ptr<ProxyRequest> request) {
+ProxyRequestReplyContext ProxyRequestHandler::get(std::shared_ptr<ProxyRequest> request) {
   auto ctx = inflight_insert_or_get(request);
   unique_lock<mutex> lk(ctx->mtx_reply);
   while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request] {
@@ -76,7 +76,7 @@ string ProxyRequestHandler::get(std::shared_ptr<ProxyRequest> request) {
     throw;
   }
   inflight_erase(request);
-  return res.hosts[0];
+  return res;
 }
 
 void ProxyRequestHandler::notify(std::shared_ptr<ProxyRequestReply> requestReply) {
