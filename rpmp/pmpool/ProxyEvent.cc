@@ -23,8 +23,8 @@ ProxyRequestContext &ProxyRequest::get_rc() { return requestContext_; }
 
 void ProxyRequest::encode() {
   const std::lock_guard<std::mutex> lock(data_lock_);
-  ProxyOpType rt = requestContext_.type;
-  assert(rt == GET_HOSTS);
+  OpType rt = requestContext_.type;
+  // assert(rt == GET_HOSTS);
   size_ = sizeof(ProxyRequestMsg);
   data_ = static_cast<char *>(std::malloc(sizeof(ProxyRequestMsg)));
   ProxyRequestMsg *requestMsg = (ProxyRequestMsg *)data_;
@@ -37,7 +37,7 @@ void ProxyRequest::decode() {
   const std::lock_guard<std::mutex> lock(data_lock_);
   assert(size_ == sizeof(ProxyRequestMsg));
   ProxyRequestMsg *requestMsg = (ProxyRequestMsg *)data_;
-  requestContext_.type = (ProxyOpType)requestMsg->type;
+  requestContext_.type = (OpType)requestMsg->type;
   requestContext_.rid = requestMsg->rid;
   requestContext_.key = requestMsg->key;
 }
@@ -71,7 +71,7 @@ void ProxyRequestReply::encode() {
   std::cout << "encode reply" << std::endl;
   const std::lock_guard<std::mutex> lock(data_lock_);
   ProxyRequestReplyMsg requestReplyMsg;
-  requestReplyMsg.type = (ProxyOpType)requestReplyContext_.type;
+  requestReplyMsg.type = (OpType)requestReplyContext_.type;
   requestReplyMsg.success = requestReplyContext_.success;
   requestReplyMsg.rid = requestReplyContext_.rid;
   requestReplyMsg.key = requestReplyContext_.key;
@@ -109,7 +109,7 @@ void ProxyRequestReply::decode() {
   boost::archive::text_iarchive ia(is);
   ia >> requestReplyMsg;
   // ProxyRequestReplyMsg *requestReplyMsg = (ProxyRequestReplyMsg *)data_;
-  requestReplyContext_.type = (ProxyOpType)requestReplyMsg.type;
+  requestReplyContext_.type = (OpType)requestReplyMsg.type;
   requestReplyContext_.success = requestReplyMsg.success;
   requestReplyContext_.rid = requestReplyMsg.rid;
   requestReplyContext_.key = requestReplyMsg.key;

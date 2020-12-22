@@ -5,6 +5,9 @@
 #include <HPNL/ChunkMgr.h>
 #include <HPNL/Connection.h>
 
+#include <unordered_map>
+#include <vector>
+
 #include "pmpool/proxy/ConsistentHash.h"
 #include "pmpool/ProxyEvent.h"
 #include "pmpool/ThreadWrapper.h"
@@ -81,6 +84,9 @@ public:
     void enqueue_recv_msg(std::shared_ptr<ProxyRequest> request);
     void handle_recv_msg(std::shared_ptr<ProxyRequest> request);
     private:
+    void addReplica(uint64_t key, std::vector<std::string> nodes);
+    std::vector<std::string> getReplica(uint64_t key);
+    void removeReplica(uint64_t key);
     std::shared_ptr<Worker> worker_;
     std::shared_ptr<ChunkMgr> chunkMgr_;
     std::shared_ptr<Config> config_;
@@ -93,6 +99,8 @@ public:
     std::shared_ptr<ProxyShutdownCallback> shutdownCallback_;
     std::string dataServerPort_;
     uint32_t dataReplica_;
+    std::unordered_map<uint64_t, std::vector<std::string>> replicaMap_;
+    std::mutex replica_mtx;
 };
 
 #endif //RPMP_PROXYSERVER_H

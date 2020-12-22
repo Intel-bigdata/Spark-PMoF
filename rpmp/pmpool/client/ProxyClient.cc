@@ -95,7 +95,7 @@ void ProxyRequestHandler::notify(std::shared_ptr<ProxyRequestReply> requestReply
 
 void ProxyRequestHandler::handleRequest(std::shared_ptr<ProxyRequest> request) {
   auto ctx = inflight_insert_or_get(request);
-  ProxyOpType rt = request->get_rc().type;
+  OpType rt = request->get_rc().type;
   request->encode();
   proxyClient_->send(reinterpret_cast<char *>(request->data_), request->size_);
 }

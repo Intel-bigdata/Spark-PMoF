@@ -17,9 +17,11 @@ class ProxyClientRecvCallback;
 class ProxyRequestHandler;
 class ProxyServer;
 
-enum ProxyOpType : uint32_t {
-  GET_HOSTS = 1
-};
+// enum ProxyOpType : uint32_t {
+//   PUT = 1,
+//   GET = 2,
+//   GET_META = 3
+// };
 
 struct ProxyRequestMsg {
   template<class Archive>
@@ -59,7 +61,7 @@ struct ProxyRequestReplyMsg {
  * previous two events.
  */
 struct ProxyRequestReplyContext {
-  ProxyOpType type;
+  OpType type;
   uint32_t success;
   uint64_t rid;
   uint64_t key;
@@ -88,7 +90,7 @@ class ProxyRequestReply {
 };
 
 struct ProxyRequestContext {
-  ProxyOpType type;
+  OpType type;
   uint64_t rid;
   uint64_t key;
   Connection* con;

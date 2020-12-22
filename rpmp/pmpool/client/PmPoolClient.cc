@@ -188,7 +188,7 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
   Digest::computeKeyHash(key, &key_uint);
 
   ProxyRequestContext prc = {};
-  prc.type = GET_HOSTS;
+  prc.type = PUT;
   prc.rid = rid_++;
   prc.key = key_uint;
   auto pRequest = std::make_shared<ProxyRequest>(prc);
@@ -203,7 +203,7 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
 
     RequestContext rc = {};
     rc.type = PUT;
-    rc.rid = rid_++;
+    rc.rid = prc.rid;
     rc.size = size;
     rc.address = 0;
     // allocate memory for RMA read from client.
@@ -218,6 +218,10 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
     }
     networkClient->reclaim_dram_buffer(rc.src_address, rc.size);
   }
+  prc.type = PUT_FINALIZE;
+  pRequest = std::make_shared<ProxyRequest>(prc);
+  proxyRequestHandler_->addTask(pRequest);
+  auto prrc2 = proxyRequestHandler_->get(pRequest);
 #ifdef DEBUG
   std::cout << "[PmPoolClient::put start] " << key << "-" << rc.size
     << ", hashkey is " << key_uint << std::endl;
@@ -230,7 +234,7 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
   }
   fprintf(stderr, " ...\n");
 #endif
-  return result;
+  return prrc2.success;
 }
 
 uint64_t PmPoolClient::get(const string &key, char *value, uint64_t size) {
@@ -238,7 +242,7 @@ uint64_t PmPoolClient::get(const string &key, char *value, uint64_t size) {
   Digest::computeKeyHash(key, &key_uint);
 
   ProxyRequestContext prc = {};
-  prc.type = GET_HOSTS;
+  prc.type = GET;
   prc.rid = rid_++;
   prc.key = key_uint;
   auto pRequest = std::make_shared<ProxyRequest>(prc);
@@ -250,7 +254,7 @@ uint64_t PmPoolClient::get(const string &key, char *value, uint64_t size) {
 
   RequestContext rc = {};
   rc.type = GET;
-  rc.rid = rid_++;
+  rc.rid = prc.rid;
   rc.size = size;
   rc.address = 0;
   // allocate memory for RMA read from client.
@@ -283,7 +287,7 @@ vector<block_meta> PmPoolClient::getMeta(const string &key) {
   Digest::computeKeyHash(key, &key_uint);
 
   ProxyRequestContext prc = {};
-  prc.type = GET_HOSTS;
+  prc.type = GET_META;
   prc.rid = rid_++;
   prc.key = key_uint;
   auto pRequest = std::make_shared<ProxyRequest>(prc);
@@ -295,7 +299,7 @@ vector<block_meta> PmPoolClient::getMeta(const string &key) {
 
   RequestContext rc = {};
   rc.type = GET_META;
-  rc.rid = rid_++;
+  rc.rid = prc.rid;
   rc.address = 0;
   rc.key = key_uint;
   auto request = std::make_shared<Request>(rc);
@@ -309,7 +313,7 @@ int PmPoolClient::del(const string &key) {
   Digest::computeKeyHash(key, &key_uint);
 
   ProxyRequestContext prc = {};
-  prc.type = GET_HOSTS;
+  prc.type = DELETE;
   prc.rid = rid_++;
   prc.key = key_uint;
   auto pRequest = std::make_shared<ProxyRequest>(prc);
@@ -324,7 +328,7 @@ int PmPoolClient::del(const string &key) {
 
     RequestContext rc = {};
     rc.type = DELETE;
-    rc.rid = rid_++;
+    rc.rid = prc.rid;
     rc.key = key_uint;
     auto request = std::make_shared<Request>(rc);
     requestHandler->addTask(request);
@@ -333,5 +337,9 @@ int PmPoolClient::del(const string &key) {
       result = -1;
     }
   }
-  return result;
+  prc.type = DELETE_FINALIZE;
+  pRequest = std::make_shared<ProxyRequest>(prc);
+  proxyRequestHandler_->addTask(pRequest);
+  auto prrc2 = proxyRequestHandler_->get(pRequest);
+  return prrc2.success;
 }

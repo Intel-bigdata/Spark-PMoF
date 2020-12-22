@@ -80,21 +80,112 @@ void ProxyServer::enqueue_recv_msg(std::shared_ptr<ProxyRequest> request) {
 
 void ProxyServer::handle_recv_msg(std::shared_ptr<ProxyRequest> request) {
   ProxyRequestContext rc = request->get_rc();
-  vector<string> nodes = consistentHash_->getNodes(rc.key, dataReplica_);
-  auto rrc = ProxyRequestReplyContext();
-  rrc.type = rc.type;
-  rrc.success = 0;
-  rrc.rid = rc.rid;
-  rrc.hosts = nodes;
-  rrc.dataServerPort = dataServerPort_;
-  rrc.con = rc.con;
-  std::shared_ptr<ProxyRequestReply> requestReply = std::make_shared<ProxyRequestReply>(rrc);
+  switch (rc.type)
+  {
+  case PUT: {
+    cout << "PUT request" << endl;
+    vector<string> nodes = consistentHash_->getNodes(rc.key, dataReplica_);
+    auto rrc = ProxyRequestReplyContext();
+    rrc.type = rc.type;
+    rrc.success = 0;
+    rrc.rid = rc.rid;
+    rrc.hosts = nodes;
+    rrc.dataServerPort = dataServerPort_;
+    rrc.con = rc.con;
+    std::shared_ptr<ProxyRequestReply> requestReply =
+        std::make_shared<ProxyRequestReply>(rrc);
 
-  requestReply->encode();
-  auto ck = chunkMgr_->get(rrc.con);
-  memcpy(reinterpret_cast<char *>(ck->buffer), requestReply->data_, requestReply->size_);
-  ck->size = requestReply->size_;
-  rrc.con->send(ck);
+    requestReply->encode();
+    auto ck = chunkMgr_->get(rrc.con);
+    memcpy(reinterpret_cast<char*>(ck->buffer), requestReply->data_,
+           requestReply->size_);
+    ck->size = requestReply->size_;
+    rrc.con->send(ck);
+    break;
+  }
+  case PUT_FINALIZE: {
+    cout << "PUT_FINALIZE request" << endl;
+    auto rrc = ProxyRequestReplyContext();
+    rrc.type = rc.type;
+    rrc.success = 0;
+    rrc.rid = rc.rid;
+    rrc.con = rc.con;
+    std::shared_ptr<ProxyRequestReply> requestReply = std::make_shared<ProxyRequestReply>(rrc);
+    auto key = rc.key;
+    vector<string> nodes = consistentHash_->getNodes(key, dataReplica_);
+    addReplica(key, nodes);
+
+    requestReply->encode();
+    auto ck = chunkMgr_->get(rrc.con);
+    memcpy(reinterpret_cast<char*>(ck->buffer), requestReply->data_,
+           requestReply->size_);
+    ck->size = requestReply->size_;
+    rrc.con->send(ck);
+    break;
+  }
+  case GET:
+  case GET_META:
+  case DELETE: {
+    cout << "GET request" << endl;
+    vector<string> nodes = getReplica(rc.key);
+    auto rrc = ProxyRequestReplyContext();
+    rrc.type = rc.type;
+    rrc.success = 0;
+    rrc.rid = rc.rid;
+    rrc.hosts = nodes;
+    rrc.dataServerPort = dataServerPort_;
+    rrc.con = rc.con;
+    std::shared_ptr<ProxyRequestReply> requestReply =
+        std::make_shared<ProxyRequestReply>(rrc);
+
+    requestReply->encode();
+    auto ck = chunkMgr_->get(rrc.con);
+    memcpy(reinterpret_cast<char*>(ck->buffer), requestReply->data_,
+           requestReply->size_);
+    ck->size = requestReply->size_;
+    rrc.con->send(ck);
+    break;
+  }
+  case DELETE_FINALIZE: {
+    cout << "DELETE_FINALIZE request" << endl;
+    removeReplica(rc.key);
+    auto rrc = ProxyRequestReplyContext();
+    rrc.type = rc.type;
+    rrc.success = 0;
+    rrc.rid = rc.rid;
+    rrc.con = rc.con;
+    std::shared_ptr<ProxyRequestReply> requestReply =
+        std::make_shared<ProxyRequestReply>(rrc);
+
+    requestReply->encode();
+    auto ck = chunkMgr_->get(rrc.con);
+    memcpy(reinterpret_cast<char*>(ck->buffer), requestReply->data_,
+           requestReply->size_);
+    ck->size = requestReply->size_;
+    rrc.con->send(ck);
+    break;
+  }
+  default:
+    break;
+  }
+}
+
+void ProxyServer::addReplica(uint64_t key, vector<string> nodes) {
+  std::lock_guard<std::mutex> lk(replica_mtx);
+  replicaMap_.insert(pair<uint64_t, vector<string>>(key, nodes));
+  cout << "add replica: " << replicaMap_.size() << endl;
+}
+
+vector<string> ProxyServer::getReplica(uint64_t key) {
+  std::lock_guard<std::mutex> lk(replica_mtx);
+  cout << "replicaMap size: " << replicaMap_.size() << endl;
+  assert(replicaMap_.count(key));
+  return replicaMap_[key];
+}
+
+void ProxyServer::removeReplica(uint64_t key) {
+  std::lock_guard<std::mutex> lk(replica_mtx);
+  replicaMap_.erase(key);
 }
 
 bool ProxyServer::launchServer() {

@@ -27,27 +27,27 @@ class RequestHandler;
 class ClientRecvCallback;
 class Protocol;
 
-enum OpType : uint32_t {
-  ALLOC = 1,
-  FREE,
-  PREPARE,
-  WRITE,
-  READ,
-  PUT,
-  GET,
-  GET_META,
-  DELETE,
-  REPLY = 1 << 16,
-  ALLOC_REPLY,
-  FREE_REPLY,
-  PREPARE_REPLY,
-  WRITE_REPLY,
-  READ_REPLY,
-  PUT_REPLY,
-  GET_REPLY,
-  GET_META_REPLY,
-  DELETE_REPLY
-};
+// enum OpType : uint32_t {
+//   ALLOC = 1,
+//   FREE,
+//   PREPARE,
+//   WRITE,
+//   READ,
+//   PUT,
+//   GET,
+//   GET_META,
+//   DELETE,
+//   REPLY = 1 << 16,
+//   ALLOC_REPLY,
+//   FREE_REPLY,
+//   PREPARE_REPLY,
+//   WRITE_REPLY,
+//   READ_REPLY,
+//   PUT_REPLY,
+//   GET_REPLY,
+//   GET_META_REPLY,
+//   DELETE_REPLY
+// };
 
 /**
  * @brief Define two types of event in this file: Request, RequestReply

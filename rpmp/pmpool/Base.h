@@ -24,6 +24,30 @@
     }                                                               \
   }
 
+enum OpType : uint32_t {
+  ALLOC = 1,
+  FREE,
+  PREPARE,
+  WRITE,
+  READ,
+  PUT,
+  GET,
+  GET_META,
+  DELETE,
+  PUT_FINALIZE,
+  DELETE_FINALIZE,
+  REPLY = 1 << 16,
+  ALLOC_REPLY,
+  FREE_REPLY,
+  PREPARE_REPLY,
+  WRITE_REPLY,
+  READ_REPLY,
+  PUT_REPLY,
+  GET_REPLY,
+  GET_META_REPLY,
+  DELETE_REPLY
+};
+
 struct RequestMsg {
   uint32_t type;
   uint64_t rid;
