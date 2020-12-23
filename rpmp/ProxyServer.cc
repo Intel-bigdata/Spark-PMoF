@@ -14,7 +14,6 @@ ProxyRecvCallback::ProxyRecvCallback(std::shared_ptr<ProxyServer> proxyServer,
     : proxyServer_(proxyServer), chunkMgr_(chunkMgr) {}
 
 void ProxyRecvCallback::operator()(void* param_1, void* param_2) {
-  cout << "ProxyRecvCallback " << endl;
   int mid = *static_cast<int*>(param_1);
   auto chunk = chunkMgr_->get(mid);
   auto request = std::make_shared<ProxyRequest>(
@@ -83,7 +82,6 @@ void ProxyServer::handle_recv_msg(std::shared_ptr<ProxyRequest> request) {
   switch (rc.type)
   {
   case PUT: {
-    cout << "PUT request" << endl;
     vector<string> nodes = consistentHash_->getNodes(rc.key, dataReplica_);
     auto rrc = ProxyRequestReplyContext();
     rrc.type = rc.type;
@@ -104,7 +102,6 @@ void ProxyServer::handle_recv_msg(std::shared_ptr<ProxyRequest> request) {
     break;
   }
   case PUT_FINALIZE: {
-    cout << "PUT_FINALIZE request" << endl;
     auto rrc = ProxyRequestReplyContext();
     rrc.type = rc.type;
     rrc.success = 0;
@@ -126,7 +123,6 @@ void ProxyServer::handle_recv_msg(std::shared_ptr<ProxyRequest> request) {
   case GET:
   case GET_META:
   case DELETE: {
-    cout << "GET request" << endl;
     vector<string> nodes = getReplica(rc.key);
     auto rrc = ProxyRequestReplyContext();
     rrc.type = rc.type;
@@ -147,7 +143,6 @@ void ProxyServer::handle_recv_msg(std::shared_ptr<ProxyRequest> request) {
     break;
   }
   case DELETE_FINALIZE: {
-    cout << "DELETE_FINALIZE request" << endl;
     removeReplica(rc.key);
     auto rrc = ProxyRequestReplyContext();
     rrc.type = rc.type;
@@ -173,12 +168,10 @@ void ProxyServer::handle_recv_msg(std::shared_ptr<ProxyRequest> request) {
 void ProxyServer::addReplica(uint64_t key, vector<string> nodes) {
   std::lock_guard<std::mutex> lk(replica_mtx);
   replicaMap_.insert(pair<uint64_t, vector<string>>(key, nodes));
-  cout << "add replica: " << replicaMap_.size() << endl;
 }
 
 vector<string> ProxyServer::getReplica(uint64_t key) {
   std::lock_guard<std::mutex> lk(replica_mtx);
-  cout << "replicaMap size: " << replicaMap_.size() << endl;
   assert(replicaMap_.count(key));
   return replicaMap_[key];
 }

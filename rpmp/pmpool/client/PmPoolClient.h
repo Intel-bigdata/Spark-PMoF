@@ -29,6 +29,7 @@
 #include <utility>
 #include <vector>
 #include <map>
+#include <unordered_set>
 
 #include "pmpool/Base.h"
 #include "pmpool/Common.h"
@@ -106,6 +107,7 @@ class PmPoolClient {
   bool op_finished;
   std::map<string, std::shared_ptr<Channel>> channels;
   std::mutex channel_mtx;
+  std::unordered_set<std::string> deadNodes;
 };
 
 #endif  // PMPOOL_CLIENT_PMPOOLCLIENT_H_

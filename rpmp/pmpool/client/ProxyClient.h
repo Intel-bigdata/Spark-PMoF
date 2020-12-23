@@ -113,7 +113,6 @@ public:
   explicit ProxyClientSendCallback(std::shared_ptr<ChunkMgr> chunkMgr) : chunkMgr_(chunkMgr) {}
   ~ProxyClientSendCallback() override = default;
   void operator()(void* param_1, void* param_2) {
-    cout << "ProxyClientSendCallback" << endl;
     auto buffer_id_ = *static_cast<int *>(param_1);
     auto ck = chunkMgr_->get(buffer_id_);
     chunkMgr_->reclaim(ck, static_cast<Connection *>(ck->con));

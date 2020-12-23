@@ -105,7 +105,6 @@ ProxyClientConnectCallback::ProxyClientConnectCallback(std::shared_ptr<ProxyClie
 }
 
 void ProxyClientConnectCallback::operator()(void *param_1, void *param_2) {
-  cout << "ProxyClientConnectCallback" << endl;
   auto connection = static_cast<Connection*>(param_1);
   proxyClient_->setConnection(connection);
 }

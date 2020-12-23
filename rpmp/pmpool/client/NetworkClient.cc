@@ -281,11 +281,22 @@ int NetworkClient::init(std::shared_ptr<RequestHandler> requestHandler) {
   client_->start();
   int res = client_->connect(remote_address_.c_str(), remote_port_.c_str());
   unique_lock<mutex> lk(con_mtx);
-  while (!connected_) {
-    std::cout<<"NetworkClient from " <<this->getRemoteAddress()<<":" << this->getRemotePort()<<" wait to be connected to server"<<std::endl;
-    con_v.wait(lk);
+  auto start = std::chrono::steady_clock::now();
+  while (!con_v.wait_for(lk, 50ms, [start, this] {
+    auto current = std::chrono::steady_clock::now();
+    auto elapse = current - start;
+    if (elapse > 10s) {
+      fprintf(stderr, "Client connection spent %ld s, time out\n",
+              std::chrono::duration_cast<std::chrono::seconds>(elapse).count());
+      return true;
+    }
+    return this->connected_;
+  })) {
   }
 
+  if (!connected_) {
+    return -1;
+  }
   circularBuffer_ =
       make_shared<CircularBuffer>(1024 * 1024, 512, false, shared_from_this());
   return 0;

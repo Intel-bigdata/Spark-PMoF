@@ -46,7 +46,11 @@ std::shared_ptr<Channel> PmPoolClient::getChannel(string node, string port) {
     std::shared_ptr<Channel> channel = std::make_shared<Channel>();
     channel->networkClient = std::make_shared<NetworkClient>(node, port);
     channel->requestHandler = std::make_shared<RequestHandler>(channel->networkClient);
-    channel->networkClient->init(channel->requestHandler);
+    int res = channel->networkClient->init(channel->requestHandler);
+    if (res) {
+      deadNodes.insert(node);
+      throw "Failed to init RPMP client";
+    }
     channel->requestHandler->start();
     channels.insert(make_pair(node, channel));
     return channel;
@@ -248,7 +252,21 @@ uint64_t PmPoolClient::get(const string &key, char *value, uint64_t size) {
   auto pRequest = std::make_shared<ProxyRequest>(prc);
   proxyRequestHandler_->addTask(pRequest);
   ProxyRequestReplyContext prrc = proxyRequestHandler_->get(pRequest);
-  std::shared_ptr<Channel> channel = getChannel(prrc.hosts[0], prrc.dataServerPort);
+  std::shared_ptr<Channel> channel;
+  for (auto node : prrc.hosts) {
+    if (deadNodes.find(node) != deadNodes.end()) {
+      continue;
+    }
+    try {
+      channel = getChannel(node, prrc.dataServerPort);
+    } catch (const char *msg) {
+      std::cout << msg << std::endl;
+    }
+  }
+  if (!channel) {
+    std::cout << "No channel available" << std::endl;
+    return -1;
+  }
   std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
   std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
 
@@ -293,7 +311,21 @@ vector<block_meta> PmPoolClient::getMeta(const string &key) {
   auto pRequest = std::make_shared<ProxyRequest>(prc);
   proxyRequestHandler_->addTask(pRequest);
   ProxyRequestReplyContext prrc = proxyRequestHandler_->get(pRequest);
-  std::shared_ptr<Channel> channel = getChannel(prrc.hosts[0], prrc.dataServerPort);
+  std::shared_ptr<Channel> channel;
+  for (auto node : prrc.hosts) {
+    if (deadNodes.find(node) != deadNodes.end()) {
+      continue;
+    }
+    try {
+      channel = getChannel(node, prrc.dataServerPort);
+    } catch (const char *msg) {
+      std::cout << msg << std::endl;
+    }
+  }
+  if (!channel) {
+    std::cout << "No channel available" << std::endl;
+    return vector<block_meta>();
+  }
   std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
   std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
 
