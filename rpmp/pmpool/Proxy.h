@@ -1,0 +1,41 @@
+#ifndef RPMP_PROXY_H
+#define RPMP_PROXY_H
+
+#include <HPNL/Callback.h>
+#include <HPNL/ChunkMgr.h>
+#include <HPNL/Connection.h>
+
+#include "pmpool/proxy/ConsistentHash.h"
+#include "pmpool/ProxyEvent.h"
+#include "pmpool/ThreadWrapper.h"
+#include "pmpool/queue/blockingconcurrentqueue.h"
+#include "pmpool/queue/concurrentqueue.h"
+#include "pmpool/Config.h"
+#include "pmpool/Log.h"
+#include "pmpool/proxy/clientService/ClientService.h"
+
+using moodycamel::BlockingConcurrentQueue;
+
+class Proxy;
+
+class Proxy : public std::enable_shared_from_this<Proxy>{
+public:
+    explicit Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log);
+    ~Proxy();
+    bool launchServer();
+    void wait();
+    void enqueue_recv_msg(std::shared_ptr<ProxyRequest> request);
+    void handle_recv_msg(std::shared_ptr<ProxyRequest> request);
+    std::vector<std::string> getNodes(uint64_t key);
+    private:
+    std::shared_ptr<ChunkMgr> chunkMgr_;
+    std::shared_ptr<Config> config_;
+    std::shared_ptr<Log> log_;
+    std::shared_ptr<ConsistentHash> consistentHash_;
+    std::shared_ptr<Server> server_;
+    std::string dataServerPort_;
+    uint32_t dataReplica_;
+    std::shared_ptr<ClientService> clientService_;
+};
+
+#endif //RPMP_PROXY_H

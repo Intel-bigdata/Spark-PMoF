@@ -136,7 +136,7 @@ int FinalizeWorker::entry() {
   std::shared_ptr<RequestReply> requestReply;
   bool res = pendingRequestReplyQueue_.wait_dequeue_timed(
       requestReply, std::chrono::milliseconds(1000));
-  assert(res);
+  // assert(res);
   if (res) {
     protocol_->handle_finalize_msg(requestReply);
   }

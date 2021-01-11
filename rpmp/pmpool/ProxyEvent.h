@@ -16,9 +16,15 @@ using std::vector;
 class ProxyClientRecvCallback;
 class ProxyRequestHandler;
 class ProxyServer;
+class ClientService;
+class Proxy;
 
 enum ProxyOpType : uint32_t {
-  GET_HOSTS = 1
+  GET_HOSTS = 1,
+  P_PUT,
+  P_PUT_REPLY,
+  P_GET,
+  P_GET_REPLY
 };
 
 struct ProxyRequestMsg {
@@ -51,13 +57,6 @@ struct ProxyRequestReplyMsg {
   std::string dataServerPort;
 };
 
-/**
- * @brief Define two types of event in this file: Request, RequestReply
- * Request: a event that client creates and sends to server.
- * RequestReply: a event that server creates and sends to client.
- * RequestContext and RequestReplyContext include the context information of the
- * previous two events.
- */
 struct ProxyRequestReplyContext {
   ProxyOpType type;
   uint32_t success;
@@ -82,6 +81,8 @@ class ProxyRequestReply {
  private:
   std::mutex data_lock_;
   friend ProxyServer;
+  friend ClientService;
+  friend Proxy;
   char* data_ = nullptr;
   uint64_t size_ = 0;
   ProxyRequestReplyContext requestReplyContext_;
@@ -103,10 +104,8 @@ class ProxyRequest {
   ProxyRequestContext& get_rc();
   void encode();
   void decode();
-  //#ifdef DEBUG
   char* getData() { return data_; }
   uint64_t getSize() { return size_; }
-  //#endif
 
  private:
   std::mutex data_lock_;

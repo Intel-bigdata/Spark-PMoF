@@ -33,7 +33,7 @@ RequestContext &Request::get_rc() { return requestContext_; }
 void Request::encode() {
   const std::lock_guard<std::mutex> lock(data_lock_);
   OpType rt = requestContext_.type;
-  assert(rt == ALLOC || rt == FREE || rt == WRITE || rt == READ);
+  // assert(rt == ALLOC || rt == FREE || rt == WRITE || rt == READ);
   size_ = sizeof(RequestMsg);
   data_ = static_cast<char *>(std::malloc(sizeof(RequestMsg)));
   RequestMsg *requestMsg = (RequestMsg *)data_;
