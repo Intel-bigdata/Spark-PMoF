@@ -13,6 +13,7 @@
 #include "pmpool/Config.h"
 #include "pmpool/Log.h"
 #include "pmpool/proxy/clientService/ClientService.h"
+#include "pmpool/proxy/replicaService/ReplicaService.h"
 
 using moodycamel::BlockingConcurrentQueue;
 
@@ -26,16 +27,19 @@ public:
     void wait();
     void enqueue_recv_msg(std::shared_ptr<ProxyRequest> request);
     void handle_recv_msg(std::shared_ptr<ProxyRequest> request);
+    void addNode(PhysicalNode* physicalNode);
     std::vector<std::string> getNodes(uint64_t key);
     private:
     std::shared_ptr<ChunkMgr> chunkMgr_;
     std::shared_ptr<Config> config_;
     std::shared_ptr<Log> log_;
     std::shared_ptr<ConsistentHash> consistentHash_;
+    int loadBalanceFactor_;
     std::shared_ptr<Server> server_;
     std::string dataServerPort_;
     uint32_t dataReplica_;
     std::shared_ptr<ClientService> clientService_;
+    std::shared_ptr<ReplicaService> replicaService_;
 };
 
 #endif //RPMP_PROXY_H

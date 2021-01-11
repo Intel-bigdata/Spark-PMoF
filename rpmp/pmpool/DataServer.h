@@ -15,6 +15,8 @@
 
 #include <memory>
 
+#include "pmpool/DataService/DataServerService.h"
+
 class Config;
 class Protocol;
 class Digest;
@@ -42,6 +44,7 @@ class DataServer {
   std::shared_ptr<NetworkServer> networkServer_;
   std::shared_ptr<AllocatorProxy> allocatorProxy_;
   std::shared_ptr<Protocol> protocol_;
+  std::shared_ptr<DataServerService> dataService_;
 };
 
 #endif  // PMPOOL_DATASERVER_H_

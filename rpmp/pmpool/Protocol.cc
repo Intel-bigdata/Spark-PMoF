@@ -151,11 +151,13 @@ void FinalizeWorker::addTask(std::shared_ptr<RequestReply> requestReply) {
 
 Protocol::Protocol(std::shared_ptr<Config> config, std::shared_ptr<Log> log,
                    std::shared_ptr<NetworkServer> server,
-                   std::shared_ptr<AllocatorProxy> allocatorProxy)
+                   std::shared_ptr<AllocatorProxy> allocatorProxy,
+                   std::shared_ptr<DataServerService> dataService)
     : config_(config),
       log_(log),
       networkServer_(server),
-      allocatorProxy_(allocatorProxy) {
+      allocatorProxy_(allocatorProxy),
+      dataService_(dataService) {
   time = 0;
 }
 

@@ -130,6 +130,7 @@ class ReplicaRequestReply {
   std::mutex data_lock_;
     friend ProxyServer;
     friend Protocol;
+    friend ReplicaService;
   char* data_ = nullptr;
   uint64_t size_ = 0;
   ReplicaRequestReplyContext requestReplyContext_;

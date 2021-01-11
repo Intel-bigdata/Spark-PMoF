@@ -33,6 +33,7 @@ class Protocol;
 class NetworkServer;
 class Config;
 class Log;
+class DataServerService;
 
 using moodycamel::BlockingConcurrentQueue;
 using std::make_shared;
@@ -157,7 +158,8 @@ class Protocol : public std::enable_shared_from_this<Protocol> {
   Protocol() = delete;
   Protocol(std::shared_ptr<Config> config, std::shared_ptr<Log> log,
            std::shared_ptr<NetworkServer> server,
-           std::shared_ptr<AllocatorProxy> allocatorProxy);
+           std::shared_ptr<AllocatorProxy> allocatorProxy,
+           std::shared_ptr<DataServerService> dataService);
   ~Protocol();
   int init();
 
@@ -181,6 +183,7 @@ class Protocol : public std::enable_shared_from_this<Protocol> {
  private:
   std::shared_ptr<NetworkServer> networkServer_;
   std::shared_ptr<AllocatorProxy> allocatorProxy_;
+  std::shared_ptr<DataServerService> dataService_;
 
   std::shared_ptr<RecvCallback> recvCallback_;
   std::shared_ptr<SendCallback> sendCallback_;

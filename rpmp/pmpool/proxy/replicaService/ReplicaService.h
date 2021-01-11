@@ -17,7 +17,7 @@
 #include "ReplicaEvent.h"
 #include "pmpool/queue/blockingconcurrentqueue.h"
 #include "pmpool/queue/concurrentqueue.h"
-#include "pmpool/ProxyEvent.h"
+#include "pmpool/Proxy.h"
 
 using moodycamel::BlockingConcurrentQueue;
 
@@ -52,11 +52,8 @@ class ReplicaShutdownCallback : public Callback {
   ReplicaShutdownCallback() = default;
   ~ReplicaShutdownCallback() override = default;
 
-  /**
-   * Currently, nothing to be done when proxy is shutdown
-   */
   void operator()(void* param_1, void* param_2) override {
-    cout << "ProxyServer::ShutdownCallback::operator" << endl;
+    cout << "replica service::ShutdownCallback::operator" << endl;
   }
 };
 
@@ -64,7 +61,7 @@ class ReplicaConnectCallback : public Callback {
  public:
   ReplicaConnectCallback() = default;
   void operator()(void* param_1, void* param_2) override {
-    cout << "ProxyServer::ConnectCallback::operator" << endl;
+    cout << "replica service::ConnectCallback::operator" << endl;
   }
 };
 
@@ -73,27 +70,28 @@ class ReplicaWorker : public ThreadWrapper {
   ReplicaWorker(std::shared_ptr<ReplicaService> service);
   int entry() override;
   void abort() override;
-  void addTask(std::shared_ptr<ReplicaRequestReply> msg);
+  void addTask(std::shared_ptr<ReplicaRequest> msg);
 
  private:
   std::shared_ptr<ReplicaService> service_;
-  BlockingConcurrentQueue<std::shared_ptr<ReplicaRequestReply>>
+  BlockingConcurrentQueue<std::shared_ptr<ReplicaRequest>>
       pendingRecvRequestQueue_;
 };
 
 class ReplicaService : public std::enable_shared_from_this<ReplicaService> {
  public:
   explicit ReplicaService(std::shared_ptr<Config> config,
-                          std::shared_ptr<Log> log);
+                          std::shared_ptr<Log> log,
+                          std::shared_ptr<Proxy> proxyServer);
   ~ReplicaService();
-  bool initService(std::shared_ptr<ProxyServer> proxyServer);
-  void enqueue_recv_msg(std::shared_ptr<ReplicaRequestReply> msg);
-  void handle_recv_msg(std::shared_ptr<ReplicaRequestReply> msg);
+  bool startService();
+  void enqueue_recv_msg(std::shared_ptr<ReplicaRequest> msg);
+  void handle_recv_msg(std::shared_ptr<ReplicaRequest> msg);
   void wait();
 
  private:
-  void enqueue_finalize_msg(std::shared_ptr<ProxyRequestReply> reply);
-  void handle_finalize_msg(std::shared_ptr<ProxyRequestReply> reply);
+  // void enqueue_finalize_msg(std::shared_ptr<ProxyRequestReply> reply);
+  // void handle_finalize_msg(std::shared_ptr<ProxyRequestReply> reply);
   void addReplica(uint64_t key, std::string node);
   std::unordered_set<std::string> getReplica(uint64_t key);
   void removeReplica(uint64_t key);
@@ -115,7 +113,7 @@ class ReplicaService : public std::enable_shared_from_this<ReplicaService> {
   std::mutex replica_mtx;
   std::unordered_map<uint64_t, std::shared_ptr<ReplicaRequest>> prrcMap_;
   std::mutex prrcMtx;
-  std::shared_ptr<ProxyServer> proxyServer_;
+  std::shared_ptr<Proxy> proxyServer_;
 };
 
 #endif  // RPMP_REPLICASERVICE_H

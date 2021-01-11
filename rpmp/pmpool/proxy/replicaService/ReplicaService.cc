@@ -12,11 +12,11 @@ void ReplicaRecvCallback::operator()(void* param_1, void* param_2) {
   cout << "ReplicaRecvCallback " << endl;
   int mid = *static_cast<int*>(param_1);
   auto chunk = chunkMgr_->get(mid);
-  auto reply = std::make_shared<ReplicaRequestReply>(
+  auto request = std::make_shared<ReplicaRequest>(
       reinterpret_cast<char*>(chunk->buffer), chunk->size,
       reinterpret_cast<Connection*>(chunk->con));
-  reply->decode();
-  service_->enqueue_recv_msg(reply);
+  request->decode();
+  service_->enqueue_recv_msg(request);
   chunkMgr_->reclaim(chunk, static_cast<Connection*>(chunk->con));
 }
 
@@ -32,38 +32,55 @@ void ReplicaSendCallback::operator()(void* param_1, void* param_2) {
 
 ReplicaWorker::ReplicaWorker(std::shared_ptr<ReplicaService> service) : service_(service) {}
 
-void ReplicaWorker::addTask(std::shared_ptr<ReplicaRequestReply> reply) {
-  pendingRecvRequestQueue_.enqueue(reply);
+void ReplicaWorker::addTask(std::shared_ptr<ReplicaRequest> request) {
+  pendingRecvRequestQueue_.enqueue(request);
 }
 
 void ReplicaWorker::abort() {}
 
 int ReplicaWorker::entry() {
-  std::shared_ptr<ReplicaRequestReply> reply;
+  std::shared_ptr<ReplicaRequest> request;
   bool res = pendingRecvRequestQueue_.wait_dequeue_timed(
-      reply, std::chrono::milliseconds(1000));
+      request, std::chrono::milliseconds(1000));
   if (res) {
-    service_->handle_recv_msg(reply);
+    service_->handle_recv_msg(request);
   }
   return 0;
 }
 
-ReplicaService::ReplicaService(std::shared_ptr<Config> config, std::shared_ptr<Log> log) :
- config_(config), log_(log) {}
+ReplicaService::ReplicaService(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Proxy> proxyServer) :
+ config_(config), log_(log), proxyServer_(proxyServer) {}
 
 ReplicaService::~ReplicaService() {
     worker_->stop();
     worker_->join();
 }
 
-void ReplicaService::enqueue_recv_msg(std::shared_ptr<ReplicaRequestReply> reply) {
-  worker_->addTask(reply);
+void ReplicaService::enqueue_recv_msg(std::shared_ptr<ReplicaRequest> request) {
+  worker_->addTask(request);
 }
 
-void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequestReply> reply) {
-  ReplicaRequestReplyContext rrc = reply->get_rrc();
-  auto rc = ReplicaRequestContext();
-  switch(rrc.type) {
+void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
+  ReplicaRequestContext rc = request->get_rc();
+  auto rrc = ReplicaRequestReplyContext();
+  switch(rc.type) {
+    case REGISTER: {
+      PhysicalNode* physicalNode = new PhysicalNode(rc.node);
+      proxyServer_->addNode(physicalNode);
+      rrc.type = rc.type;
+      rrc.success = 0;
+      rrc.rid = rc.rid;
+      rrc.con = rc.con;
+      dataServerConnections_.insert(pair<std::string, Connection*>(rc.node, rc.con));
+      std::shared_ptr<ReplicaRequestReply> requestReply = std::make_shared<ReplicaRequestReply>(rrc);
+      requestReply->encode();
+      auto ck = chunkMgr_->get(rrc.con);
+      memcpy(reinterpret_cast<char*>(ck->buffer), requestReply->data_,
+             requestReply->size_);
+      ck->size = requestReply->size_;
+      rrc.con->send(ck);
+      break;
+    }
     case REPLICATE: {
       cout << "put reply" << endl;
       rc.type = REPLICATE;
@@ -107,11 +124,7 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequestReply> reply)
   }
 }
 
-bool ReplicaService::initService(std::shared_ptr<ProxyServer> proxyServer) {
-  proxyServer_ = proxyServer;
-  dataServerPort_ = config_->get_port();
-  dataReplica_ = config_->get_data_replica();
-
+bool ReplicaService::startService() {
   int worker_number = config_->get_network_worker_num();
   int buffer_number = config_->get_network_buffer_num();
   int buffer_size = config_->get_network_buffer_size();
@@ -158,6 +171,5 @@ void ReplicaService::removeReplica(uint64_t key) {
 
 std::unordered_set<std::string> ReplicaService::getReplica(uint64_t key) {
   std::lock_guard<std::mutex> lk(replica_mtx);
-  cout << "replica map size: " << replicaMap_.size() << endl;
   return replicaMap_[key];
 }

@@ -1,0 +1,144 @@
+#include "DataServerService.h"
+
+ServiceConnectCallback::ServiceConnectCallback(std::shared_ptr<DataServerService> service) {
+    service_ = service;
+}
+
+void ServiceConnectCallback::operator()(void *param_1, void *param_2) {
+  cout << "ServiceConnectCallback" << endl;
+  auto connection = static_cast<Connection*>(param_1);
+  service_->setConnection(connection);
+}
+
+ServiceRecvCallback::ServiceRecvCallback(std::shared_ptr<ChunkMgr> chunkMgr, std::shared_ptr<DataServiceRequestHandler> requestHandler) 
+: chunkMgr_(chunkMgr), requestHandler_(requestHandler) {}
+
+void ServiceRecvCallback::operator()(void *param_1, void *param_2) {
+  int mid = *static_cast<int*>(param_1);
+  Chunk* ck = chunkMgr_->get(mid);
+  auto requestReply = std::make_shared<ReplicaRequestReply>(
+      reinterpret_cast<char *>(ck->buffer), ck->size,
+      reinterpret_cast<Connection *>(ck->con));
+  requestReply->decode();
+  auto rrc = requestReply->get_rrc();
+  if (rrc.type == REGISTER) {
+    requestHandler_->notify(requestReply);
+  } else {
+    // requestHandler_->addTask()
+  }
+  chunkMgr_->reclaim(ck, static_cast<Connection *>(ck->con));
+}
+
+// ReplicateWorker::ReplicateWorker(std::shared_ptr<DataServerService> service, int index)
+//     : service_(service), index_(index) {
+//   init = false;
+// }
+
+// int ReplicateWorker::entry() {
+//   std::shared_ptr<ReplicaRequestReply> requestReply;
+//   bool res = pendingRecvRequestQueue_.wait_dequeue_timed(
+//       requestReply, std::chrono::milliseconds(1000));
+//   if (res) {
+//     // service_->handle_rma_msg(requestReply);
+//   }
+//   return 0;
+// }
+
+// void ReplicateWorker::abort() {}
+
+// void ReplicateWorker::addTask(std::shared_ptr<ReplicaRequestReply> rr) {
+//   pendingRecvRequestQueue_.enqueue(rr);
+// }
+
+DataServerService::DataServerService(std::shared_ptr<Config> config,
+                                     std::shared_ptr<Log> log)
+    : config_(config), log_(log) {}
+
+DataServerService::~DataServerService() {
+  requestHandler_->reset();
+  shutdownCallback.reset();
+  connectCallback.reset();
+  recvCallback.reset();
+  sendCallback.reset();
+  if (proxyCon_) {
+    proxyCon_->shutdown();
+  }
+  if (proxyClient_) {
+    proxyClient_->shutdown();
+    proxyClient_.reset();
+  }
+}
+
+bool DataServerService::init() {
+  requestHandler_ = std::make_shared<DataServiceRequestHandler>(shared_from_this());
+  requestHandler_->start();
+  host_ = config_->get_ip();
+  proxyClient_ = std::make_shared<Client>(1, 32);
+  if ((proxyClient_->init()) != 0) {
+    return -1;
+  }
+  int buffer_size_ = 65536;
+  int buffer_number_ = 64;
+  chunkMgr_ = std::make_shared<ChunkPool>(proxyClient_.get(), buffer_size_,
+                                          buffer_number_);
+  proxyClient_->set_chunk_mgr(chunkMgr_.get());
+
+  shutdownCallback = std::make_shared<ServiceShutdownCallback>();
+  connectCallback =
+      std::make_shared<ServiceConnectCallback>(shared_from_this());
+  recvCallback =
+      std::make_shared<ServiceRecvCallback>(chunkMgr_, requestHandler_);
+  sendCallback = std::make_shared<ServiceSendCallback>(chunkMgr_);
+  proxyClient_->set_shutdown_callback(shutdownCallback.get());
+  proxyClient_->set_connected_callback(connectCallback.get());
+  proxyClient_->set_recv_callback(recvCallback.get());
+  proxyClient_->set_send_callback(sendCallback.get());
+
+  proxyClient_->start();
+  //TODO get service ip & port from config
+  int res = proxyClient_->connect("172.168.0.209", "12340");
+  std::unique_lock<std::mutex> lk(con_mtx);
+  while (!proxyConnected) {
+    std::cout<<"NetworkClient from " << host_ <<" wait to be connected to proxy " << config_->get_proxy_ip()<<std::endl;
+    con_v.wait(lk);
+  }
+  registerDataServer();
+  return 0;
+}
+
+void DataServerService::setConnection(Connection *con) {
+  std::cout<<"NetworkClient from " << host_ <<" connected to proxy " << config_->get_proxy_ip()<<std::endl;
+  std::unique_lock<std::mutex> lk(con_mtx);
+  proxyCon_ = con;
+  proxyConnected = true;
+  con_v.notify_all();
+  lk.unlock();
+}
+
+void DataServerService::registerDataServer() {
+  while (true) {
+    ReplicaRequestContext rc = {};
+    rc.type = REGISTER;
+    rc.rid = rid_++;
+    rc.node = host_;
+    auto request = std::make_shared<ReplicaRequest>(rc);
+    requestHandler_->addTask(request);
+    try {
+      auto rrc = requestHandler_->get(request);
+      break;
+    } catch (const char *ex) {
+      std::cout << "Failed to register data server, try again" << std::endl;
+    }
+  }
+}
+
+void DataServerService::send(const char *data, uint64_t size) {
+  auto chunk = chunkMgr_->get(proxyCon_);
+  std::memcpy(reinterpret_cast<char *>(chunk->buffer), data, size);
+  chunk->size = size;
+  proxyCon_->send(chunk);
+}
+
+void DataServerService::addTask(std::shared_ptr<ReplicaRequest> request) {
+  requestHandler_->addTask(request);
+}
