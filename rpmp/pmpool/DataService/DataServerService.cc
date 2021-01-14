@@ -74,6 +74,7 @@ bool DataServerService::init() {
   worker_ = std::make_shared<ReplicateWorker>(shared_from_this());
   worker_->start();
   host_ = config_->get_ip();
+  port_ = config_->get_port();
   proxyClient_ = std::make_shared<Client>(1, 32);
   if ((proxyClient_->init()) != 0) {
     return -1;
@@ -122,6 +123,7 @@ void DataServerService::registerDataServer() {
     rc.type = REGISTER;
     rc.rid = rid_++;
     rc.node = host_;
+    rc.port = port_;
     auto request = std::make_shared<ReplicaRequest>(rc);
     requestHandler_->addTask(request);
     try {
@@ -136,14 +138,16 @@ void DataServerService::registerDataServer() {
 void DataServerService::handle_replica_msg(std::shared_ptr<ReplicaRequestReply> reply) {
   auto rrc = reply->get_rrc();
   if (rrc.type == REPLICATE) {
+    cout << "handle replicate" << endl;
     auto rc = ReplicaRequestContext();
     rc.type = REPLICA_REPLY;
     rc.key = rrc.key;
     rc.node = rrc.node;
+    rc.port = rrc.port;
     rc.rid = rrc.rid;
     rc.src_address = rrc.src_address;
     auto rr = std::make_shared<ReplicaRequest>(rc);
-    std::shared_ptr<DataChannel> channel = getChannel(rrc.node, config_->get_port());
+    std::shared_ptr<DataChannel> channel = getChannel(rrc.node, rrc.port);
     std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
     std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
     // RequestContext rc = {};
@@ -158,8 +162,8 @@ void DataServerService::handle_replica_msg(std::shared_ptr<ReplicaRequestReply> 
     // requestHandler->addTask(request);
     // auto res = requestHandler->wait(request);
     // auto res = proxyRequestHandler_->get(pRequest);
-    auto dataRc = RequestContext();
-    dataRc.type = PUT;
+    RequestContext dataRc = {};
+    dataRc.type = REPLICATE_PUT;
     dataRc.rid = rid_++;
     dataRc.key = rrc.key;
     dataRc.size = rrc.size;
@@ -187,15 +191,15 @@ void DataServerService::addTask(std::shared_ptr<ReplicaRequest> request) {
 
 std::shared_ptr<DataChannel> DataServerService::getChannel(string node, string port) {
   std::lock_guard<std::mutex> lk(channel_mtx);
-  if (channels.count(node)) {
-    return channels.find(node)->second;
+  if (channels.count(node+port)) {
+    return channels.find(node+port)->second;
   } else {
     std::shared_ptr<DataChannel> channel = std::make_shared<DataChannel>();
     channel->networkClient = std::make_shared<NetworkClient>(node, port);
     channel->requestHandler = std::make_shared<RequestHandler>(channel->networkClient);
     channel->networkClient->init(channel->requestHandler);
     channel->requestHandler->start();
-    channels.insert(make_pair(node, channel));
+    channels.insert(make_pair(node+port, channel));
     return channel;
   }
 }

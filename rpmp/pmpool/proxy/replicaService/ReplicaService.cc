@@ -15,9 +15,7 @@ void ReplicaRecvCallback::operator()(void* param_1, void* param_2) {
   auto request = std::make_shared<ReplicaRequest>(
       reinterpret_cast<char*>(chunk->buffer), chunk->size,
       reinterpret_cast<Connection*>(chunk->con));
-  cout << "before" << endl;
   request->decode();
-  cout << "after" << endl;
   service_->enqueue_recv_msg(request);
   chunkMgr_->reclaim(chunk, static_cast<Connection*>(chunk->con));
 }
@@ -62,13 +60,13 @@ void ReplicaService::enqueue_recv_msg(std::shared_ptr<ReplicaRequest> request) {
   worker_->addTask(request);
 }
 
-int minReplica = 1;
+int minReplica = 2;
 void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
   ReplicaRequestContext rc = request->get_rc();
   auto rrc = ReplicaRequestReplyContext();
   switch(rc.type) {
     case REGISTER: {
-      PhysicalNode* physicalNode = new PhysicalNode(rc.node);
+      PhysicalNode* physicalNode = new PhysicalNode(rc.node, rc.port);
       proxyServer_->addNode(physicalNode);
       rrc.type = rc.type;
       rrc.success = 0;
@@ -86,19 +84,21 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
     }
     case REPLICATE: {
       cout << "put reply" << endl;
-      addReplica(rc.key, rc.node);
+      addReplica(rc.key, rc.node, rc.port);
       if (getReplica(rc.key).size() < minReplica) {
         cout << "replicate work" << endl;
-        vector<string> nodes = proxyServer_->getNodes(rc.key);
+        vector<pair<string, string>> nodes = proxyServer_->getNodes(rc.key);
         for (auto node : nodes) {
-          if (node == rc.node) {
+          if (node.first == rc.node && node.second == rc.port) {
             continue;
           } else {
+            cout << "send replicate msg" << endl;
             rrc.type = REPLICATE;
             rrc.rid = rid_++;
             rrc.key = rc.key;
             rrc.size = rc.size;
-            rrc.node = node;
+            rrc.node = node.first;
+            rrc.port = node.second;
             rrc.con = rc.con;
             rrc.src_address = rc.src_address;
             auto reply = std::make_shared<ReplicaRequestReply>(rrc);
@@ -121,8 +121,9 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
     }
     case REPLICA_REPLY : {
       cout << "replica reply" << endl;
-      addReplica(rc.key, rc.node);
+      addReplica(rc.key, rc.node, rc.port);
       if (getReplica(rc.key).size() == minReplica) {
+        cout << "notify client" << endl;
         // auto request = prrcMap_[rc.key];
         // auto rc = request->get_rc();
         // rrc.type = rc.type;
@@ -182,8 +183,8 @@ void ReplicaService::wait() {
   server_->wait();
 }
 
-void ReplicaService::addReplica(uint64_t key, std::string node) {
-  proxyServer_->addReplica(key, node);
+void ReplicaService::addReplica(uint64_t key, std::string node, std::string port) {
+  proxyServer_->addReplica(key, node, port);
 }
 
 void ReplicaService::removeReplica(uint64_t key) {

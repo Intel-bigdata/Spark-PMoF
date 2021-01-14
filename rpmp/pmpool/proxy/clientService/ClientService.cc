@@ -75,12 +75,17 @@ void ClientService::handle_recv_msg(std::shared_ptr<ProxyRequest> request) {
   auto rrc = ProxyRequestReplyContext();
   switch(rc.type) {
     case GET_HOSTS: {
-      vector<string> nodes = proxyServer_->getNodes(rc.key);
+      vector<pair<string, string>> nodes = proxyServer_->getNodes(rc.key);
       rrc.type = rc.type;
       rrc.success = 0;
       rrc.rid = rc.rid;
-      rrc.hosts = nodes;
-      rrc.dataServerPort = dataServerPort_;
+      for (auto node : nodes) {
+        cout << "get node: " << node.first << ":" << node.second << endl;
+        rrc.hosts.push_back(node.first);
+        rrc.ports.push_back(node.second);
+      }
+      // rrc.hosts = nodes;
+      // rrc.dataServerPort = dataServerPort_;
       rrc.con = rc.con;
       std::shared_ptr<ProxyRequestReply> requestReply =
           std::make_shared<ProxyRequestReply>(rrc);
@@ -133,13 +138,13 @@ bool ClientService::startService() {
 
 void ClientService::notifyClient(uint64_t key) {
   auto reply = prrcMap_[key];
-  prrcMap_.erase(key);
   auto rrc = reply->get_rrc();
   auto ck = chunkMgr_->get(rrc.con);
   memcpy(reinterpret_cast<char*>(ck->buffer), reply->data_,
          reply->size_);
   ck->size = reply->size_;
   rrc.con->send(ck);
+  prrcMap_.erase(key);
 }
 
 void ClientService::wait() {

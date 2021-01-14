@@ -101,6 +101,7 @@ public:
  std::shared_ptr<DataChannel> getChannel(string node, string port);
 private:
  std::string host_;
+ std::string port_;
  atomic<uint64_t> rid_ = {0};
  std::shared_ptr<DataServiceRequestHandler> requestHandler_;
  std::shared_ptr<ReplicateWorker> worker_;

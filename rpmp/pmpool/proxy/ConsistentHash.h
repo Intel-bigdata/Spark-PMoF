@@ -72,20 +72,20 @@ class ConsistentHash {
       return getNode(hashValue);
     };
 
-    vector<string> getNodes(uint64_t hashValue, uint32_t num) {
+    vector<pair<string, string>> getNodes(uint64_t hashValue, uint32_t num) {
       uint32_t node_num = num < pRing.size() ? num : pRing.size();
-      vector<string> pNodes;
+      vector<pair<string, string>> pNodes;
       PhysicalNode pNode = getNode(hashValue);
-      pNodes.push_back(pNode.getKey());
+      pNodes.push_back(pair<string, string>(pNode.getIp(), pNode.getPort()));
       for (int i = 1; i < node_num; i++) {
         PhysicalNode node = getNextNode(pNode);
-        pNodes.push_back(node.getKey());
+        pNodes.push_back(pair<string, string>(node.getIp(), node.getPort()));
         pNode = node;
       }
       return pNodes;
     }
 
-    vector<string> getNodes(string key, uint32_t num) {
+    vector<pair<string, string>> getNodes(string key, uint32_t num) {
       uint64_t hashValue = hashFactory->hash(key);
       return getNodes(hashValue, num);
     }

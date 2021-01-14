@@ -47,14 +47,14 @@ struct ProxyRequestReplyMsg {
     ar &rid;
     ar &key;
     ar &hosts;
-    ar &dataServerPort;
+    ar &ports;
   }
   uint32_t type;
   uint32_t success;
   uint64_t rid;
   uint64_t key;
   vector<std::string> hosts;
-  std::string dataServerPort;
+  vector<std::string> ports;
 };
 
 struct ProxyRequestReplyContext {
@@ -64,7 +64,7 @@ struct ProxyRequestReplyContext {
   uint64_t key;
   Connection* con;
   vector<std::string> hosts;
-  std::string dataServerPort;
+  vector<std::string> ports;
 };
 
 class ProxyRequestReply {

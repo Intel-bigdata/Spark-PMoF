@@ -7,7 +7,7 @@ using namespace std;
 
 class VirtualNode: public Node{
   public:
-    VirtualNode(const PhysicalNode &physicalNode, int index):physicalNode(""){
+    VirtualNode(const PhysicalNode &physicalNode, int index):physicalNode("", ""){
       this->physicalNode = physicalNode;
       this->index = index;
     }

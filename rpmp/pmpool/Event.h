@@ -34,6 +34,7 @@ enum OpType : uint32_t {
   WRITE,
   READ,
   PUT,
+  REPLICATE_PUT,
   GET,
   GET_META,
   DELETE,
@@ -44,6 +45,7 @@ enum OpType : uint32_t {
   WRITE_REPLY,
   READ_REPLY,
   PUT_REPLY,
+  REPLICATE_PUT_REPLY,
   GET_REPLY,
   GET_META_REPLY,
   DELETE_REPLY

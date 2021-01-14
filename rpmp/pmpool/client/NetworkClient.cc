@@ -189,6 +189,13 @@ void RequestHandler::handleRequest(std::shared_ptr<Request> request) {
                            request->size_);
       break;
     }
+    case REPLICATE_PUT: {
+      expectedReturnType = REPLICATE_PUT_REPLY;
+      request->encode();
+      networkClient_->send(reinterpret_cast<char *>(request->data_),
+                           request->size_);
+      break;
+    }
     case GET: {
       expectedReturnType = GET_REPLY;
       request->encode();

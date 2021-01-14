@@ -33,13 +33,13 @@ void Proxy::addNode(PhysicalNode* physicalNode) {
   consistentHash_->addNode(*physicalNode, loadBalanceFactor_);
 }
 
-vector<string> Proxy::getNodes(uint64_t key) {
+vector<pair<string, string>> Proxy::getNodes(uint64_t key) {
   return consistentHash_->getNodes(key, dataReplica_);
 }
 
-void Proxy::addReplica(uint64_t key, std::string node) {
+void Proxy::addReplica(uint64_t key, std::string node, std::string port) {
   std::lock_guard<std::mutex> lk(replica_mtx);
-  replicaMap_[key].insert(node);
+  replicaMap_[key].insert(node+port);
 }
 
 void Proxy::removeReplica(uint64_t key) {

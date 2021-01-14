@@ -341,6 +341,36 @@ void Protocol::handle_recv_msg(std::shared_ptr<Request> request) {
       networkServer_->read(requestReply);
       break;
     }
+    case REPLICATE_PUT: {
+      rrc.type = REPLICATE_PUT_REPLY;
+      rrc.success = 0;
+      rrc.rid = rc.rid;
+      rrc.src_address = rc.src_address;
+      rrc.src_rkey = rc.src_rkey;
+      rrc.size = rc.size;
+      rrc.key = rc.key;
+      rrc.con = rc.con;
+      /////// Use DRAM Addr ////////
+      rrc.address = rc.address;
+      networkServer_->get_dram_buffer(&rrc);
+      /////// Use Pmem Addr /////////
+      /*uint64_t addr = allocatorProxy_->allocate_and_write(
+          rc.size, nullptr, rc.rid % config_->get_pool_size());
+      rrc.address = addr;
+      rrc.dest_address = allocatorProxy_->get_virtual_address(addr);
+      Chunk *base_ck = allocatorProxy_->get_rma_chunk(addr);
+      networkServer_->get_pmem_buffer(&rrc, base_ck);*/
+      ///////////////////////////////
+      std::shared_ptr<RequestReply> requestReply =
+          std::make_shared<RequestReply>(rrc);
+      rrc.ck->ptr = requestReply.get();
+
+      std::unique_lock<std::mutex> lk(rrcMtx_);
+      rrcMap_[rrc.ck->buffer_id] = requestReply;
+      lk.unlock();
+      networkServer_->read(requestReply);
+      break;
+    }
     case GET: {
       rrc.type = GET_REPLY;
       rrc.success = 0;
@@ -424,7 +454,10 @@ void Protocol::handle_finalize_msg(std::shared_ptr<RequestReply> requestReply) {
     requestReply->encode();
     networkServer_->send(reinterpret_cast<char *>(requestReply->data_),
                          requestReply->size_, rrc.con);
-  } else {
+  } else if (rrc.type == REPLICATE_PUT_REPLY) {
+    requestReply->encode();
+    networkServer_->send(reinterpret_cast<char *>(requestReply->data_),
+                         requestReply->size_, rrc.con);
   }
 }
 
@@ -486,12 +519,37 @@ void Protocol::handle_rma_msg(std::shared_ptr<RequestReply> requestReply) {
       rc.type = REPLICATE;
       rc.key = rrc.key;
       rc.node = config_->get_ip();
+      rc.port = config_->get_port();
       rc.src_address = rrc.dest_address;
       rc.rid = rrc.rid;
       rc.size = rrc.size;
       auto rr = std::make_shared<ReplicaRequest>(rc);
       rr->encode();
       dataService_->send(reinterpret_cast<char *>(rr->data_), rr->size_);
+      requestReply->requestReplyContext_.address = rrc.address;
+      //////////// PMEM ////////////
+      // networkServer_->reclaim_pmem_buffer(&rrc);
+      //////////////////////////////
+      break;
+    }
+    case REPLICATE_PUT_REPLY: {
+      cout << "replicate put" << endl;
+      char *buffer = static_cast<char *>(rrc.ck->buffer);
+      //////////// DRAM ////////////
+      rrc.address = allocatorProxy_->allocate_and_write(
+          rrc.size, buffer, rrc.rid % config_->get_pool_size());
+      // networkServer_->reclaim_dram_buffer(&rrc);
+      // auto rc = ReplicaRequestContext();
+      // rc.type = REPLICA_REPLY;
+      // rc.key = rrc.key;
+      // rc.node = config_->get_ip();
+      // rc.port = config_->get_port();
+      // rc.src_address = rrc.dest_address;
+      // rc.rid = rrc.rid;
+      // rc.size = rrc.size;
+      // auto rr = std::make_shared<ReplicaRequest>(rc);
+      // rr->encode();
+      // dataService_->send(reinterpret_cast<char *>(rr->data_), rr->size_);
       requestReply->requestReplyContext_.address = rrc.address;
       //////////// PMEM ////////////
       // networkServer_->reclaim_pmem_buffer(&rrc);
