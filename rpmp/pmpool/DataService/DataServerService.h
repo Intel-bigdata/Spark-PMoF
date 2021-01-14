@@ -30,6 +30,14 @@
 using moodycamel::BlockingConcurrentQueue;
 
 class DataServerService;
+class NetworkClient;
+class RequestHandler;
+class ReplicateWorker;
+
+struct DataChannel {
+  std::shared_ptr<NetworkClient> networkClient;
+  std::shared_ptr<RequestHandler> requestHandler;
+};
 
 class ServiceShutdownCallback : public Callback {
 public:
@@ -51,13 +59,14 @@ private:
 
 class ServiceRecvCallback : public Callback {
 public:
-  ServiceRecvCallback(std::shared_ptr<ChunkMgr> chunkMgr, std::shared_ptr<DataServiceRequestHandler> requestHandler);
+  ServiceRecvCallback(std::shared_ptr<ChunkMgr> chunkMgr, std::shared_ptr<DataServiceRequestHandler> requestHandler, std::shared_ptr<ReplicateWorker> worker);
   ~ServiceRecvCallback() override = default;
   void operator()(void* param_1, void* param_2);
 
 private:
   std::shared_ptr<ChunkMgr> chunkMgr_;
   std::shared_ptr<DataServiceRequestHandler> requestHandler_;
+  std::shared_ptr<ReplicateWorker> worker_;
   std::mutex mtx;
 };
 
@@ -77,7 +86,7 @@ private:
   std::shared_ptr<ChunkMgr> chunkMgr_;
 };
 
-class DataServerService : public std::enable_shared_from_this<DataServerService>{
+class DataServerService : public std::enable_shared_from_this<DataServerService> {
 public:
  explicit DataServerService(std::shared_ptr<Config> config,
                             std::shared_ptr<Log> log);
@@ -88,12 +97,13 @@ public:
  void send(const char* data, uint64_t size);
  void addTask(std::shared_ptr<ReplicaRequest> request);
  // void enqueue_recv_msg(std::shared_ptr<ProxyRequest> request);
- // void handle_recv_msg(std::shared_ptr<ProxyRequest> request);
+ void handle_replica_msg(std::shared_ptr<ReplicaRequestReply> msg);
+ std::shared_ptr<DataChannel> getChannel(string node, string port);
 private:
  std::string host_;
  atomic<uint64_t> rid_ = {0};
  std::shared_ptr<DataServiceRequestHandler> requestHandler_;
- // std::shared_ptr<Worker> worker_;
+ std::shared_ptr<ReplicateWorker> worker_;
  std::shared_ptr<ChunkMgr> chunkMgr_;
  std::shared_ptr<ServiceShutdownCallback> shutdownCallback;
  std::shared_ptr<ServiceConnectCallback> connectCallback;
@@ -107,6 +117,8 @@ private:
  bool proxyConnected = false;
  std::mutex con_mtx;
  std::condition_variable con_v;
+ std::map<string, std::shared_ptr<DataChannel>> channels;
+ std::mutex channel_mtx;
 };
 
 class DataServiceRequestHandler : public ThreadWrapper {
@@ -221,20 +233,18 @@ class DataServiceRequestHandler : public ThreadWrapper {
   }
 };
 
-// class ReplicateWorker : public ThreadWrapper {
-//  public:
-//   ReplicateWorker() = delete;
-//   ReplicateWorker(std::shared_ptr<DataServerService> service, int index);
-//   ~ReplicateWorker() override = default;
-//   int entry() override;
-//   void abort() override;
-//   void addTask(std::shared_ptr<ReplicaRequestReply> requestReply);
+class ReplicateWorker : public ThreadWrapper {
+ public:
+  ReplicateWorker() = delete;
+  ReplicateWorker(std::shared_ptr<DataServerService> service);
+  ~ReplicateWorker() override = default;
+  int entry() override;
+  void abort() override;
+  void addTask(std::shared_ptr<ReplicaRequestReply> requestReply);
 
-//  private:
-//   std::shared_ptr<DataServerService> service_;
-//   int index_;
-//   bool init;
-//   BlockingConcurrentQueue<std::shared_ptr<ReplicaRequestReply>> pendingRecvRequestQueue_;
-// };
+ private:
+  std::shared_ptr<DataServerService> service_;
+  BlockingConcurrentQueue<std::shared_ptr<ReplicaRequestReply>> pendingRecvRequestQueue_;
+};
 
 #endif //RPMP_DATASERVICE_H

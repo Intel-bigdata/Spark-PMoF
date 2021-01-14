@@ -217,7 +217,8 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
   rc.key = key_uint;
   auto request = std::make_shared<Request>(rc);
   requestHandler->addTask(request);
-  auto res = requestHandler->wait(request);
+  // auto res = requestHandler->wait(request);
+  auto res = proxyRequestHandler_->get(pRequest).success;
   networkClient->reclaim_dram_buffer(rc.src_address, rc.size);
 #ifdef DEBUG
   fprintf(stderr, "[PUT]key is %s, length is %ld, content is \n", key.c_str(),

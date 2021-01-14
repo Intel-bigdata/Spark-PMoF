@@ -15,7 +15,9 @@ void ReplicaRecvCallback::operator()(void* param_1, void* param_2) {
   auto request = std::make_shared<ReplicaRequest>(
       reinterpret_cast<char*>(chunk->buffer), chunk->size,
       reinterpret_cast<Connection*>(chunk->con));
+  cout << "before" << endl;
   request->decode();
+  cout << "after" << endl;
   service_->enqueue_recv_msg(request);
   chunkMgr_->reclaim(chunk, static_cast<Connection*>(chunk->con));
 }
@@ -60,6 +62,7 @@ void ReplicaService::enqueue_recv_msg(std::shared_ptr<ReplicaRequest> request) {
   worker_->addTask(request);
 }
 
+int minReplica = 1;
 void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
   ReplicaRequestContext rc = request->get_rc();
   auto rrc = ReplicaRequestReplyContext();
@@ -83,29 +86,45 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
     }
     case REPLICATE: {
       cout << "put reply" << endl;
-      rc.type = REPLICATE;
-      rc.rid = rid_++;
-      rc.key = rrc.key;
-      rc.node = rrc.node;
-      rc.src_address = rrc.src_address;
-      auto request = std::make_shared<ReplicaRequest>(rc);
-      request->encode();
-      auto ck = chunkMgr_->get(rrc.con);
-      memcpy(reinterpret_cast<char*>(ck->buffer), request->data_,
-             request->size_);
-      ck->size = request->size_;
-      std::unique_lock<std::mutex> lk(prrcMtx);
-      prrcMap_[rc.key] = request;
-      lk.unlock();
-      rrc.con->send(ck);
+      addReplica(rc.key, rc.node);
+      if (getReplica(rc.key).size() < minReplica) {
+        cout << "replicate work" << endl;
+        vector<string> nodes = proxyServer_->getNodes(rc.key);
+        for (auto node : nodes) {
+          if (node == rc.node) {
+            continue;
+          } else {
+            rrc.type = REPLICATE;
+            rrc.rid = rid_++;
+            rrc.key = rc.key;
+            rrc.size = rc.size;
+            rrc.node = node;
+            rrc.con = rc.con;
+            rrc.src_address = rc.src_address;
+            auto reply = std::make_shared<ReplicaRequestReply>(rrc);
+            reply->encode();
+            auto ck = chunkMgr_->get(rrc.con);
+            memcpy(reinterpret_cast<char*>(ck->buffer), reply->data_,
+                   reply->size_);
+            ck->size = reply->size_;
+            // std::unique_lock<std::mutex> lk(prrcMtx);
+            // prrcMap_[rc.key] = request;
+            // lk.unlock();
+            rrc.con->send(ck);
+          }
+        }
+      } else {
+        cout << "no need replica work" << endl;
+        proxyServer_->notifyClient(rc.key);
+      }
       break;
     }
     case REPLICA_REPLY : {
       cout << "replica reply" << endl;
       addReplica(rc.key, rc.node);
-      if (getReplica(rc.key).size() >= 2) {
-        auto request = prrcMap_[rc.key];
-        auto rc = request->get_rc();
+      if (getReplica(rc.key).size() == minReplica) {
+        // auto request = prrcMap_[rc.key];
+        // auto rc = request->get_rc();
         // rrc.type = rc.type;
         // rrc.success = 0;
         // rrc.rid = rc.rid;
@@ -113,13 +132,16 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
         // std::shared_ptr<ProxyRequestReply> requestReply =
         //     std::make_shared<ProxyRequestReply>(rrc);
         // requestReply->encode();
-        auto ck = chunkMgr_->get(rc.con);
-        memcpy(reinterpret_cast<char*>(ck->buffer), request->data_,
-               request->size_);
-        ck->size = request->size_;
-        rrc.con->send(ck);
-        break;
+        // auto ck = chunkMgr_->get(rc.con);
+        // memcpy(reinterpret_cast<char*>(ck->buffer), request->data_,
+        //        request->size_);
+        // ck->size = request->size_;
+        // rrc.con->send(ck);
+        proxyServer_->notifyClient(rc.key);
+      } else {
+        cout << "pending data replication" << endl;
       }
+      break;
     }
   }
 }
@@ -161,15 +183,13 @@ void ReplicaService::wait() {
 }
 
 void ReplicaService::addReplica(uint64_t key, std::string node) {
-  // proxyServer_->addReplica(key, node);
+  proxyServer_->addReplica(key, node);
 }
 
 void ReplicaService::removeReplica(uint64_t key) {
-  std::lock_guard<std::mutex> lk(replica_mtx);
-  replicaMap_.erase(key);
+  proxyServer_->removeReplica(key);
 }
 
 std::unordered_set<std::string> ReplicaService::getReplica(uint64_t key) {
-  std::lock_guard<std::mutex> lk(replica_mtx);
-  return replicaMap_[key];
+  return proxyServer_->getReplica(key);
 }

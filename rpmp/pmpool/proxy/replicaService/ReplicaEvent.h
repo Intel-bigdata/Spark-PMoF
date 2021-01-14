@@ -20,6 +20,7 @@ class ProxyServer;
 class Protocol;
 class ReplicaService;
 class DataServiceRequestHandler;
+class DataServerService;
 
 enum ReplicaOpType : uint32_t { REGISTER = 1, REPLICATE, REPLICA_REPLY };
 
@@ -29,14 +30,18 @@ struct ReplicaRequestMsg {
     ar& type;
     ar& rid;
     ar& key;
+    ar& size;
     ar& node;
     ar& src_address;
+    ar& des_address;
   }
   uint32_t type;
   uint64_t rid;
   uint64_t key;
+  uint64_t size;
   std::string node;
   uint64_t src_address;
+  uint64_t des_address;
 };
 
 struct ReplicaRequestReplyMsg {
@@ -46,6 +51,7 @@ struct ReplicaRequestReplyMsg {
     ar& success;
     ar& rid;
     ar& key;
+    ar& size;
     ar& node;
     ar& src_address;
   }
@@ -53,6 +59,7 @@ struct ReplicaRequestReplyMsg {
   uint32_t success;
   uint64_t rid;
   uint64_t key;
+  uint64_t size;
   std::string node;
   uint64_t src_address;
 };
@@ -62,6 +69,7 @@ struct ReplicaRequestReplyContext {
   uint32_t success;
   uint64_t rid;
   uint64_t key;
+  uint64_t size;
   std::string node;
   uint64_t src_address;
   Connection* con;
@@ -97,6 +105,7 @@ class ReplicaRequestReply {
     requestReplyMsg.success = requestReplyContext_.success;
     requestReplyMsg.rid = requestReplyContext_.rid;
     requestReplyMsg.key = requestReplyContext_.key;
+    requestReplyMsg.size = requestReplyContext_.size;
     requestReplyMsg.node = requestReplyContext_.node;
     requestReplyMsg.src_address = requestReplyContext_.src_address;
     std::ostringstream os;
@@ -122,6 +131,7 @@ class ReplicaRequestReply {
     requestReplyContext_.success = requestReplyMsg.success;
     requestReplyContext_.rid = requestReplyMsg.rid;
     requestReplyContext_.key = requestReplyMsg.key;
+    requestReplyContext_.size = requestReplyMsg.size;
     requestReplyContext_.node = requestReplyMsg.node;
     requestReplyContext_.src_address = requestReplyMsg.src_address;
   };
@@ -140,9 +150,12 @@ struct ReplicaRequestContext {
   ReplicaOpType type;
   uint64_t rid;
   uint64_t key;
+  uint64_t size;
   std::string node;
   uint64_t src_address;
+  uint64_t des_address;
   Connection* con;
+  Chunk *ck;
 };
 
 class ReplicaRequest {
@@ -169,8 +182,10 @@ class ReplicaRequest {
     requestMsg.type = requestContext_.type;
     requestMsg.rid = requestContext_.rid;
     requestMsg.key = requestContext_.key;
+    requestMsg.size = requestContext_.size;
     requestMsg.node = requestContext_.node;
     requestMsg.src_address = requestContext_.src_address;
+    requestMsg.des_address = requestContext_.des_address;
     std::ostringstream os;
     boost::archive::text_oarchive ao(os);
     ao << requestMsg;
@@ -193,8 +208,10 @@ class ReplicaRequest {
     requestContext_.type = (ReplicaOpType)requestMsg.type;
     requestContext_.rid = requestMsg.rid;
     requestContext_.key = requestMsg.key;
+    requestContext_.size = requestMsg.size;
     requestContext_.node = requestMsg.node;
     requestContext_.src_address = requestMsg.src_address;
+    requestContext_.des_address = requestMsg.des_address;
   };
   char* getData() { return data_; }
   uint64_t getSize() { return size_; }
@@ -207,6 +224,7 @@ class ReplicaRequest {
     friend Protocol;
   friend ReplicaService;
   friend DataServiceRequestHandler;
+  friend DataServerService;
   char* data_;
   uint64_t size_;
   ReplicaRequestContext requestContext_;

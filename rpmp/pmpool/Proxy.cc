@@ -37,6 +37,26 @@ vector<string> Proxy::getNodes(uint64_t key) {
   return consistentHash_->getNodes(key, dataReplica_);
 }
 
+void Proxy::addReplica(uint64_t key, std::string node) {
+  std::lock_guard<std::mutex> lk(replica_mtx);
+  replicaMap_[key].insert(node);
+}
+
+void Proxy::removeReplica(uint64_t key) {
+  std::lock_guard<std::mutex> lk(replica_mtx);
+  replicaMap_.erase(key);
+}
+
+std::unordered_set<std::string> Proxy::getReplica(uint64_t key) {
+  std::lock_guard<std::mutex> lk(replica_mtx);
+  cout << "replica map size: " << replicaMap_[key].size() << endl;
+  return replicaMap_[key];
+}
+
+void Proxy::notifyClient(uint64_t key) {
+  clientService_->notifyClient(key);
+}
+
 void Proxy::wait() {
     clientService_->wait();
     replicaService_->wait();

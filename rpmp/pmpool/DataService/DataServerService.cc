@@ -1,4 +1,5 @@
 #include "DataServerService.h"
+#include "pmpool/client/NetworkClient.h"
 
 ServiceConnectCallback::ServiceConnectCallback(std::shared_ptr<DataServerService> service) {
     service_ = service;
@@ -10,8 +11,8 @@ void ServiceConnectCallback::operator()(void *param_1, void *param_2) {
   service_->setConnection(connection);
 }
 
-ServiceRecvCallback::ServiceRecvCallback(std::shared_ptr<ChunkMgr> chunkMgr, std::shared_ptr<DataServiceRequestHandler> requestHandler) 
-: chunkMgr_(chunkMgr), requestHandler_(requestHandler) {}
+ServiceRecvCallback::ServiceRecvCallback(std::shared_ptr<ChunkMgr> chunkMgr, std::shared_ptr<DataServiceRequestHandler> requestHandler, std::shared_ptr<ReplicateWorker> worker) 
+: chunkMgr_(chunkMgr), requestHandler_(requestHandler), worker_(worker) {}
 
 void ServiceRecvCallback::operator()(void *param_1, void *param_2) {
   int mid = *static_cast<int*>(param_1);
@@ -24,31 +25,29 @@ void ServiceRecvCallback::operator()(void *param_1, void *param_2) {
   if (rrc.type == REGISTER) {
     requestHandler_->notify(requestReply);
   } else {
-    // requestHandler_->addTask()
+    worker_->addTask(requestReply);
   }
   chunkMgr_->reclaim(ck, static_cast<Connection *>(ck->con));
 }
 
-// ReplicateWorker::ReplicateWorker(std::shared_ptr<DataServerService> service, int index)
-//     : service_(service), index_(index) {
-//   init = false;
-// }
+ReplicateWorker::ReplicateWorker(std::shared_ptr<DataServerService> service)
+    : service_(service) {}
 
-// int ReplicateWorker::entry() {
-//   std::shared_ptr<ReplicaRequestReply> requestReply;
-//   bool res = pendingRecvRequestQueue_.wait_dequeue_timed(
-//       requestReply, std::chrono::milliseconds(1000));
-//   if (res) {
-//     // service_->handle_rma_msg(requestReply);
-//   }
-//   return 0;
-// }
+int ReplicateWorker::entry() {
+  std::shared_ptr<ReplicaRequestReply> requestReply;
+  bool res = pendingRecvRequestQueue_.wait_dequeue_timed(
+      requestReply, std::chrono::milliseconds(1000));
+  if (res) {
+    service_->handle_replica_msg(requestReply);
+  }
+  return 0;
+}
 
-// void ReplicateWorker::abort() {}
+void ReplicateWorker::abort() {}
 
-// void ReplicateWorker::addTask(std::shared_ptr<ReplicaRequestReply> rr) {
-//   pendingRecvRequestQueue_.enqueue(rr);
-// }
+void ReplicateWorker::addTask(std::shared_ptr<ReplicaRequestReply> rr) {
+  pendingRecvRequestQueue_.enqueue(rr);
+}
 
 DataServerService::DataServerService(std::shared_ptr<Config> config,
                                      std::shared_ptr<Log> log)
@@ -72,6 +71,8 @@ DataServerService::~DataServerService() {
 bool DataServerService::init() {
   requestHandler_ = std::make_shared<DataServiceRequestHandler>(shared_from_this());
   requestHandler_->start();
+  worker_ = std::make_shared<ReplicateWorker>(shared_from_this());
+  worker_->start();
   host_ = config_->get_ip();
   proxyClient_ = std::make_shared<Client>(1, 32);
   if ((proxyClient_->init()) != 0) {
@@ -87,7 +88,7 @@ bool DataServerService::init() {
   connectCallback =
       std::make_shared<ServiceConnectCallback>(shared_from_this());
   recvCallback =
-      std::make_shared<ServiceRecvCallback>(chunkMgr_, requestHandler_);
+      std::make_shared<ServiceRecvCallback>(chunkMgr_, requestHandler_, worker_);
   sendCallback = std::make_shared<ServiceSendCallback>(chunkMgr_);
   proxyClient_->set_shutdown_callback(shutdownCallback.get());
   proxyClient_->set_connected_callback(connectCallback.get());
@@ -96,7 +97,7 @@ bool DataServerService::init() {
 
   proxyClient_->start();
   //TODO get service ip & port from config
-  int res = proxyClient_->connect("172.168.0.209", "12340");
+  int res = proxyClient_->connect(config_->get_proxy_ip().c_str(), "12340");
   std::unique_lock<std::mutex> lk(con_mtx);
   while (!proxyConnected) {
     std::cout<<"NetworkClient from " << host_ <<" wait to be connected to proxy " << config_->get_proxy_ip()<<std::endl;
@@ -132,6 +133,47 @@ void DataServerService::registerDataServer() {
   }
 }
 
+void DataServerService::handle_replica_msg(std::shared_ptr<ReplicaRequestReply> reply) {
+  auto rrc = reply->get_rrc();
+  if (rrc.type == REPLICATE) {
+    auto rc = ReplicaRequestContext();
+    rc.type = REPLICA_REPLY;
+    rc.key = rrc.key;
+    rc.node = rrc.node;
+    rc.rid = rrc.rid;
+    rc.src_address = rrc.src_address;
+    auto rr = std::make_shared<ReplicaRequest>(rc);
+    std::shared_ptr<DataChannel> channel = getChannel(rrc.node, config_->get_port());
+    std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
+    std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
+    // RequestContext rc = {};
+    // rc.type = PUT;
+    // rc.rid = rid_++;
+    // rc.size = rrc.size;
+    // rc.address = 0;
+    // rc.src_address = rrc.src_address;
+    // rc.src_rkey = networkClient->get_rkey();
+    // rc.key = rrc.key;
+    // auto request = std::make_shared<Request>(rc);
+    // requestHandler->addTask(request);
+    // auto res = requestHandler->wait(request);
+    // auto res = proxyRequestHandler_->get(pRequest);
+    auto dataRc = RequestContext();
+    dataRc.type = PUT;
+    dataRc.rid = rid_++;
+    dataRc.key = rrc.key;
+    dataRc.size = rrc.size;
+    dataRc.src_address = networkClient->get_dram_buffer(reinterpret_cast<char *>(rrc.src_address), rrc.size);
+    dataRc.src_rkey = networkClient->get_rkey();
+    auto dataRequest = std::make_shared<Request>(dataRc);
+    requestHandler->addTask(dataRequest);
+    requestHandler->wait(dataRequest);
+    networkClient->reclaim_dram_buffer(rc.src_address, rc.size);
+    rr->encode();
+    send(rr->data_, rr->size_);
+  }
+}
+
 void DataServerService::send(const char *data, uint64_t size) {
   auto chunk = chunkMgr_->get(proxyCon_);
   std::memcpy(reinterpret_cast<char *>(chunk->buffer), data, size);
@@ -141,4 +183,19 @@ void DataServerService::send(const char *data, uint64_t size) {
 
 void DataServerService::addTask(std::shared_ptr<ReplicaRequest> request) {
   requestHandler_->addTask(request);
+}
+
+std::shared_ptr<DataChannel> DataServerService::getChannel(string node, string port) {
+  std::lock_guard<std::mutex> lk(channel_mtx);
+  if (channels.count(node)) {
+    return channels.find(node)->second;
+  } else {
+    std::shared_ptr<DataChannel> channel = std::make_shared<DataChannel>();
+    channel->networkClient = std::make_shared<NetworkClient>(node, port);
+    channel->requestHandler = std::make_shared<RequestHandler>(channel->networkClient);
+    channel->networkClient->init(channel->requestHandler);
+    channel->requestHandler->start();
+    channels.insert(make_pair(node, channel));
+    return channel;
+  }
 }

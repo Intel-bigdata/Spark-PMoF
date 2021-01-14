@@ -29,6 +29,10 @@ public:
     void handle_recv_msg(std::shared_ptr<ProxyRequest> request);
     void addNode(PhysicalNode* physicalNode);
     std::vector<std::string> getNodes(uint64_t key);
+    void addReplica(uint64_t key, std::string node);
+    std::unordered_set<std::string> getReplica(uint64_t key);
+    void removeReplica(uint64_t key);
+    void notifyClient(uint64_t key);
     private:
     std::shared_ptr<ChunkMgr> chunkMgr_;
     std::shared_ptr<Config> config_;
@@ -40,6 +44,8 @@ public:
     uint32_t dataReplica_;
     std::shared_ptr<ClientService> clientService_;
     std::shared_ptr<ReplicaService> replicaService_;
+    std::unordered_map<uint64_t, std::unordered_set<std::string>> replicaMap_;
+    std::mutex replica_mtx;
 };
 
 #endif //RPMP_PROXY_H

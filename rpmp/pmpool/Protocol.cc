@@ -83,7 +83,7 @@ RecvWorker::RecvWorker(std::shared_ptr<Protocol> protocol, int index)
 int RecvWorker::entry() {
   if (!init) {
     if (index_ != -1) {
-      set_affinity(index_);
+      // set_affinity(index_);
     }
     init = true;
   }
@@ -110,7 +110,7 @@ ReadWorker::ReadWorker(std::shared_ptr<Protocol> protocol, int index)
 int ReadWorker::entry() {
   if (!init) {
     if (index_ != -1) {
-      set_affinity(index_);
+      // set_affinity(index_);
     }
     init = true;
   }
@@ -421,11 +421,11 @@ void Protocol::handle_finalize_msg(std::shared_ptr<RequestReply> requestReply) {
     }
     allocatorProxy_->del_chunk(rrc.key);
   } else if (rrc.type == GET_REPLY) {
+    requestReply->encode();
+    networkServer_->send(reinterpret_cast<char *>(requestReply->data_),
+                         requestReply->size_, rrc.con);
   } else {
   }
-  requestReply->encode();
-  networkServer_->send(reinterpret_cast<char *>(requestReply->data_),
-                       requestReply->size_, rrc.con);
 }
 
 void Protocol::enqueue_rma_msg(uint64_t buffer_id) {
@@ -481,7 +481,17 @@ void Protocol::handle_rma_msg(std::shared_ptr<RequestReply> requestReply) {
       //////////// DRAM ////////////
       rrc.address = allocatorProxy_->allocate_and_write(
           rrc.size, buffer, rrc.rid % config_->get_pool_size());
-      networkServer_->reclaim_dram_buffer(&rrc);
+      // networkServer_->reclaim_dram_buffer(&rrc);
+      auto rc = ReplicaRequestContext();
+      rc.type = REPLICATE;
+      rc.key = rrc.key;
+      rc.node = config_->get_ip();
+      rc.src_address = rrc.dest_address;
+      rc.rid = rrc.rid;
+      rc.size = rrc.size;
+      auto rr = std::make_shared<ReplicaRequest>(rc);
+      rr->encode();
+      dataService_->send(reinterpret_cast<char *>(rr->data_), rr->size_);
       requestReply->requestReplyContext_.address = rrc.address;
       //////////// PMEM ////////////
       // networkServer_->reclaim_pmem_buffer(&rrc);

@@ -23,11 +23,13 @@
 int ServerMain(int argc, char **argv) {
   /// initialize Config class
   std::shared_ptr<Config> config = std::make_shared<Config>();
+  config->readFromFile();
   if (argc > 1){
     CHK_ERR("config init", config->init(argc, argv));
-  }else{
-    config->readFromFile();
   }
+  // }else{
+  //   config->readFromFile();
+  // }
   /// initialize Log class
   std::shared_ptr<Log> log = std::make_shared<Log>(config.get());
   /// initialize DataServer class

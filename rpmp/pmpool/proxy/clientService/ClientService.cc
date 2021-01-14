@@ -131,6 +131,17 @@ bool ClientService::startService() {
   return true;
 }
 
+void ClientService::notifyClient(uint64_t key) {
+  auto reply = prrcMap_[key];
+  prrcMap_.erase(key);
+  auto rrc = reply->get_rrc();
+  auto ck = chunkMgr_->get(rrc.con);
+  memcpy(reinterpret_cast<char*>(ck->buffer), reply->data_,
+         reply->size_);
+  ck->size = reply->size_;
+  rrc.con->send(ck);
+}
+
 void ClientService::wait() {
   server_->wait();
 }

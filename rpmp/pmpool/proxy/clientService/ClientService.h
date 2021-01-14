@@ -84,6 +84,7 @@ public:
     void wait();
     void enqueue_recv_msg(std::shared_ptr<ProxyRequest> request);
     void handle_recv_msg(std::shared_ptr<ProxyRequest> request);
+    void notifyClient(uint64_t key);
     private:
     void enqueue_finalize_msg(std::shared_ptr<ProxyRequestReply> reply);
     void handle_finalize_msg(std::shared_ptr<ProxyRequestReply> reply);

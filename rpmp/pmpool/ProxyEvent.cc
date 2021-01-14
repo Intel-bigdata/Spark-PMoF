@@ -68,7 +68,6 @@ void ProxyRequestReply::set_rrc(ProxyRequestReplyContext &rrc) {
 }
 
 void ProxyRequestReply::encode() {
-  std::cout << "encode reply" << std::endl;
   const std::lock_guard<std::mutex> lock(data_lock_);
   ProxyRequestReplyMsg requestReplyMsg;
   requestReplyMsg.type = (ProxyOpType)requestReplyContext_.type;
@@ -102,7 +101,6 @@ void ProxyRequestReply::decode() {
     std::cerr << err_msg << std::endl;
     throw;
   }
-  std::cout << "decode hosts1" << std::endl;
   ProxyRequestReplyMsg requestReplyMsg;
   std::string str(data_);
   std::istringstream is(str);
@@ -115,10 +113,6 @@ void ProxyRequestReply::decode() {
   requestReplyContext_.key = requestReplyMsg.key;
   requestReplyContext_.hosts = requestReplyMsg.hosts;
   requestReplyContext_.dataServerPort = requestReplyMsg.dataServerPort;
-  std::cout << "decode hosts" << std::endl;
-  for (auto host : requestReplyContext_.hosts) {
-    std::cout << "get host: " << host << std::endl;
-  }
   // uint64_t host_size = size_ - sizeof(ProxyRequestReplyMsg);
   // char* tmp = static_cast<char*>(malloc(host_size));
   // memcpy(tmp, data_ + sizeof(ProxyRequestReplyMsg), host_size);
