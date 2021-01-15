@@ -4,7 +4,8 @@
 #include <map>
 #include <string>
 #include <vector>
-#include "pmpool/proxy/Node.h"
+// #include "pmpool/proxy/Node.h"
+#include "pmpool/proxy/PhysicalNode.h"
 #include "pmpool/proxy/VirtualNode.h"
 #include "pmpool/proxy/XXHash.h"
 
@@ -72,20 +73,20 @@ class ConsistentHash {
       return getNode(hashValue);
     };
 
-    vector<pair<string, string>> getNodes(uint64_t hashValue, uint32_t num) {
+    vector<PhysicalNode> getNodes(uint64_t hashValue, uint32_t num) {
       uint32_t node_num = num < pRing.size() ? num : pRing.size();
-      vector<pair<string, string>> pNodes;
+      vector<PhysicalNode> pNodes;
       PhysicalNode pNode = getNode(hashValue);
-      pNodes.push_back(pair<string, string>(pNode.getIp(), pNode.getPort()));
+      pNodes.push_back(pNode);
       for (int i = 1; i < node_num; i++) {
         PhysicalNode node = getNextNode(pNode);
-        pNodes.push_back(pair<string, string>(node.getIp(), node.getPort()));
+        pNodes.push_back(node);
         pNode = node;
       }
       return pNodes;
     }
 
-    vector<pair<string, string>> getNodes(string key, uint32_t num) {
+    vector<PhysicalNode> getNodes(string key, uint32_t num) {
       uint64_t hashValue = hashFactory->hash(key);
       return getNodes(hashValue, num);
     }

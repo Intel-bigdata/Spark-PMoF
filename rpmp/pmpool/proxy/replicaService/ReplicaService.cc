@@ -87,9 +87,10 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
       addReplica(rc.key, rc.node, rc.port);
       if (getReplica(rc.key).size() < minReplica) {
         cout << "replicate work" << endl;
-        vector<pair<string, string>> nodes = proxyServer_->getNodes(rc.key);
+        vector<PhysicalNode> nodes = proxyServer_->getNodes(rc.key);
+        auto n = PhysicalNode(rc.node, rc.port);
         for (auto node : nodes) {
-          if (node.first == rc.node && node.second == rc.port) {
+          if (node == n) {
             continue;
           } else {
             cout << "send replicate msg" << endl;
@@ -97,8 +98,8 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
             rrc.rid = rid_++;
             rrc.key = rc.key;
             rrc.size = rc.size;
-            rrc.node = node.first;
-            rrc.port = node.second;
+            rrc.node = node.getIp();
+            rrc.port = node.getPort();
             rrc.con = rc.con;
             rrc.src_address = rc.src_address;
             auto reply = std::make_shared<ReplicaRequestReply>(rrc);

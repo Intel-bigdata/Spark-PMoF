@@ -10,6 +10,7 @@
 #include <boost/serialization/vector.hpp>
 
 #include "pmpool/Base.h"
+#include "pmpool/proxy/PhysicalNode.h"
 
 using std::vector;
 
@@ -48,6 +49,7 @@ struct ProxyRequestReplyMsg {
     ar &key;
     ar &hosts;
     ar &ports;
+    ar &nodes;
   }
   uint32_t type;
   uint32_t success;
@@ -55,6 +57,7 @@ struct ProxyRequestReplyMsg {
   uint64_t key;
   vector<std::string> hosts;
   vector<std::string> ports;
+  vector<PhysicalNode> nodes;
 };
 
 struct ProxyRequestReplyContext {
@@ -65,6 +68,7 @@ struct ProxyRequestReplyContext {
   Connection* con;
   vector<std::string> hosts;
   vector<std::string> ports;
+  vector<PhysicalNode> nodes;
 };
 
 class ProxyRequestReply {

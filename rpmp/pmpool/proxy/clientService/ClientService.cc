@@ -75,15 +75,11 @@ void ClientService::handle_recv_msg(std::shared_ptr<ProxyRequest> request) {
   auto rrc = ProxyRequestReplyContext();
   switch(rc.type) {
     case GET_HOSTS: {
-      vector<pair<string, string>> nodes = proxyServer_->getNodes(rc.key);
+      vector<PhysicalNode> nodes = proxyServer_->getNodes(rc.key);
       rrc.type = rc.type;
       rrc.success = 0;
       rrc.rid = rc.rid;
-      for (auto node : nodes) {
-        cout << "get node: " << node.first << ":" << node.second << endl;
-        rrc.hosts.push_back(node.first);
-        rrc.ports.push_back(node.second);
-      }
+      rrc.nodes = nodes;
       // rrc.hosts = nodes;
       // rrc.dataServerPort = dataServerPort_;
       rrc.con = rc.con;

@@ -33,7 +33,7 @@ void Proxy::addNode(PhysicalNode* physicalNode) {
   consistentHash_->addNode(*physicalNode, loadBalanceFactor_);
 }
 
-vector<pair<string, string>> Proxy::getNodes(uint64_t key) {
+vector<PhysicalNode> Proxy::getNodes(uint64_t key) {
   return consistentHash_->getNodes(key, dataReplica_);
 }
 

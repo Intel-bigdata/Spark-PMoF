@@ -76,6 +76,7 @@ void ProxyRequestReply::encode() {
   requestReplyMsg.key = requestReplyContext_.key;
   requestReplyMsg.hosts = requestReplyContext_.hosts;
   requestReplyMsg.ports = requestReplyContext_.ports;
+  requestReplyMsg.nodes = requestReplyContext_.nodes;
   std::ostringstream os;
   boost::archive::text_oarchive ao(os);
   ao << requestReplyMsg;
@@ -113,6 +114,7 @@ void ProxyRequestReply::decode() {
   requestReplyContext_.key = requestReplyMsg.key;
   requestReplyContext_.hosts = requestReplyMsg.hosts;
   requestReplyContext_.ports = requestReplyMsg.ports;
+  requestReplyContext_.nodes = requestReplyMsg.nodes;
   // uint64_t host_size = size_ - sizeof(ProxyRequestReplyMsg);
   // char* tmp = static_cast<char*>(malloc(host_size));
   // memcpy(tmp, data_ + sizeof(ProxyRequestReplyMsg), host_size);

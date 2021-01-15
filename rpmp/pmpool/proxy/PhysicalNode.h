@@ -1,26 +1,37 @@
+#ifndef PMPOOL_PROXY_PHYSICALNODE_H_
+#define PMPOOL_PROXY_PHYSICALNODE_H_
 
-class PhysicalNode: public Node{
+#include <string>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
+
+using std::string;
+
+class PhysicalNode {
   public:
-    PhysicalNode(string ip, string port){
-      this->key = ip + port;
-      this->ip = ip;
-      this->port = port;
+   template <class Archive>
+   void serialize(Archive &ar, const unsigned int version) {
+     ar &ip;
+     ar &port;
+   }
+
+   PhysicalNode(string ip, string port) : ip(ip), port(port) {}
+
+   PhysicalNode() = default;
+
+   string getKey() { return ip + port; }
+
+   string getIp() { return ip; }
+
+   string getPort() { return port; }
+
+   bool operator==(PhysicalNode &node) {
+     return (this->ip == node.getIp()) && (this->port == node.getPort());
     }
 
-    string getKey(){
-      return key;
-    }
-
-    string getIp() {
-      return ip;
-    }
-
-    string getPort() {
-      return port;
-    }
-    
   private:
-    string key;
     string ip;
     string port;
 };
+
+#endif

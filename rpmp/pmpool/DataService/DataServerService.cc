@@ -172,7 +172,7 @@ void DataServerService::handle_replica_msg(std::shared_ptr<ReplicaRequestReply> 
     auto dataRequest = std::make_shared<Request>(dataRc);
     requestHandler->addTask(dataRequest);
     requestHandler->wait(dataRequest);
-    networkClient->reclaim_dram_buffer(rc.src_address, rc.size);
+    networkClient->reclaim_dram_buffer(dataRc.src_address, dataRc.size);
     rr->encode();
     send(rr->data_, rr->size_);
   }

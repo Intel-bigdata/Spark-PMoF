@@ -455,6 +455,8 @@ void Protocol::handle_finalize_msg(std::shared_ptr<RequestReply> requestReply) {
     networkServer_->send(reinterpret_cast<char *>(requestReply->data_),
                          requestReply->size_, rrc.con);
   } else if (rrc.type == REPLICATE_PUT_REPLY) {
+    allocatorProxy_->cache_chunk(rrc.key, rrc.address, rrc.size,
+                                 networkServer_->get_rkey());
     requestReply->encode();
     networkServer_->send(reinterpret_cast<char *>(requestReply->data_),
                          requestReply->size_, rrc.con);
