@@ -60,14 +60,14 @@ private:
 
 class ServiceRecvCallback : public Callback {
 public:
-  ServiceRecvCallback(std::shared_ptr<ChunkMgr> chunkMgr, std::shared_ptr<DataServiceRequestHandler> requestHandler, std::shared_ptr<ReplicateWorker> worker);
+  ServiceRecvCallback(std::shared_ptr<ChunkMgr> chunkMgr, std::shared_ptr<DataServiceRequestHandler> requestHandler, std::shared_ptr<DataServerService> service);
   ~ServiceRecvCallback() override = default;
   void operator()(void* param_1, void* param_2);
 
 private:
   std::shared_ptr<ChunkMgr> chunkMgr_;
   std::shared_ptr<DataServiceRequestHandler> requestHandler_;
-  std::shared_ptr<ReplicateWorker> worker_;
+  std::shared_ptr<DataServerService> service_;
   std::mutex mtx;
 };
 
@@ -98,7 +98,7 @@ public:
  void registerDataServer();
  void send(const char* data, uint64_t size);
  void addTask(std::shared_ptr<ReplicaRequest> request);
- // void enqueue_recv_msg(std::shared_ptr<ProxyRequest> request);
+ void enqueue_recv_msg(std::shared_ptr<ReplicaRequestReply> repy);
  void handle_replica_msg(std::shared_ptr<ReplicaRequestReply> msg);
  std::shared_ptr<DataChannel> getChannel(string node, string port);
 private:
@@ -106,7 +106,7 @@ private:
  std::string port_;
  atomic<uint64_t> rid_ = {0};
  std::shared_ptr<DataServiceRequestHandler> requestHandler_;
- std::shared_ptr<ReplicateWorker> worker_;
+ std::vector<std::shared_ptr<ReplicateWorker>> workers_;
  std::shared_ptr<ChunkMgr> chunkMgr_;
  std::shared_ptr<ServiceShutdownCallback> shutdownCallback;
  std::shared_ptr<ServiceConnectCallback> connectCallback;

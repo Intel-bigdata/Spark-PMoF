@@ -84,7 +84,7 @@ RecvWorker::RecvWorker(std::shared_ptr<Protocol> protocol, int index)
 int RecvWorker::entry() {
   if (!init) {
     if (index_ != -1) {
-      // set_affinity(index_);
+      set_affinity(index_);
     }
     init = true;
   }
@@ -111,7 +111,7 @@ ReadWorker::ReadWorker(std::shared_ptr<Protocol> protocol, int index)
 int ReadWorker::entry() {
   if (!init) {
     if (index_ != -1) {
-      // set_affinity(index_);
+      set_affinity(index_);
     }
     init = true;
   }

@@ -11,8 +11,11 @@ void ServiceConnectCallback::operator()(void *param_1, void *param_2) {
   service_->setConnection(connection);
 }
 
-ServiceRecvCallback::ServiceRecvCallback(std::shared_ptr<ChunkMgr> chunkMgr, std::shared_ptr<DataServiceRequestHandler> requestHandler, std::shared_ptr<ReplicateWorker> worker) 
-: chunkMgr_(chunkMgr), requestHandler_(requestHandler), worker_(worker) {}
+ServiceRecvCallback::ServiceRecvCallback(
+    std::shared_ptr<ChunkMgr> chunkMgr,
+    std::shared_ptr<DataServiceRequestHandler> requestHandler,
+    std::shared_ptr<DataServerService> service)
+    : chunkMgr_(chunkMgr), requestHandler_(requestHandler), service_(service) {}
 
 void ServiceRecvCallback::operator()(void *param_1, void *param_2) {
   int mid = *static_cast<int*>(param_1);
@@ -25,7 +28,7 @@ void ServiceRecvCallback::operator()(void *param_1, void *param_2) {
   if (rrc.type == REGISTER) {
     requestHandler_->notify(requestReply);
   } else {
-    worker_->addTask(requestReply);
+    service_->enqueue_recv_msg(requestReply);
   }
   chunkMgr_->reclaim(ck, static_cast<Connection *>(ck->con));
 }
@@ -69,11 +72,17 @@ DataServerService::~DataServerService() {
   }
 }
 
+int worker_num = 10;
 bool DataServerService::init() {
   requestHandler_ = std::make_shared<DataServiceRequestHandler>(shared_from_this());
   requestHandler_->start();
-  worker_ = std::make_shared<ReplicateWorker>(shared_from_this());
-  worker_->start();
+  for (int i = 0; i < worker_num; i++) {
+    auto worker = std::make_shared<ReplicateWorker>(shared_from_this());
+    worker->start();
+    workers_.push_back(std::move(worker));
+  }
+  // worker_ = std::make_shared<ReplicateWorker>(shared_from_this());
+  // worker_->start();
   host_ = config_->get_ip();
   port_ = config_->get_port();
   proxyClient_ = std::make_shared<Client>(1, 32);
@@ -90,7 +99,7 @@ bool DataServerService::init() {
   connectCallback =
       std::make_shared<ServiceConnectCallback>(shared_from_this());
   recvCallback =
-      std::make_shared<ServiceRecvCallback>(chunkMgr_, requestHandler_, worker_);
+      std::make_shared<ServiceRecvCallback>(chunkMgr_, requestHandler_, shared_from_this());
   sendCallback = std::make_shared<ServiceSendCallback>(chunkMgr_);
   proxyClient_->set_shutdown_callback(shutdownCallback.get());
   proxyClient_->set_connected_callback(connectCallback.get());
@@ -197,6 +206,11 @@ void DataServerService::send(const char *data, uint64_t size) {
 
 void DataServerService::addTask(std::shared_ptr<ReplicaRequest> request) {
   requestHandler_->addTask(request);
+}
+
+void DataServerService::enqueue_recv_msg(std::shared_ptr<ReplicaRequestReply> reply) {
+  auto rrc = reply->get_rrc();
+  workers_[rrc.rid % worker_num]->addTask(reply);
 }
 
 std::shared_ptr<DataChannel> DataServerService::getChannel(string node, string port) {

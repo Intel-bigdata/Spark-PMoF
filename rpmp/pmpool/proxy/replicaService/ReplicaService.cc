@@ -159,7 +159,7 @@ bool ReplicaService::startService() {
   int worker_number = config_->get_network_worker_num();
   int buffer_number = config_->get_network_buffer_num();
   int buffer_size = config_->get_network_buffer_size();
-  minReplica_ = proxyServer_->getNodeNum() > config_->get_data_replica() ? config_->get_data_replica() : proxyServer_->getNodeNum();
+  minReplica_ = config_->get_data_replica();
   server_ = std::make_shared<Server>(worker_number, buffer_number);
   if(server_->init() != 0){
     cout<<"HPNL server init failed"<<endl;
