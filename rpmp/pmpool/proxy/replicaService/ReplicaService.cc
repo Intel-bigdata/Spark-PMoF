@@ -60,7 +60,6 @@ void ReplicaService::enqueue_recv_msg(std::shared_ptr<ReplicaRequest> request) {
   worker_->addTask(request);
 }
 
-int minReplica = 2;
 void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
   ReplicaRequestContext rc = request->get_rc();
   auto rrc = ReplicaRequestReplyContext();
@@ -84,46 +83,54 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
     }
     case REPLICATE: {
       cout << "put reply" << endl;
+      if (getReplica(rc.key).size() != 0) {
+        cout << "multi key" << endl;
+        removeReplica(rc.key);
+      }
       addReplica(rc.key, rc.node, rc.port);
-      if (getReplica(rc.key).size() < minReplica) {
+      // if (getReplica(rc.key).size() < minReplica) {
         cout << "replicate work" << endl;
         vector<PhysicalNode> nodes = proxyServer_->getNodes(rc.key);
         auto n = PhysicalNode(rc.node, rc.port);
-        for (auto node : nodes) {
-          if (node == n) {
-            continue;
-          } else {
-            cout << "send replicate msg" << endl;
-            rrc.type = REPLICATE;
-            rrc.rid = rid_++;
-            rrc.key = rc.key;
-            rrc.size = rc.size;
-            rrc.node = node.getIp();
-            rrc.port = node.getPort();
-            rrc.con = rc.con;
-            rrc.src_address = rc.src_address;
-            auto reply = std::make_shared<ReplicaRequestReply>(rrc);
-            reply->encode();
-            auto ck = chunkMgr_->get(rrc.con);
-            memcpy(reinterpret_cast<char*>(ck->buffer), reply->data_,
-                   reply->size_);
-            ck->size = reply->size_;
-            // std::unique_lock<std::mutex> lk(prrcMtx);
-            // prrcMap_[rc.key] = request;
-            // lk.unlock();
-            rrc.con->send(ck);
+        for (auto it = nodes.begin(); it != nodes.end(); ++it) {
+          if (it->getIp() == rc.node && it->getPort() == rc.port) {
+            it = nodes.erase(it);
+            --it;
           }
         }
-      } else {
-        cout << "no need replica work" << endl;
-        proxyServer_->notifyClient(rc.key);
-      }
+
+        cout << "send replicate msg" << endl;
+        rrc.type = REPLICATE;
+        rrc.rid = rid_++;
+        rrc.key = rc.key;
+        rrc.size = rc.size;
+        // rrc.node = node.getIp();
+        // rrc.port = node.getPort();
+        rrc.nodes = nodes;
+        rrc.con = rc.con;
+        rrc.src_address = rc.src_address;
+        auto reply = std::make_shared<ReplicaRequestReply>(rrc);
+        reply->encode();
+        auto ck = chunkMgr_->get(rrc.con);
+        memcpy(reinterpret_cast<char*>(ck->buffer), reply->data_, reply->size_);
+        ck->size = reply->size_;
+        // std::unique_lock<std::mutex> lk(prrcMtx);
+        // prrcMap_[rc.key] = request;
+        // lk.unlock();
+        rrc.con->send(ck);
+
+      // } else {
+        if (getReplica(rc.key).size() >= minReplica_) {
+          cout << "no need replica work" << endl;
+          proxyServer_->notifyClient(rc.key);
+        }
+      // }
       break;
     }
     case REPLICA_REPLY : {
       cout << "replica reply" << endl;
       addReplica(rc.key, rc.node, rc.port);
-      if (getReplica(rc.key).size() == minReplica) {
+      if (getReplica(rc.key).size() == minReplica_) {
         cout << "notify client" << endl;
         // auto request = prrcMap_[rc.key];
         // auto rc = request->get_rc();
@@ -152,6 +159,7 @@ bool ReplicaService::startService() {
   int worker_number = config_->get_network_worker_num();
   int buffer_number = config_->get_network_buffer_num();
   int buffer_size = config_->get_network_buffer_size();
+  minReplica_ = proxyServer_->getNodeNum() > config_->get_data_replica() ? config_->get_data_replica() : proxyServer_->getNodeNum();
   server_ = std::make_shared<Server>(worker_number, buffer_number);
   if(server_->init() != 0){
     cout<<"HPNL server init failed"<<endl;

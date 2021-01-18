@@ -29,12 +29,12 @@ int DataServer::init() {
   CHK_ERR("allocator proxy init", allocatorProxy_->init());
   log_->get_file_log()->info("allocator proxy initialized.");
 
-  dataService_ = std::make_shared<DataServerService>(config_, log_);
-  dataService_->init();
-  log_->get_console_log()->info("Data service initialized.");
+  // dataService_ = std::make_shared<DataServerService>(config_, log_);
+  // dataService_->init();
+  // log_->get_console_log()->info("Data service initialized.");
 
   protocol_ = std::make_shared<Protocol>(config_, log_, networkServer_,
-                                         allocatorProxy_, dataService_);
+                                         allocatorProxy_);
   CHK_ERR("protocol init", protocol_->init());
   log_->get_file_log()->info("protocol initialized.");
 

@@ -37,6 +37,10 @@ vector<PhysicalNode> Proxy::getNodes(uint64_t key) {
   return consistentHash_->getNodes(key, dataReplica_);
 }
 
+uint32_t Proxy::getNodeNum() {
+  return consistentHash_->getNodeNum();
+}
+
 void Proxy::addReplica(uint64_t key, std::string node, std::string port) {
   std::lock_guard<std::mutex> lk(replica_mtx);
   replicaMap_[key].insert(node+port);

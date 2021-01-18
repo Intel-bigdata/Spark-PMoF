@@ -108,6 +108,7 @@ class ReplicaService : public std::enable_shared_from_this<ReplicaService> {
   atomic<uint64_t> rid_ = {0};
   std::string dataServerPort_;
   uint32_t dataReplica_;
+  uint32_t minReplica_;
   std::unordered_map<std::string, Connection*> dataServerConnections_;
   std::unordered_map<uint64_t, std::unordered_set<std::string>> replicaMap_;
   std::mutex replica_mtx;

@@ -42,7 +42,7 @@ class CircularBuffer {
   }
   CircularBuffer(uint64_t buffer_size, uint32_t buffer_num, bool is_server,
                  std::shared_ptr<RmaBufferRegister> rbr)
-      : rbr_(rbr), buffer_size_(buffer_size), buffer_num_(buffer_num) {
+      : rbr_(rbr), buffer_size_(buffer_size), buffer_num_(buffer_num), isServer_(is_server) {
     // init();
   }
   void try_init() {
@@ -117,6 +117,10 @@ class CircularBuffer {
   }
 
   bool get(uint64_t bytes, uint64_t *offset) {
+    // if (isServer_) {
+
+    //   std::cout << optimal_start << std::endl;
+    // }
     uint32_t alloc_num = p2align(bytes, buffer_size_) / buffer_size_;
     if (alloc_num > buffer_num_) {
       return false;
@@ -136,7 +140,7 @@ class CircularBuffer {
     if (found == -1) {
       std::cerr << "Can't find a " << alloc_num << " * " << buffer_size_
                 << " sized buffer. " << std::endl;
-      throw;
+      throw "cannot get dram buffer";
     } else {
       *offset = found;
 #ifdef DEBUG
@@ -174,6 +178,7 @@ class CircularBuffer {
   bool initialized = false;
   std::mutex lock_;
   uint64_t optimal_start = 0;
+  bool isServer_;
 
   bool check_availability(uint64_t index, uint64_t alloc_num) {
     for (int i = 0; i < alloc_num; i++) {

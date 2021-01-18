@@ -11,6 +11,8 @@
 #include <vector>
 #include <sstream>
 
+#include "pmpool/proxy/PhysicalNode.h"
+
 using std::vector;
 
 // class ProxyClientRecvCallback;
@@ -54,8 +56,9 @@ struct ReplicaRequestReplyMsg {
     ar& rid;
     ar& key;
     ar& size;
-    ar& node;
-    ar& port;
+    // ar& node;
+    // ar& port;
+    ar& nodes;
     ar& src_address;
   }
   uint32_t type;
@@ -63,8 +66,9 @@ struct ReplicaRequestReplyMsg {
   uint64_t rid;
   uint64_t key;
   uint64_t size;
-  std::string node;
-  std::string port;
+  // std::string node;
+  // std::string port;
+  std::vector<PhysicalNode> nodes;
   uint64_t src_address;
 };
 
@@ -74,8 +78,9 @@ struct ReplicaRequestReplyContext {
   uint64_t rid;
   uint64_t key;
   uint64_t size;
-  std::string node;
-  std::string port;
+  // std::string node;
+  // std::string port;
+  std::vector<PhysicalNode> nodes;
   uint64_t src_address;
   Connection* con;
 };
@@ -111,8 +116,9 @@ class ReplicaRequestReply {
     requestReplyMsg.rid = requestReplyContext_.rid;
     requestReplyMsg.key = requestReplyContext_.key;
     requestReplyMsg.size = requestReplyContext_.size;
-    requestReplyMsg.node = requestReplyContext_.node;
-    requestReplyMsg.port = requestReplyContext_.port;
+    // requestReplyMsg.node = requestReplyContext_.node;
+    // requestReplyMsg.port = requestReplyContext_.port;
+    requestReplyMsg.nodes = requestReplyContext_.nodes;
     requestReplyMsg.src_address = requestReplyContext_.src_address;
     std::ostringstream os;
     boost::archive::text_oarchive ao(os);
@@ -138,8 +144,9 @@ class ReplicaRequestReply {
     requestReplyContext_.rid = requestReplyMsg.rid;
     requestReplyContext_.key = requestReplyMsg.key;
     requestReplyContext_.size = requestReplyMsg.size;
-    requestReplyContext_.node = requestReplyMsg.node;
-    requestReplyContext_.port = requestReplyMsg.port;
+    // requestReplyContext_.node = requestReplyMsg.node;
+    // requestReplyContext_.port = requestReplyMsg.port;
+    requestReplyContext_.nodes = requestReplyMsg.nodes;
     requestReplyContext_.src_address = requestReplyMsg.src_address;
   };
 

@@ -26,6 +26,7 @@
 #include "pmpool/proxy/replicaService/ReplicaEvent.h"
 // #include "DataServiceEvent.h"
 // #include "DataServiceRequestHandler.h"
+#include "pmpool/Protocol.h"
 
 using moodycamel::BlockingConcurrentQueue;
 
@@ -76,7 +77,7 @@ public:
   explicit ServiceSendCallback(std::shared_ptr<ChunkMgr> chunkMgr) : chunkMgr_(chunkMgr) {}
   ~ServiceSendCallback() override = default;
   void operator()(void* param_1, void* param_2) {
-    cout << "DataServiceSendCallback" << endl;
+    // cout << "DataServiceSendCallback" << endl;
     auto buffer_id_ = *static_cast<int *>(param_1);
     auto ck = chunkMgr_->get(buffer_id_);
     chunkMgr_->reclaim(ck, static_cast<Connection *>(ck->con));
@@ -89,7 +90,8 @@ private:
 class DataServerService : public std::enable_shared_from_this<DataServerService> {
 public:
  explicit DataServerService(std::shared_ptr<Config> config,
-                            std::shared_ptr<Log> log);
+                            std::shared_ptr<Log> log,
+                            std::shared_ptr<Protocol> protocol);
  ~DataServerService();
  bool init();  // connect to proxy server
  void setConnection(Connection* connection);
@@ -112,6 +114,7 @@ private:
  std::shared_ptr<ServiceSendCallback> sendCallback;
  std::shared_ptr<Config> config_;
  std::shared_ptr<Log> log_;
+ std::shared_ptr<Protocol> protocol_;
 
  std::shared_ptr<Client> proxyClient_;
  Connection* proxyCon_;

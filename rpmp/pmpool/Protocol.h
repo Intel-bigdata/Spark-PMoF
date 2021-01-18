@@ -158,8 +158,7 @@ class Protocol : public std::enable_shared_from_this<Protocol> {
   Protocol() = delete;
   Protocol(std::shared_ptr<Config> config, std::shared_ptr<Log> log,
            std::shared_ptr<NetworkServer> server,
-           std::shared_ptr<AllocatorProxy> allocatorProxy,
-           std::shared_ptr<DataServerService> dataService);
+           std::shared_ptr<AllocatorProxy> allocatorProxy);
   ~Protocol();
   int init();
 
@@ -174,6 +173,8 @@ class Protocol : public std::enable_shared_from_this<Protocol> {
 
   void enqueue_rma_msg(uint64_t buffer_id);
   void handle_rma_msg(std::shared_ptr<RequestReply> requestReply);
+
+  void reclaim_dram_buffer(uint64_t key);
 
  public:
   std::shared_ptr<Config> config_;
@@ -200,6 +201,9 @@ class Protocol : public std::enable_shared_from_this<Protocol> {
   std::mutex rrcMtx_;
   std::unordered_map<uint64_t, std::shared_ptr<RequestReply>> rrcMap_;
   uint64_t time;
+
+  std::mutex replicateMtx_;
+  std::map<uint64_t, std::shared_ptr<RequestReply>> replicateMap_;
 };
 
 #endif  // PMPOOL_PROTOCOL_H_

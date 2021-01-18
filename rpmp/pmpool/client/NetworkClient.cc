@@ -88,7 +88,7 @@ uint64_t RequestHandler::wait(std::shared_ptr<Request> request) {
   while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request] {
     auto current = std::chrono::steady_clock::now();
     auto elapse = current - ctx->start;
-    if (elapse > 10s) {  // tried 10s and found 8 process * 8 threads request
+    if (elapse > 30s) {  // tried 10s and found 8 process * 8 threads request
                          // will still go timeout, need to fix
       ctx->op_failed = true;
       fprintf(stderr, "Request [TYPE %ld][Key %ld] spent %ld s, time out\n",
@@ -113,7 +113,7 @@ RequestReplyContext &RequestHandler::get(std::shared_ptr<Request> request) {
   while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request] {
     auto current = std::chrono::steady_clock::now();
     auto elapse = current - ctx->start;
-    if (elapse > 10s) {  // tried 10s and found 8 process * 8 threads request
+    if (elapse > 30s) {  // tried 10s and found 8 process * 8 threads request
                          // will still go timeout, need to fix
       ctx->op_failed = true;
       fprintf(stderr, "Request [TYPE %ld] spent %ld s, time out\n",

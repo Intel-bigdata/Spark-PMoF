@@ -91,6 +91,10 @@ class ConsistentHash {
       return getNodes(hashValue, num);
     }
 
+    uint32_t getNodeNum() {
+      return pRing.size();
+    }
+
   private:
     PhysicalNode getNextNode(PhysicalNode node) {
       map<uint64_t, PhysicalNode>::iterator itr = pRing.find(hashFactory->hash(node.getKey()));

@@ -77,6 +77,7 @@ void ClientService::handle_recv_msg(std::shared_ptr<ProxyRequest> request) {
     case GET_HOSTS: {
       vector<PhysicalNode> nodes = proxyServer_->getNodes(rc.key);
       rrc.type = rc.type;
+      rrc.key = rc.key;
       rrc.success = 0;
       rrc.rid = rc.rid;
       rrc.nodes = nodes;
@@ -133,14 +134,16 @@ bool ClientService::startService() {
 }
 
 void ClientService::notifyClient(uint64_t key) {
-  auto reply = prrcMap_[key];
-  auto rrc = reply->get_rrc();
-  auto ck = chunkMgr_->get(rrc.con);
-  memcpy(reinterpret_cast<char*>(ck->buffer), reply->data_,
-         reply->size_);
-  ck->size = reply->size_;
-  rrc.con->send(ck);
-  prrcMap_.erase(key);
+  std::unique_lock<std::mutex> lk(prrcMtx);
+  if (prrcMap_.count(key)) {
+    auto reply = prrcMap_[key];
+    auto rrc = reply->get_rrc();
+    auto ck = chunkMgr_->get(rrc.con);
+    memcpy(reinterpret_cast<char*>(ck->buffer), reply->data_, reply->size_);
+    ck->size = reply->size_;
+    rrc.con->send(ck);
+    prrcMap_.erase(key);
+  }
 }
 
 void ClientService::wait() {
