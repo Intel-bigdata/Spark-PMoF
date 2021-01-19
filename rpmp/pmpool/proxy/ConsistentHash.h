@@ -4,7 +4,8 @@
 #include <map>
 #include <string>
 #include <vector>
-// #include "pmpool/proxy/Node.h"
+#include <unordered_set>
+
 #include "pmpool/proxy/PhysicalNode.h"
 #include "pmpool/proxy/VirtualNode.h"
 #include "pmpool/proxy/XXHash.h"
@@ -16,12 +17,11 @@ class ConsistentHash {
     ConsistentHash(){};
 
     void addNode(PhysicalNode physicalNode, int loadBalanceFactor){
-      uint64_t pHash = hashFactory->hash(physicalNode.getKey());
-      pRing.insert(pair<uint64_t, PhysicalNode>(pHash, physicalNode));
+      nodes.insert(physicalNode.getKey());
       for (int i = 0; i < loadBalanceFactor; i++){
-        VirtualNode *virtualNode = new VirtualNode(physicalNode, i);
-        uint64_t hashValue = hashFactory->hash(virtualNode->getKey());
-        ring.insert(pair<uint64_t, VirtualNode>(hashValue, *virtualNode));
+        VirtualNode virtualNode = {physicalNode, i};
+        uint64_t hashValue = hashFactory->hash(virtualNode.getKey());
+        ring.insert(pair<uint64_t, VirtualNode>(hashValue, virtualNode));
       }
 
       map<uint64_t, VirtualNode>::iterator itr;
@@ -31,9 +31,8 @@ class ConsistentHash {
 
     };
 
-    void removeNode(PhysicalNode physicalNode){  
-      uint64_t pHash = hashFactory->hash(physicalNode.getKey());         
-      pRing.erase(pHash);
+    void removeNode(PhysicalNode physicalNode){
+      nodes.erase(physicalNode.getKey());
       map<uint64_t, VirtualNode>::iterator itr3;
       for (itr3 = ring.begin(); itr3 != ring.end(); ++itr3){
           cout << '\t' << itr3->first << '\t' << itr3->second.getKey() << '\n';
@@ -74,14 +73,39 @@ class ConsistentHash {
     };
 
     vector<PhysicalNode> getNodes(uint64_t hashValue, uint32_t num) {
-      uint32_t node_num = num < pRing.size() ? num : pRing.size();
+      uint32_t node_num = num < nodes.size() ? num : nodes.size();
+      unordered_set<string> tmpNodes;
       vector<PhysicalNode> pNodes;
-      PhysicalNode pNode = getNode(hashValue);
-      pNodes.push_back(pNode);
+      if (ring.begin() == ring.end()) {
+        return pNodes;
+      }
+      auto it = ring.lower_bound(hashValue);
+      it = it == ring.end() ? ring.begin() : it;
+      auto begin = it;
+      pNodes.push_back(it->second.getPhysicalNode());
+      tmpNodes.insert(it->second.getPhysicalNode().getKey());
+      ++it;
       for (int i = 1; i < node_num; i++) {
-        PhysicalNode node = getNextNode(pNode);
-        pNodes.push_back(node);
-        pNode = node;
+        it = it == ring.end() ? ring.begin() : it;
+        while (true) {
+          if (it == ring.end()) {
+            it = ring.begin();
+          }
+          if (it == begin) {
+            break;
+          }
+          if (tmpNodes.count(it->second.getPhysicalNode().getKey())) {
+            ++it;
+          } else {
+            break;
+          }
+        }
+        if (it == begin) {
+          break;
+        }
+        pNodes.push_back(it->second.getPhysicalNode());
+        tmpNodes.insert(it->second.getPhysicalNode().getKey());
+        ++it;
       }
       return pNodes;
     }
@@ -92,20 +116,12 @@ class ConsistentHash {
     }
 
     uint32_t getNodeNum() {
-      return pRing.size();
+      return nodes.size();
     }
 
   private:
-    PhysicalNode getNextNode(PhysicalNode node) {
-      map<uint64_t, PhysicalNode>::iterator itr = pRing.find(hashFactory->hash(node.getKey()));
-      if (++itr == pRing.end()) {
-        return pRing.begin()->second;
-      } else {
-        return itr->second;
-      }
-    }
     map<uint64_t, VirtualNode> ring;
-    map<uint64_t, PhysicalNode> pRing;
+    unordered_set<string> nodes;
     IHash *hashFactory = new XXHash();      
 };
 

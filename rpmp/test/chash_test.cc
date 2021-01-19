@@ -19,15 +19,15 @@ void consistent_hash_test(){
    *
    **/
   int loadBalanceFactor = 5;
-  PhysicalNode *physicalNode1 = new PhysicalNode("host1");
+  PhysicalNode *physicalNode1 = new PhysicalNode("host1", "12345");
   consistentHash->addNode(*physicalNode1, loadBalanceFactor);
-  PhysicalNode *physicalNode2 = new PhysicalNode("host2");
+  PhysicalNode *physicalNode2 = new PhysicalNode("host1", "12346");
   consistentHash->addNode(*physicalNode2, loadBalanceFactor);
-  PhysicalNode *physicalNode3 = new PhysicalNode("host3");
+  PhysicalNode *physicalNode3 = new PhysicalNode("host2", "12345");
   consistentHash->addNode(*physicalNode3, loadBalanceFactor);
-  PhysicalNode *physicalNode4 = new PhysicalNode("host4");
+  PhysicalNode *physicalNode4 = new PhysicalNode("host2", "12346");
   consistentHash->addNode(*physicalNode4, loadBalanceFactor);
-  PhysicalNode *physicalNode5 = new PhysicalNode("host5");
+  PhysicalNode *physicalNode5 = new PhysicalNode("host3", "12345");
   consistentHash->addNode(*physicalNode5, loadBalanceFactor);
 
   /**
@@ -43,16 +43,16 @@ void consistent_hash_test(){
    * Get physical nodes for a shuffle block and block replication
    * */
   cout << "get nodes for replication" << endl;
-  vector<string> pNodes = consistentHash->getNodes(shuffle_key, 2);
+  vector<PhysicalNode> pNodes = consistentHash->getNodes(shuffle_key, 3);
   for (auto pNode : pNodes) {
-    cout << "getNode: " << pNode << endl;
+    cout << "getNode: " << pNode.getKey() << endl;
   }
   /**
    *
    * Remove one physical node
    *
    **/
-  consistentHash->removeNode(*physicalNode1);
+  consistentHash->removeNode(*physicalNode4);
 
 
   /**

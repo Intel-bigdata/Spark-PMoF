@@ -19,7 +19,7 @@ class PhysicalNode {
 
    PhysicalNode() = default;
 
-   string getKey() { return ip + port; }
+   string getKey() { return ip + ":" + port; }
 
    string getIp() { return ip; }
 
