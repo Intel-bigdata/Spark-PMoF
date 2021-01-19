@@ -132,8 +132,9 @@ void DataServerService::registerDataServer() {
     ReplicaRequestContext rc = {};
     rc.type = REGISTER;
     rc.rid = rid_++;
-    rc.node = host_;
-    rc.port = port_;
+    // rc.node = host_;
+    // rc.port = port_;
+    rc.node = {host_, port_};
     auto request = std::make_shared<ReplicaRequest>(rc);
     requestHandler_->addTask(request);
     try {
@@ -157,6 +158,7 @@ void DataServerService::handle_replica_msg(std::shared_ptr<ReplicaRequestReply> 
     rc.rid = rrc.rid;
     rc.src_address = rrc.src_address;
     for (auto node : rrc.nodes) {
+      rc.node = node;
       auto rr = std::make_shared<ReplicaRequest>(rc);
       std::shared_ptr<DataChannel> channel = getChannel(node.getIp(), node.getPort());
       std::shared_ptr<NetworkClient> networkClient = channel->networkClient;

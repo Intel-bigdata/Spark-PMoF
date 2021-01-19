@@ -27,10 +27,10 @@ public:
     void wait();
     void enqueue_recv_msg(std::shared_ptr<ProxyRequest> request);
     void handle_recv_msg(std::shared_ptr<ProxyRequest> request);
-    void addNode(PhysicalNode* physicalNode);
+    void addNode(PhysicalNode physicalNode);
     std::vector<PhysicalNode> getNodes(uint64_t key);
     uint32_t getNodeNum();
-    void addReplica(uint64_t key, std::string node, std::string port);
+    void addReplica(uint64_t key, std::string node);
     std::unordered_set<std::string> getReplica(uint64_t key);
     void removeReplica(uint64_t key);
     void notifyClient(uint64_t key);

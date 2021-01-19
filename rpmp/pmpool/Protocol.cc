@@ -540,8 +540,9 @@ void Protocol::handle_rma_msg(std::shared_ptr<RequestReply> requestReply) {
       auto rc = ReplicaRequestContext();
       rc.type = REPLICATE;
       rc.key = rrc.key;
-      rc.node = config_->get_ip();
-      rc.port = config_->get_port();
+      // rc.node = config_->get_ip();
+      // rc.port = config_->get_port();
+      rc.node = {config_->get_ip(), config_->get_port()};
       rc.src_address = rrc.dest_address;
       rc.rid = rrc.rid;
       rc.size = rrc.size;

@@ -47,16 +47,16 @@ struct ProxyRequestReplyMsg {
     ar &success;
     ar &rid;
     ar &key;
-    ar &hosts;
-    ar &ports;
+    // ar &hosts;
+    // ar &ports;
     ar &nodes;
   }
   uint32_t type;
   uint32_t success;
   uint64_t rid;
   uint64_t key;
-  vector<std::string> hosts;
-  vector<std::string> ports;
+  // vector<std::string> hosts;
+  // vector<std::string> ports;
   vector<PhysicalNode> nodes;
 };
 
@@ -66,8 +66,8 @@ struct ProxyRequestReplyContext {
   uint64_t rid;
   uint64_t key;
   Connection* con;
-  vector<std::string> hosts;
-  vector<std::string> ports;
+  // vector<std::string> hosts;
+  // vector<std::string> ports;
   vector<PhysicalNode> nodes;
 };
 

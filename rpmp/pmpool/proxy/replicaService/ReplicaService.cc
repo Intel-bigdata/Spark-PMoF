@@ -65,13 +65,13 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
   auto rrc = ReplicaRequestReplyContext();
   switch(rc.type) {
     case REGISTER: {
-      PhysicalNode* physicalNode = new PhysicalNode(rc.node, rc.port);
+      PhysicalNode physicalNode = {rc.node.getIp(), rc.node.getPort()};
       proxyServer_->addNode(physicalNode);
       rrc.type = rc.type;
       rrc.success = 0;
       rrc.rid = rc.rid;
       rrc.con = rc.con;
-      dataServerConnections_.insert(pair<std::string, Connection*>(rc.node, rc.con));
+      dataServerConnections_.insert(pair<std::string, Connection*>(physicalNode.getKey(), rc.con));
       std::shared_ptr<ReplicaRequestReply> requestReply = std::make_shared<ReplicaRequestReply>(rrc);
       requestReply->encode();
       auto ck = chunkMgr_->get(rrc.con);
@@ -87,13 +87,13 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
         cout << "multi key" << endl;
         removeReplica(rc.key);
       }
-      addReplica(rc.key, rc.node, rc.port);
+      addReplica(rc.key, rc.node.getKey());
       // if (getReplica(rc.key).size() < minReplica) {
         cout << "replicate work" << endl;
         vector<PhysicalNode> nodes = proxyServer_->getNodes(rc.key);
-        auto n = PhysicalNode(rc.node, rc.port);
+        // auto n = PhysicalNode(rc.node, rc.port);
         for (auto it = nodes.begin(); it != nodes.end(); ++it) {
-          if (it->getIp() == rc.node && it->getPort() == rc.port) {
+          if (it->getKey() == rc.node.getKey()) {
             it = nodes.erase(it);
             --it;
           }
@@ -129,7 +129,7 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
     }
     case REPLICA_REPLY : {
       cout << "replica reply" << endl;
-      addReplica(rc.key, rc.node, rc.port);
+      addReplica(rc.key, rc.node.getKey());
       if (getReplica(rc.key).size() == minReplica_) {
         cout << "notify client" << endl;
         // auto request = prrcMap_[rc.key];
@@ -192,8 +192,8 @@ void ReplicaService::wait() {
   server_->wait();
 }
 
-void ReplicaService::addReplica(uint64_t key, std::string node, std::string port) {
-  proxyServer_->addReplica(key, node, port);
+void ReplicaService::addReplica(uint64_t key, std::string node) {
+  proxyServer_->addReplica(key, node);
 }
 
 void ReplicaService::removeReplica(uint64_t key) {

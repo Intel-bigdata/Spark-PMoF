@@ -27,10 +27,11 @@ bool Proxy::launchServer() {
   clientService_->startService();
   replicaService_ = std::make_shared<ReplicaService>(config_, log_, shared_from_this());
   replicaService_->startService();
+  return true;
 }
 
-void Proxy::addNode(PhysicalNode* physicalNode) {
-  consistentHash_->addNode(*physicalNode, loadBalanceFactor_);
+void Proxy::addNode(PhysicalNode physicalNode) {
+  consistentHash_->addNode(physicalNode, loadBalanceFactor_);
 }
 
 vector<PhysicalNode> Proxy::getNodes(uint64_t key) {
@@ -41,9 +42,9 @@ uint32_t Proxy::getNodeNum() {
   return consistentHash_->getNodeNum();
 }
 
-void Proxy::addReplica(uint64_t key, std::string node, std::string port) {
+void Proxy::addReplica(uint64_t key, std::string node) {
   std::lock_guard<std::mutex> lk(replica_mtx);
-  replicaMap_[key].insert(node+port);
+  replicaMap_[key].insert(node);
 }
 
 void Proxy::removeReplica(uint64_t key) {

@@ -101,7 +101,7 @@ class PmPoolClient {
 
   void shutdown();
   void wait();
-  std::shared_ptr<Channel> getChannel(string node, string port);
+  std::shared_ptr<Channel> getChannel(PhysicalNode node);
 
  private:
   shared_ptr<ProxyRequestHandler> proxyRequestHandler_;
