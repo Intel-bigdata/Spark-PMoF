@@ -107,7 +107,7 @@ uint64_t RequestHandler::wait(std::shared_ptr<Request> request) {
   return res;
 }
 
-RequestReplyContext &RequestHandler::get(std::shared_ptr<Request> request) {
+RequestReplyContext RequestHandler::get(std::shared_ptr<Request> request) {
   auto ctx = inflight_insert_or_get(request);
   unique_lock<mutex> lk(ctx->mtx_reply);
   while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request] {

@@ -122,7 +122,7 @@ class ConsistentHash {
   private:
     map<uint64_t, VirtualNode> ring;
     unordered_set<string> nodes;
-    IHash *hashFactory = new XXHash();      
+    XXHash *hashFactory = new XXHash();      
 };
 
 #endif

@@ -39,7 +39,7 @@ PmPoolClient::~PmPoolClient() {
 }
 
 std::shared_ptr<Channel> PmPoolClient::getChannel(PhysicalNode node) {
-  std::lock_guard<std::mutex> lk(channel_mtx);
+  std::unique_lock<std::mutex> lk(channel_mtx);
   if (channels.count(node.getKey())) {
     return channels.find(node.getKey())->second;
   } else if (deadNodes.find(node.getKey()) != deadNodes.end()) {
@@ -98,7 +98,7 @@ int PmPoolClient::free(uint64_t address) {
 }
 
 void PmPoolClient::shutdown() {
-  map<string, std::shared_ptr<Channel>>::iterator itr;                              
+  map<string, std::shared_ptr<Channel>>::iterator itr;
   for (itr = channels.begin(); itr != channels.end(); ++itr){      
     itr->second->networkClient->shutdown(); 
   }
@@ -254,9 +254,11 @@ uint64_t PmPoolClient::get(const string &key, char *value, uint64_t size) {
   ProxyRequestReplyContext prrc = proxyRequestHandler_->get(pRequest);
   std::shared_ptr<Channel> channel;
   for (auto node : prrc.nodes) {
-    if (deadNodes.find(node.getIp()+node.getPort()) != deadNodes.end()) {
+    std::unique_lock<std::mutex> lk(channel_mtx);
+    if (deadNodes.find(node.getKey()) != deadNodes.end()) {
       continue;
     }
+    lk.unlock();
     try {
       channel = getChannel(node);
       break;
