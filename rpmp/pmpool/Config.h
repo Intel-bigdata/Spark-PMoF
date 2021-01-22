@@ -58,6 +58,7 @@ class Config {
       configs.insert(pair<string,string>(RPMP_LOG_LEVEL, DEFAULT_RPMP_LOG_LEVEL));
       configs.insert(pair<string,string>(RPMP_LOG_PATH, DEFAULT_RPMP_LOG_PATH));
       configs.insert(pair<string,string>(RPMP_DATA_REPLICA, DEFAULT_RPMP_DATA_REPLICA));
+      configs.insert(pair<string,string>(RPMP_DATA_MINREPLICA, DEFAULT_RPMP_DATA_MINREPLICA));
       return 0;
     }
 
@@ -86,9 +87,8 @@ class Config {
         vector<string> nodes;
         boost::split(nodes, configs.find(RPMP_NODE_LIST)->second, boost::is_any_of(","), boost::token_compress_on);
         set_nodes(nodes);
-        for (auto node : nodes) {
-          cout << "get node from config: " << node << endl;
-        }
+
+        set_data_minReplica(stoi(configs.find(RPMP_DATA_MINREPLICA)->second));
 
         set_data_replica(stoi(configs.find(RPMP_DATA_REPLICA)->second));
 
@@ -316,6 +316,9 @@ class Config {
     void set_data_replica(uint32_t replica) {replica_ = replica;}
     uint32_t get_data_replica() {return replica_;}
 
+    void set_data_minReplica(uint32_t replica) {minReplica_ = replica;}
+    uint32_t get_data_minReplica() {return minReplica_;}
+
   private:
     string ip_;
     string port_;
@@ -332,6 +335,7 @@ class Config {
     string proxy_port_;
     string proxy_ip_;
     uint32_t replica_;
+    uint32_t minReplica_;
 
 const string RPMP_NODE_LIST = "rpmp.node.list";
 const string RPMP_NETWORK_HEARTBEAT_INTERVAL = "rpmp.network.heartbeat-interval";
@@ -348,6 +352,7 @@ const string RPMP_NETWORK_BUFFER_SIZE = "rpmp.network.buffer.size";
 const string RPMP_LOG_LEVEL = "rpmp.log.level";
 const string RPMP_LOG_PATH = "rpmp.log.path";
 const string RPMP_DATA_REPLICA = "rpmp.data.replica";
+const string RPMP_DATA_MINREPLICA = "rpmp.data.minreplica";
 const string DEFAULT_RPMP_NODE_LIST = "172.168.0.209,172.168.0.40";
 const string DEFAULT_RPMP_NETWORK_HEARTBEAT_INTERVAL = "5";
 const string DEFAULT_RPMP_NETWORK_PROXY_ADDRESS = "172.168.0.209";
@@ -363,6 +368,7 @@ const string DEFAULT_RPMP_NETWORK_BUFFER_SIZE = "65536";
 const string DEFAULT_RPMP_LOG_LEVEL = "warn";
 const string DEFAULT_RPMP_LOG_PATH = "/tmp/rpmp.log";
 const string DEFAULT_RPMP_DATA_REPLICA = "3";
+const string DEFAULT_RPMP_DATA_MINREPLICA = "1";
 };
 
 #endif  // PMPOOL_CONFIG_H_

@@ -82,6 +82,8 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
       break;
     }
     case REPLICATE: {
+      uint32_t replicaNum = dataReplica_ < proxyServer_->getNodeNum() ? dataReplica_ : proxyServer_->getNodeNum();
+      uint32_t minReplica = replicaNum < minReplica_ ? replicaNum : minReplica_;
       cout << "put reply" << endl;
       if (getReplica(rc.key).size() != 0) {
         cout << "multi key" << endl;
@@ -120,7 +122,7 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
         rrc.con->send(ck);
 
       // } else {
-        if (getReplica(rc.key).size() >= minReplica_) {
+        if (getReplica(rc.key).size() >= minReplica) {
           cout << "no need replica work" << endl;
           proxyServer_->notifyClient(rc.key);
         }
@@ -128,9 +130,11 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
       break;
     }
     case REPLICA_REPLY : {
+      uint32_t replicaNum = dataReplica_ < proxyServer_->getNodeNum() ? dataReplica_ : proxyServer_->getNodeNum();
+      uint32_t minReplica = replicaNum < minReplica_ ? replicaNum : minReplica_;
       cout << "replica reply" << endl;
       addReplica(rc.key, rc.node.getKey());
-      if (getReplica(rc.key).size() == minReplica_) {
+      if (getReplica(rc.key).size() == minReplica) {
         cout << "notify client" << endl;
         // auto request = prrcMap_[rc.key];
         // auto rc = request->get_rc();
@@ -159,7 +163,8 @@ bool ReplicaService::startService() {
   int worker_number = config_->get_network_worker_num();
   int buffer_number = config_->get_network_buffer_num();
   int buffer_size = config_->get_network_buffer_size();
-  minReplica_ = config_->get_data_replica();
+  minReplica_ = config_->get_data_minReplica();
+  dataReplica_ = config_->get_data_replica();
   server_ = std::make_shared<Server>(worker_number, buffer_number);
   if(server_->init() != 0){
     cout<<"HPNL server init failed"<<endl;
