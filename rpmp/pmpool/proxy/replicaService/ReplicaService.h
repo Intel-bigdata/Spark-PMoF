@@ -92,8 +92,8 @@ class ReplicaService : public std::enable_shared_from_this<ReplicaService> {
  private:
   // void enqueue_finalize_msg(std::shared_ptr<ProxyRequestReply> reply);
   // void handle_finalize_msg(std::shared_ptr<ProxyRequestReply> reply);
-  void addReplica(uint64_t key, std::string node);
-  std::unordered_set<std::string> getReplica(uint64_t key);
+  void addReplica(uint64_t key, PhysicalNode node);
+  std::unordered_set<PhysicalNode, PhysicalNodeHash> getReplica(uint64_t key);
   void removeReplica(uint64_t key);
   std::shared_ptr<ReplicaWorker> worker_;
   std::shared_ptr<ChunkMgr> chunkMgr_;

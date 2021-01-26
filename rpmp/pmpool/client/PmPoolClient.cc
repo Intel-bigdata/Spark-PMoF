@@ -204,7 +204,7 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
   auto pRequest = std::make_shared<ProxyRequest>(prc);
   proxyRequestHandler_->addTask(pRequest);
   ProxyRequestReplyContext prrc = proxyRequestHandler_->get(pRequest);
-  std::shared_ptr<Channel> channel = getChannel(prrc.nodes[0]);
+  std::shared_ptr<Channel> channel = getChannel(*prrc.nodes.begin());
   std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
   std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
 
@@ -246,7 +246,7 @@ uint64_t PmPoolClient::get(const string &key, char *value, uint64_t size) {
   Digest::computeKeyHash(key, &key_uint);
 
   ProxyRequestContext prc = {};
-  prc.type = GET_HOSTS;
+  prc.type = GET_REPLICA;
   prc.rid = rid_++;
   prc.key = key_uint;
   auto pRequest = std::make_shared<ProxyRequest>(prc);
@@ -309,13 +309,13 @@ vector<block_meta> PmPoolClient::getMeta(const string &key) {
   Digest::computeKeyHash(key, &key_uint);
 
   ProxyRequestContext prc = {};
-  prc.type = GET_HOSTS;
+  prc.type = GET_REPLICA;
   prc.rid = rid_++;
   prc.key = key_uint;
   auto pRequest = std::make_shared<ProxyRequest>(prc);
   proxyRequestHandler_->addTask(pRequest);
   ProxyRequestReplyContext prrc = proxyRequestHandler_->get(pRequest);
-  std::shared_ptr<Channel> channel = getChannel(prrc.nodes[0]);
+  std::shared_ptr<Channel> channel = getChannel(*prrc.nodes.begin());
   std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
   std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
 
@@ -335,13 +335,13 @@ int PmPoolClient::del(const string &key) {
   Digest::computeKeyHash(key, &key_uint);
 
   ProxyRequestContext prc = {};
-  prc.type = GET_HOSTS;
+  prc.type = GET_REPLICA;
   prc.rid = rid_++;
   prc.key = key_uint;
   auto pRequest = std::make_shared<ProxyRequest>(prc);
   proxyRequestHandler_->addTask(pRequest);
   ProxyRequestReplyContext prrc = proxyRequestHandler_->get(pRequest);
-  std::shared_ptr<Channel> channel = getChannel(prrc.nodes[0]);
+  std::shared_ptr<Channel> channel = getChannel(*prrc.nodes.begin());
   std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
   std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
 

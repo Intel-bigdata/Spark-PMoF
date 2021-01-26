@@ -34,7 +34,7 @@ void Proxy::addNode(PhysicalNode physicalNode) {
   consistentHash_->addNode(physicalNode, loadBalanceFactor_);
 }
 
-vector<PhysicalNode> Proxy::getNodes(uint64_t key) {
+unordered_set<PhysicalNode, PhysicalNodeHash> Proxy::getNodes(uint64_t key) {
   return consistentHash_->getNodes(key, dataReplica_);
 }
 
@@ -42,7 +42,7 @@ uint32_t Proxy::getNodeNum() {
   return consistentHash_->getNodeNum();
 }
 
-void Proxy::addReplica(uint64_t key, std::string node) {
+void Proxy::addReplica(uint64_t key, PhysicalNode node) {
   std::lock_guard<std::mutex> lk(replica_mtx);
   replicaMap_[key].insert(node);
 }
@@ -52,7 +52,7 @@ void Proxy::removeReplica(uint64_t key) {
   replicaMap_.erase(key);
 }
 
-std::unordered_set<std::string> Proxy::getReplica(uint64_t key) {
+std::unordered_set<PhysicalNode,PhysicalNodeHash> Proxy::getReplica(uint64_t key) {
   std::lock_guard<std::mutex> lk(replica_mtx);
   cout << "replica map size: " << replicaMap_[key].size() << endl;
   return replicaMap_[key];

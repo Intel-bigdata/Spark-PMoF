@@ -8,7 +8,9 @@
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/serialization/vector.hpp>
+#include <boost/serialization/unordered_set.hpp>
 #include <vector>
+#include <unordered_set>
 #include <sstream>
 
 #include "pmpool/proxy/PhysicalNode.h"
@@ -70,7 +72,7 @@ struct ReplicaRequestReplyMsg {
   uint64_t size;
   // std::string node;
   // std::string port;
-  std::vector<PhysicalNode> nodes;
+  std::unordered_set<PhysicalNode, PhysicalNodeHash> nodes;
   uint64_t src_address;
 };
 
@@ -82,7 +84,7 @@ struct ReplicaRequestReplyContext {
   uint64_t size;
   // std::string node;
   // std::string port;
-  std::vector<PhysicalNode> nodes;
+  std::unordered_set<PhysicalNode, PhysicalNodeHash> nodes;
   uint64_t src_address;
   Connection* con;
 };

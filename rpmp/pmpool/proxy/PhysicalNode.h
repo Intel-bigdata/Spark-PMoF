@@ -15,23 +15,30 @@ class PhysicalNode {
      ar &port;
    }
 
-   PhysicalNode(string ip, string port) : ip(ip), port(port) {}
+   PhysicalNode(string ip, string port) : ip(ip), port(port) {};
 
    PhysicalNode() = default;
 
-   string getKey() { return ip + ":" + port; }
+   string getKey() const { return ip + ":" + port; }
 
    string getIp() { return ip; }
 
    string getPort() { return port; }
-
-   bool operator==(PhysicalNode &node) {
-     return (this->ip == node.getIp()) && (this->port == node.getPort());
-    }
 
   private:
     string ip;
     string port;
 };
 
+inline bool operator==(const PhysicalNode &node1, const PhysicalNode &node2) {
+  return node1.getKey() == node2.getKey();
+}
+
+class PhysicalNodeHash {
+  public:
+    size_t operator() (const PhysicalNode &node) const{
+      std::hash<string> hash;
+      return hash(node.getKey());
+    }
+};
 #endif

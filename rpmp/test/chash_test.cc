@@ -43,7 +43,7 @@ void consistent_hash_test(){
    * Get physical nodes for a shuffle block and block replication
    * */
   cout << "get nodes for replication" << endl;
-  vector<PhysicalNode> pNodes = consistentHash->getNodes(shuffle_key, 3);
+  unordered_set<PhysicalNode, PhysicalNodeHash> pNodes = consistentHash->getNodes(shuffle_key, 3);
   for (auto pNode : pNodes) {
     cout << "getNode: " << pNode.getKey() << endl;
   }

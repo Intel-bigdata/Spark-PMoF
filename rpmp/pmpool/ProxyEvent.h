@@ -5,14 +5,17 @@
 #include <HPNL/Connection.h>
 
 #include <vector>
+#include <unordered_set>
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/serialization/vector.hpp>
+#include <boost/serialization/unordered_set.hpp>
 
 #include "pmpool/Base.h"
 #include "pmpool/proxy/PhysicalNode.h"
 
 using std::vector;
+using std::unordered_set;
 
 class ProxyClientRecvCallback;
 class ProxyRequestHandler;
@@ -22,6 +25,7 @@ class Proxy;
 
 enum ProxyOpType : uint32_t {
   GET_HOSTS = 1,
+  GET_REPLICA,
   P_PUT,
   P_PUT_REPLY,
   P_GET,
@@ -57,7 +61,7 @@ struct ProxyRequestReplyMsg {
   uint64_t key;
   // vector<std::string> hosts;
   // vector<std::string> ports;
-  vector<PhysicalNode> nodes;
+  unordered_set<PhysicalNode, PhysicalNodeHash> nodes;
 };
 
 struct ProxyRequestReplyContext {
@@ -68,7 +72,7 @@ struct ProxyRequestReplyContext {
   Connection* con;
   // vector<std::string> hosts;
   // vector<std::string> ports;
-  vector<PhysicalNode> nodes;
+  unordered_set<PhysicalNode, PhysicalNodeHash> nodes;
 };
 
 class ProxyRequestReply {

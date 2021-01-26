@@ -24,7 +24,7 @@ ProxyRequestContext &ProxyRequest::get_rc() { return requestContext_; }
 void ProxyRequest::encode() {
   const std::lock_guard<std::mutex> lock(data_lock_);
   ProxyOpType rt = requestContext_.type;
-  assert(rt == GET_HOSTS);
+  // assert(rt == GET_HOSTS);
   size_ = sizeof(ProxyRequestMsg);
   data_ = static_cast<char *>(std::malloc(sizeof(ProxyRequestMsg)));
   ProxyRequestMsg *requestMsg = (ProxyRequestMsg *)data_;

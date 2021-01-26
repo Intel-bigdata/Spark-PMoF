@@ -72,18 +72,16 @@ class ConsistentHash {
       return getNode(hashValue);
     };
 
-    vector<PhysicalNode> getNodes(uint64_t hashValue, uint32_t num) {
+    unordered_set<PhysicalNode,PhysicalNodeHash> getNodes(uint64_t hashValue, uint32_t num) {
       uint32_t node_num = num < nodes.size() ? num : nodes.size();
-      unordered_set<string> tmpNodes;
-      vector<PhysicalNode> pNodes;
+      unordered_set<PhysicalNode,PhysicalNodeHash> pNodes;
       if (ring.begin() == ring.end()) {
         return pNodes;
       }
       auto it = ring.lower_bound(hashValue);
       it = it == ring.end() ? ring.begin() : it;
       auto begin = it;
-      pNodes.push_back(it->second.getPhysicalNode());
-      tmpNodes.insert(it->second.getPhysicalNode().getKey());
+      pNodes.insert(it->second.getPhysicalNode());
       ++it;
       for (int i = 1; i < node_num; i++) {
         it = it == ring.end() ? ring.begin() : it;
@@ -94,7 +92,7 @@ class ConsistentHash {
           if (it == begin) {
             break;
           }
-          if (tmpNodes.count(it->second.getPhysicalNode().getKey())) {
+          if (pNodes.count(it->second.getPhysicalNode())) {
             ++it;
           } else {
             break;
@@ -103,14 +101,13 @@ class ConsistentHash {
         if (it == begin) {
           break;
         }
-        pNodes.push_back(it->second.getPhysicalNode());
-        tmpNodes.insert(it->second.getPhysicalNode().getKey());
+        pNodes.insert(it->second.getPhysicalNode());
         ++it;
       }
       return pNodes;
     }
 
-    vector<PhysicalNode> getNodes(string key, uint32_t num) {
+    unordered_set<PhysicalNode, PhysicalNodeHash> getNodes(string key, uint32_t num) {
       uint64_t hashValue = hashFactory->hash(key);
       return getNodes(hashValue, num);
     }

@@ -89,16 +89,12 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
         cout << "multi key" << endl;
         removeReplica(rc.key);
       }
-      addReplica(rc.key, rc.node.getKey());
+      addReplica(rc.key, rc.node);
       // if (getReplica(rc.key).size() < minReplica) {
         cout << "replicate work" << endl;
-        vector<PhysicalNode> nodes = proxyServer_->getNodes(rc.key);
-        // auto n = PhysicalNode(rc.node, rc.port);
-        for (auto it = nodes.begin(); it != nodes.end(); ++it) {
-          if (it->getKey() == rc.node.getKey()) {
-            it = nodes.erase(it);
-            --it;
-          }
+        unordered_set<PhysicalNode, PhysicalNodeHash> nodes = proxyServer_->getNodes(rc.key);
+        if (nodes.count(rc.node)) {
+          nodes.erase(rc.node);
         }
 
         cout << "send replicate msg" << endl;
@@ -133,7 +129,7 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
       uint32_t replicaNum = dataReplica_ < proxyServer_->getNodeNum() ? dataReplica_ : proxyServer_->getNodeNum();
       uint32_t minReplica = replicaNum < minReplica_ ? replicaNum : minReplica_;
       cout << "replica reply" << endl;
-      addReplica(rc.key, rc.node.getKey());
+      addReplica(rc.key, rc.node);
       if (getReplica(rc.key).size() == minReplica) {
         cout << "notify client" << endl;
         // auto request = prrcMap_[rc.key];
@@ -197,7 +193,7 @@ void ReplicaService::wait() {
   server_->wait();
 }
 
-void ReplicaService::addReplica(uint64_t key, std::string node) {
+void ReplicaService::addReplica(uint64_t key, PhysicalNode node) {
   proxyServer_->addReplica(key, node);
 }
 
@@ -205,6 +201,6 @@ void ReplicaService::removeReplica(uint64_t key) {
   proxyServer_->removeReplica(key);
 }
 
-std::unordered_set<std::string> ReplicaService::getReplica(uint64_t key) {
+std::unordered_set<PhysicalNode, PhysicalNodeHash> ReplicaService::getReplica(uint64_t key) {
   return proxyServer_->getReplica(key);
 }
