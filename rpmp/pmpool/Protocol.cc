@@ -481,9 +481,6 @@ void Protocol::handle_finalize_msg(std::shared_ptr<RequestReply> requestReply) {
 
 void Protocol::enqueue_rma_msg(uint64_t buffer_id) {
   std::unique_lock<std::mutex> lk(rrcMtx_);
-  if (!rrcMap_.count(buffer_id)) {
-    cout << "enqueue none exist rma msg" << endl;
-  }
   auto requestReply = rrcMap_[buffer_id];
   lk.unlock();
   auto rrc = requestReply->get_rrc();
@@ -592,14 +589,9 @@ void Protocol::handle_rma_msg(std::shared_ptr<RequestReply> requestReply) {
 }
 
 void Protocol::reclaim_dram_buffer(uint64_t key) {
-  // cout << "reclaim" << endl;
   std::unique_lock<std::mutex> lk(replicateMtx_);
-  if (!replicateMap_.count(key)) {
-    cout << "none reclaim dram buffer" << endl;
-  }
   auto reply = replicateMap_[key];
   auto rrc = reply->get_rrc();
-  // cout << "reclaim info: " << rrc.size << ":" << rrc.dest_address << endl;
   networkServer_->reclaim_dram_buffer(&rrc);
   replicateMap_.erase(key);
   lk.unlock();

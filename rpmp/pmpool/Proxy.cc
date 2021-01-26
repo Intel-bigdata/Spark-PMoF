@@ -54,7 +54,6 @@ void Proxy::removeReplica(uint64_t key) {
 
 std::unordered_set<PhysicalNode,PhysicalNodeHash> Proxy::getReplica(uint64_t key) {
   std::lock_guard<std::mutex> lk(replica_mtx);
-  cout << "replica map size: " << replicaMap_[key].size() << endl;
   return replicaMap_[key];
 }
 

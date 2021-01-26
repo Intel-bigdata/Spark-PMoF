@@ -9,7 +9,6 @@ ReplicaRecvCallback::ReplicaRecvCallback(std::shared_ptr<ReplicaService> service
     : service_(service), chunkMgr_(chunkMgr) {}
 
 void ReplicaRecvCallback::operator()(void* param_1, void* param_2) {
-  cout << "ReplicaRecvCallback " << endl;
   int mid = *static_cast<int*>(param_1);
   auto chunk = chunkMgr_->get(mid);
   auto request = std::make_shared<ReplicaRequest>(
@@ -84,20 +83,16 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
     case REPLICATE: {
       uint32_t replicaNum = dataReplica_ < proxyServer_->getNodeNum() ? dataReplica_ : proxyServer_->getNodeNum();
       uint32_t minReplica = replicaNum < minReplica_ ? replicaNum : minReplica_;
-      cout << "put reply" << endl;
       if (getReplica(rc.key).size() != 0) {
-        cout << "multi key" << endl;
         removeReplica(rc.key);
       }
       addReplica(rc.key, rc.node);
       // if (getReplica(rc.key).size() < minReplica) {
-        cout << "replicate work" << endl;
         unordered_set<PhysicalNode, PhysicalNodeHash> nodes = proxyServer_->getNodes(rc.key);
         if (nodes.count(rc.node)) {
           nodes.erase(rc.node);
         }
 
-        cout << "send replicate msg" << endl;
         rrc.type = REPLICATE;
         rrc.rid = rid_++;
         rrc.key = rc.key;
@@ -119,7 +114,6 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
 
       // } else {
         if (getReplica(rc.key).size() >= minReplica) {
-          cout << "no need replica work" << endl;
           proxyServer_->notifyClient(rc.key);
         }
       // }
@@ -128,10 +122,8 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
     case REPLICA_REPLY : {
       uint32_t replicaNum = dataReplica_ < proxyServer_->getNodeNum() ? dataReplica_ : proxyServer_->getNodeNum();
       uint32_t minReplica = replicaNum < minReplica_ ? replicaNum : minReplica_;
-      cout << "replica reply" << endl;
       addReplica(rc.key, rc.node);
       if (getReplica(rc.key).size() == minReplica) {
-        cout << "notify client" << endl;
         // auto request = prrcMap_[rc.key];
         // auto rc = request->get_rc();
         // rrc.type = rc.type;
@@ -147,8 +139,6 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
         // ck->size = request->size_;
         // rrc.con->send(ck);
         proxyServer_->notifyClient(rc.key);
-      } else {
-        cout << "pending data replication" << endl;
       }
       break;
     }

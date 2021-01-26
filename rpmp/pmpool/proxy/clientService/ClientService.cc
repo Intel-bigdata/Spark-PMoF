@@ -9,7 +9,6 @@ ProxyRecvCallback::ProxyRecvCallback(std::shared_ptr<ClientService> service,
     : service_(service), chunkMgr_(chunkMgr) {}
 
 void ProxyRecvCallback::operator()(void* param_1, void* param_2) {
-  cout << "ClientServiceRecvCallback " << endl;
   int mid = *static_cast<int*>(param_1);
   auto chunk = chunkMgr_->get(mid);
   auto request = std::make_shared<ProxyRequest>(
@@ -34,7 +33,6 @@ ProxySendCallback::ProxySendCallback(std::shared_ptr<ChunkMgr> chunkMgr)
     : chunkMgr_(chunkMgr) {}
 
 void ProxySendCallback::operator()(void* param_1, void* param_2) {
-  cout << "proxy send call back" << endl;
   int mid = *static_cast<int*>(param_1);
   auto chunk = chunkMgr_->get(mid);
   auto connection = static_cast<Connection*>(chunk->con);
@@ -76,11 +74,7 @@ void ClientService::handle_recv_msg(std::shared_ptr<ProxyRequest> request) {
   auto rrc = ProxyRequestReplyContext();
   switch(rc.type) {
     case GET_HOSTS: {
-      cout << "get hosts" << endl;
       unordered_set<PhysicalNode, PhysicalNodeHash> nodes = proxyServer_->getNodes(rc.key);
-      for (auto node : nodes) {
-        cout << node.getKey() << endl;
-      }
       rrc.type = rc.type;
       rrc.key = rc.key;
       rrc.success = 0;
@@ -101,7 +95,6 @@ void ClientService::handle_recv_msg(std::shared_ptr<ProxyRequest> request) {
       prrcMap_[rc.key] = requestReply;
       lk.unlock();
       rrc.con->send(ck);
-      cout << "send" << endl;
       break;
     }
     case GET_REPLICA: {
