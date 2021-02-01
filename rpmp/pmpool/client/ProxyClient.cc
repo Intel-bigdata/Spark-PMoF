@@ -83,7 +83,7 @@ void ProxyRequestHandler::notify(std::shared_ptr<ProxyRequestReply> requestReply
   const std::lock_guard<std::mutex> lock(inflight_mtx_);
   auto rid = requestReply->get_rrc().rid;
   if (inflight_.count(rid) == 0) {
-    cout << "none exist reply to notify: " << rid << endl;
+    cout << "No exist reply to notify: " << rid << endl;
     return;
   }
   auto ctx = inflight_[rid];

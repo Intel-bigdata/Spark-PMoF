@@ -81,8 +81,6 @@ bool DataServerService::init() {
     worker->start();
     workers_.push_back(std::move(worker));
   }
-  // worker_ = std::make_shared<ReplicateWorker>(shared_from_this());
-  // worker_->start();
   host_ = config_->get_ip();
   port_ = config_->get_port();
   proxyClient_ = std::make_shared<Client>(1, 32);
@@ -131,8 +129,6 @@ void DataServerService::registerDataServer() {
     ReplicaRequestContext rc = {};
     rc.type = REGISTER;
     rc.rid = rid_++;
-    // rc.node = host_;
-    // rc.port = port_;
     rc.node = {host_, port_};
     auto request = std::make_shared<ReplicaRequest>(rc);
     requestHandler_->addTask(request);
@@ -148,12 +144,9 @@ void DataServerService::registerDataServer() {
 void DataServerService::handle_replica_msg(std::shared_ptr<ReplicaRequestReply> reply) {
   auto rrc = reply->get_rrc();
   if (rrc.type == REPLICATE) {
-    // cout << "handle replicate" << endl;
     auto rc = ReplicaRequestContext();
     rc.type = REPLICA_REPLY;
     rc.key = rrc.key;
-    // rc.node = rrc.node;
-    // rc.port = rrc.port;
     rc.rid = rrc.rid;
     rc.src_address = rrc.src_address;
     for (auto node : rrc.nodes) {
@@ -162,29 +155,16 @@ void DataServerService::handle_replica_msg(std::shared_ptr<ReplicaRequestReply> 
       std::shared_ptr<DataChannel> channel = getChannel(node.getIp(), node.getPort());
       std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
       std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
-      // RequestContext rc = {};
-      // rc.type = PUT;
-      // rc.rid = rid_++;
-      // rc.size = rrc.size;
-      // rc.address = 0;
-      // rc.src_address = rrc.src_address;
-      // rc.src_rkey = networkClient->get_rkey();
-      // rc.key = rrc.key;
-      // auto request = std::make_shared<Request>(rc);
-      // requestHandler->addTask(request);
-      // auto res = requestHandler->wait(request);
-      // auto res = proxyRequestHandler_->get(pRequest);
       RequestContext dataRc = {};
       dataRc.type = REPLICATE_PUT;
       dataRc.rid = rid_++;
       dataRc.key = rrc.key;
       dataRc.size = rrc.size;
       try {
-
-      dataRc.src_address = networkClient->get_dram_buffer(
-          reinterpret_cast<char *>(rrc.src_address), rrc.size);
+        dataRc.src_address = networkClient->get_dram_buffer(
+            reinterpret_cast<char *>(rrc.src_address), rrc.size);
       } catch (const char *msg) {
-        std::cout << "client" << msg << std::endl;
+        std::cout << "Replication work: " << msg << std::endl;
       }
       dataRc.src_rkey = networkClient->get_rkey();
       auto dataRequest = std::make_shared<Request>(dataRc);

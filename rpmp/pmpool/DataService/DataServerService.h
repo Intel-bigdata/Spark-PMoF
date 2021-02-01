@@ -21,11 +21,7 @@
 #include "pmpool/queue/concurrentqueue.h"
 #include "pmpool/Config.h"
 #include "pmpool/Log.h"
-// #include "pmpool/ProxyEvent.h"
-// #include "pmpool/proxy/heartbeatService/HeartbeatEvent.h"
 #include "pmpool/proxy/replicaService/ReplicaEvent.h"
-// #include "DataServiceEvent.h"
-// #include "DataServiceRequestHandler.h"
 #include "pmpool/Protocol.h"
 
 using moodycamel::BlockingConcurrentQueue;
@@ -77,7 +73,6 @@ public:
   explicit ServiceSendCallback(std::shared_ptr<ChunkMgr> chunkMgr) : chunkMgr_(chunkMgr) {}
   ~ServiceSendCallback() override = default;
   void operator()(void* param_1, void* param_2) {
-    // cout << "DataServiceSendCallback" << endl;
     auto buffer_id_ = *static_cast<int *>(param_1);
     auto ck = chunkMgr_->get(buffer_id_);
     chunkMgr_->reclaim(ck, static_cast<Connection *>(ck->con));

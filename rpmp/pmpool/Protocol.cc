@@ -326,10 +326,9 @@ void Protocol::handle_recv_msg(std::shared_ptr<Request> request) {
       /////// Use DRAM Addr ////////
       rrc.address = rc.address;
       try {
-
         networkServer_->get_dram_buffer(&rrc);
       } catch (const char *msg) {
-        std::cout << "put" << msg << std::endl;
+        std::cout << "RPMP put: " << msg << std::endl;
       }
       /////// Use Pmem Addr /////////
       /*uint64_t addr = allocatorProxy_->allocate_and_write(
@@ -367,7 +366,7 @@ void Protocol::handle_recv_msg(std::shared_ptr<Request> request) {
 
         networkServer_->get_dram_buffer(&rrc);
       } catch (const char *msg) {
-        std::cout << "replicate put" << msg << std::endl;
+        std::cout << "Replicate put:" << msg << std::endl;
       }
       /////// Use Pmem Addr /////////
       /*uint64_t addr = allocatorProxy_->allocate_and_write(
@@ -453,6 +452,7 @@ void Protocol::handle_finalize_msg(std::shared_ptr<RequestReply> requestReply) {
   if (rrc.type == PUT_REPLY) {
     allocatorProxy_->cache_chunk(rrc.key, rrc.address, rrc.size,
                                  networkServer_->get_rkey());
+    return;
   } else if (rrc.type == GET_META_REPLY) {
     auto bml = allocatorProxy_->get_cached_chunk(rrc.key);
     requestReply->requestReplyContext_.bml = bml;
@@ -473,23 +473,16 @@ void Protocol::handle_finalize_msg(std::shared_ptr<RequestReply> requestReply) {
   } else if (rrc.type == REPLICATE_PUT_REPLY) {
     allocatorProxy_->cache_chunk(rrc.key, rrc.address, rrc.size,
                                  networkServer_->get_rkey());
-    requestReply->encode();
-    networkServer_->send(reinterpret_cast<char *>(requestReply->data_),
-                         requestReply->size_, rrc.con);
-    // std::unique_lock<std::mutex> lk(rrcMtx_);
-    // rrcMap_.erase(rrc.ck->buffer_id);
-    // cout << "send erase: " << rrc.ck->buffer_id << endl;
-    // lk.unlock();
-    // std::unique_lock<std::mutex> lk(rrcMtx_);
-    // rrcMap_.erase(rrc.ck->buffer_id);
-    // lk.unlock();
   }
+  requestReply->encode();
+  networkServer_->send(reinterpret_cast<char *>(requestReply->data_),
+                       requestReply->size_, rrc.con);
 }
 
 void Protocol::enqueue_rma_msg(uint64_t buffer_id) {
   std::unique_lock<std::mutex> lk(rrcMtx_);
   if (!rrcMap_.count(buffer_id)) {
-    cout << "enqueue none exist rma msg: " << buffer_id << endl;
+    cout << "Enqueue none exist rma msg: " << buffer_id << endl;
     return;
   }
   auto requestReply = rrcMap_[buffer_id];
@@ -522,7 +515,6 @@ void Protocol::handle_rma_msg(std::shared_ptr<RequestReply> requestReply) {
       break;
     }
     case PUT_REPLY: {
-      // cout << "put reply" << endl;
       char *buffer = static_cast<char *>(rrc.ck->buffer);
 #ifdef DEBUG
       std::stringstream ss;
@@ -548,8 +540,6 @@ void Protocol::handle_rma_msg(std::shared_ptr<RequestReply> requestReply) {
       auto rc = ReplicaRequestContext();
       rc.type = REPLICATE;
       rc.key = rrc.key;
-      // rc.node = config_->get_ip();
-      // rc.port = config_->get_port();
       rc.node = {config_->get_ip(), config_->get_port()};
       rc.src_address = rrc.dest_address;
       rc.rid = rrc.rid;
@@ -567,7 +557,6 @@ void Protocol::handle_rma_msg(std::shared_ptr<RequestReply> requestReply) {
       break;
     }
     case REPLICATE_PUT_REPLY: {
-      // cout << "replicate put" << endl;
       std::unique_lock<std::mutex> lk(rrcMtx_);
       rrcMap_.erase(rrc.ck->buffer_id);
       lk.unlock();
@@ -576,17 +565,6 @@ void Protocol::handle_rma_msg(std::shared_ptr<RequestReply> requestReply) {
       rrc.address = allocatorProxy_->allocate_and_write(
           rrc.size, buffer, rrc.rid % config_->get_pool_size());
       networkServer_->reclaim_dram_buffer(&rrc);
-      // auto rc = ReplicaRequestContext();
-      // rc.type = REPLICA_REPLY;
-      // rc.key = rrc.key;
-      // rc.node = config_->get_ip();
-      // rc.port = config_->get_port();
-      // rc.src_address = rrc.dest_address;
-      // rc.rid = rrc.rid;
-      // rc.size = rrc.size;
-      // auto rr = std::make_shared<ReplicaRequest>(rc);
-      // rr->encode();
-      // dataService_->send(reinterpret_cast<char *>(rr->data_), rr->size_);
       requestReply->requestReplyContext_.address = rrc.address;
       //////////// PMEM ////////////
       // networkServer_->reclaim_pmem_buffer(&rrc);
@@ -605,7 +583,7 @@ void Protocol::handle_rma_msg(std::shared_ptr<RequestReply> requestReply) {
 void Protocol::reclaim_dram_buffer(uint64_t key) {
   std::unique_lock<std::mutex> lk(replicateMtx_);
   if (!replicateMap_.count(key)) {
-    cout << "none reclaim dram buffer" << endl;
+    cout << "Reclaim none exist dram buffer" << endl;
     return;
   }
   auto reply = replicateMap_[key];

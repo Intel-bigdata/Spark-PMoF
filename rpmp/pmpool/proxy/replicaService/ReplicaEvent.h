@@ -35,8 +35,6 @@ struct ReplicaRequestMsg {
     ar& rid;
     ar& key;
     ar& size;
-    // ar& node;
-    // ar& port;
     ar& node;
     ar& src_address;
     ar& des_address;
@@ -45,8 +43,6 @@ struct ReplicaRequestMsg {
   uint64_t rid;
   uint64_t key;
   uint64_t size;
-  // std::string node;
-  // std::string port;
   PhysicalNode node;
   uint64_t src_address;
   uint64_t des_address;
@@ -60,8 +56,6 @@ struct ReplicaRequestReplyMsg {
     ar& rid;
     ar& key;
     ar& size;
-    // ar& node;
-    // ar& port;
     ar& nodes;
     ar& src_address;
   }
@@ -70,8 +64,6 @@ struct ReplicaRequestReplyMsg {
   uint64_t rid;
   uint64_t key;
   uint64_t size;
-  // std::string node;
-  // std::string port;
   std::unordered_set<PhysicalNode, PhysicalNodeHash> nodes;
   uint64_t src_address;
 };
@@ -82,8 +74,6 @@ struct ReplicaRequestReplyContext {
   uint64_t rid;
   uint64_t key;
   uint64_t size;
-  // std::string node;
-  // std::string port;
   std::unordered_set<PhysicalNode, PhysicalNodeHash> nodes;
   uint64_t src_address;
   Connection* con;
@@ -120,8 +110,6 @@ class ReplicaRequestReply {
     requestReplyMsg.rid = requestReplyContext_.rid;
     requestReplyMsg.key = requestReplyContext_.key;
     requestReplyMsg.size = requestReplyContext_.size;
-    // requestReplyMsg.node = requestReplyContext_.node;
-    // requestReplyMsg.port = requestReplyContext_.port;
     requestReplyMsg.nodes = requestReplyContext_.nodes;
     requestReplyMsg.src_address = requestReplyContext_.src_address;
     std::ostringstream os;
@@ -148,8 +136,6 @@ class ReplicaRequestReply {
     requestReplyContext_.rid = requestReplyMsg.rid;
     requestReplyContext_.key = requestReplyMsg.key;
     requestReplyContext_.size = requestReplyMsg.size;
-    // requestReplyContext_.node = requestReplyMsg.node;
-    // requestReplyContext_.port = requestReplyMsg.port;
     requestReplyContext_.nodes = requestReplyMsg.nodes;
     requestReplyContext_.src_address = requestReplyMsg.src_address;
   };
@@ -169,8 +155,6 @@ struct ReplicaRequestContext {
   uint64_t rid;
   uint64_t key;
   uint64_t size;
-  // std::string node;
-  // std::string port;
   PhysicalNode node;
   uint64_t src_address;
   uint64_t des_address;
@@ -203,8 +187,6 @@ class ReplicaRequest {
     requestMsg.rid = requestContext_.rid;
     requestMsg.key = requestContext_.key;
     requestMsg.size = requestContext_.size;
-    // requestMsg.node = requestContext_.node;
-    // requestMsg.port = requestContext_.port;
     requestMsg.node = requestContext_.node;
     requestMsg.src_address = requestContext_.src_address;
     requestMsg.des_address = requestContext_.des_address;
@@ -231,8 +213,6 @@ class ReplicaRequest {
     requestContext_.rid = requestMsg.rid;
     requestContext_.key = requestMsg.key;
     requestContext_.size = requestMsg.size;
-    // requestContext_.node = requestMsg.node;
-    // requestContext_.port = requestMsg.port;
     requestContext_.node = requestMsg.node;
     requestContext_.src_address = requestMsg.src_address;
     requestContext_.des_address = requestMsg.des_address;

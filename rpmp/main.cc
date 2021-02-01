@@ -27,13 +27,9 @@ int ServerMain(int argc, char **argv) {
   if (argc > 1){
     CHK_ERR("config init", config->init(argc, argv));
   }
-  // }else{
-  //   config->readFromFile();
-  // }
   /// initialize Log class
   std::shared_ptr<Log> log = std::make_shared<Log>(config.get());
   /// initialize DataServer class
-  
   std::shared_ptr<DataServer> dataServer =
       std::make_shared<DataServer>(config, log);
   log->get_file_log()->info("start to initialize data server.");

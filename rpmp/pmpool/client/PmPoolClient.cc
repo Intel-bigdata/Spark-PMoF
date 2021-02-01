@@ -228,7 +228,6 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
   rc.key = key_uint;
   auto request = std::make_shared<Request>(rc);
   requestHandler->addTask(request);
-  // auto res = requestHandler->wait(request);
   auto res = proxyRequestHandler_->get(pRequest).success;
   networkClient->reclaim_dram_buffer(rc.src_address, rc.size);
 #ifdef DEBUG
@@ -271,7 +270,6 @@ uint64_t PmPoolClient::get(const string &key, char *value, uint64_t size) {
     std::cout << "No channel available" << std::endl;
     return -1;
   }
-  // std::shared_ptr<Channel> channel = getChannel(prrc.hosts[0], prrc.ports[0]);
   std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
   std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
 

@@ -51,8 +51,8 @@ ReplicaService::ReplicaService(std::shared_ptr<Config> config, std::shared_ptr<L
  config_(config), log_(log), proxyServer_(proxyServer) {}
 
 ReplicaService::~ReplicaService() {
-    worker_->stop();
-    worker_->join();
+  worker_->stop();
+  worker_->join();
 }
 
 void ReplicaService::enqueue_recv_msg(std::shared_ptr<ReplicaRequest> request) {
@@ -87,36 +87,27 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
         removeReplica(rc.key);
       }
       addReplica(rc.key, rc.node);
-      // if (getReplica(rc.key).size() < minReplica) {
-        unordered_set<PhysicalNode, PhysicalNodeHash> nodes = proxyServer_->getNodes(rc.key);
-        if (nodes.count(rc.node)) {
-          nodes.erase(rc.node);
-        }
+      unordered_set<PhysicalNode, PhysicalNodeHash> nodes = proxyServer_->getNodes(rc.key);
+      if (nodes.count(rc.node)) {
+        nodes.erase(rc.node);
+      }
 
-        rrc.type = REPLICATE;
-        rrc.rid = rid_++;
-        rrc.key = rc.key;
-        rrc.size = rc.size;
-        // rrc.node = node.getIp();
-        // rrc.port = node.getPort();
-        rrc.nodes = nodes;
-        rrc.con = rc.con;
-        rrc.src_address = rc.src_address;
-        auto reply = std::make_shared<ReplicaRequestReply>(rrc);
-        reply->encode();
-        auto ck = chunkMgr_->get(rrc.con);
-        memcpy(reinterpret_cast<char*>(ck->buffer), reply->data_, reply->size_);
-        ck->size = reply->size_;
-        // std::unique_lock<std::mutex> lk(prrcMtx);
-        // prrcMap_[rc.key] = request;
-        // lk.unlock();
-        rrc.con->send(ck);
-
-      // } else {
-        if (getReplica(rc.key).size() >= minReplica) {
-          proxyServer_->notifyClient(rc.key);
-        }
-      // }
+      rrc.type = REPLICATE;
+      rrc.rid = rid_++;
+      rrc.key = rc.key;
+      rrc.size = rc.size;
+      rrc.nodes = nodes;
+      rrc.con = rc.con;
+      rrc.src_address = rc.src_address;
+      auto reply = std::make_shared<ReplicaRequestReply>(rrc);
+      reply->encode();
+      auto ck = chunkMgr_->get(rrc.con);
+      memcpy(reinterpret_cast<char *>(ck->buffer), reply->data_, reply->size_);
+      ck->size = reply->size_;
+      rrc.con->send(ck);
+      if (getReplica(rc.key).size() >= minReplica) {
+        proxyServer_->notifyClient(rc.key);
+      }
       break;
     }
     case REPLICA_REPLY : {
@@ -124,20 +115,6 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
       uint32_t minReplica = replicaNum < minReplica_ ? replicaNum : minReplica_;
       addReplica(rc.key, rc.node);
       if (getReplica(rc.key).size() == minReplica) {
-        // auto request = prrcMap_[rc.key];
-        // auto rc = request->get_rc();
-        // rrc.type = rc.type;
-        // rrc.success = 0;
-        // rrc.rid = rc.rid;
-        // rrc.con = rc.con;
-        // std::shared_ptr<ProxyRequestReply> requestReply =
-        //     std::make_shared<ProxyRequestReply>(rrc);
-        // requestReply->encode();
-        // auto ck = chunkMgr_->get(rc.con);
-        // memcpy(reinterpret_cast<char*>(ck->buffer), request->data_,
-        //        request->size_);
-        // ck->size = request->size_;
-        // rrc.con->send(ck);
         proxyServer_->notifyClient(rc.key);
       }
       break;

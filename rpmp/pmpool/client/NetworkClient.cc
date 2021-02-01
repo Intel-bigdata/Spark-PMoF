@@ -288,10 +288,6 @@ int NetworkClient::init(std::shared_ptr<RequestHandler> requestHandler) {
   client_->start();
   int res = client_->connect(remote_address_.c_str(), remote_port_.c_str());
   unique_lock<mutex> lk(con_mtx);
-  // while (!connected_) {
-  //   std::cout<<"NetworkClient from " <<this->getRemoteAddress()<<":" << this->getRemotePort()<<" wait to be connected to server"<<std::endl;
-  //   con_v.wait(lk);
-  // }
   auto start = std::chrono::steady_clock::now();
   while (!con_v.wait_for(lk, 50ms, [start, this] {
     auto current = std::chrono::steady_clock::now();
@@ -394,32 +390,3 @@ string NetworkClient::getRemoteAddress(){
 string NetworkClient::getRemotePort(){
   return remote_port_;
 }
-
-// void NetworkClient::get_dram_buffer(ReplicaRequestContext *rc) {
-//   char *buffer = circularBuffer_->get(rc->size);
-// #ifdef DEBUG
-//   fprintf(stderr, "[get_dram_buffer]key is %lu, start is %lu, end is %lu\n",
-//           rrc->key, circularBuffer_->get_offset((uint64_t)buffer),
-//           circularBuffer_->get_offset((uint64_t)buffer) + rrc->size);
-// #endif
-
-//   rc->des_address = (uint64_t)buffer;
-
-//   Chunk *base_ck = circularBuffer_->get_rma_chunk();
-//   uint64_t offset = circularBuffer_->get_offset(rc->des_address);
-
-//   // encapsulate new chunk
-//   Chunk *ck = new Chunk();
-//   ck->buffer = static_cast<char *>(base_ck->buffer) + offset;
-//   ck->capacity = base_ck->capacity;
-//   ck->buffer_id = buffer_id_++;
-//   ck->mr = base_ck->mr;
-//   ck->size = rc->size;
-//   rc->ck = ck;
-// }
-
-// void NetworkClient::reclaim_dram_buffer(ReplicaRequestContext *rc) {
-//   char *buffer_tmp = reinterpret_cast<char *>(rc->des_address);
-//   circularBuffer_->put(buffer_tmp, rc->size);
-//   delete rc->ck;
-// }
