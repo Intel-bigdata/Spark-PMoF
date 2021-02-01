@@ -61,7 +61,7 @@ ProxyRequestReplyContext ProxyRequestHandler::get(std::shared_ptr<ProxyRequest> 
   while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request] {
     auto current = std::chrono::steady_clock::now();
     auto elapse = current - ctx->start;
-    if (elapse > 10s) {
+    if (elapse > 30s) {
       ctx->op_failed = true;
       fprintf(stderr, "Request [TYPE %ld] spent %ld s, time out\n",
               request->requestContext_.type,
@@ -83,6 +83,7 @@ void ProxyRequestHandler::notify(std::shared_ptr<ProxyRequestReply> requestReply
   const std::lock_guard<std::mutex> lock(inflight_mtx_);
   auto rid = requestReply->get_rrc().rid;
   if (inflight_.count(rid) == 0) {
+    cout << "none exist reply to notify: " << rid << endl;
     return;
   }
   auto ctx = inflight_[rid];
@@ -91,6 +92,10 @@ void ProxyRequestHandler::notify(std::shared_ptr<ProxyRequestReply> requestReply
   auto rrc = requestReply->get_rrc();
   ctx->requestReplyContext = rrc;
   ctx->cv_reply.notify_one();
+}
+
+void ProxyRequestHandler::addRequest(std::shared_ptr<ProxyRequest> request) {
+  inflight_insert_or_get(request);
 }
 
 void ProxyRequestHandler::handleRequest(std::shared_ptr<ProxyRequest> request) {

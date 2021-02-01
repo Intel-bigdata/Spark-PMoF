@@ -63,7 +63,7 @@ void SendCallback::operator()(void *buffer_id, void *buffer_size) {
   auto ck = chunkMgr_->get(buffer_id_);
 
   /// free the memory of class RequestReply
-  rrcMap_.erase(buffer_id_);
+  // rrcMap_.erase(buffer_id_);
 
   chunkMgr_->reclaim(ck, static_cast<Connection *>(ck->con));
 }
@@ -476,11 +476,22 @@ void Protocol::handle_finalize_msg(std::shared_ptr<RequestReply> requestReply) {
     requestReply->encode();
     networkServer_->send(reinterpret_cast<char *>(requestReply->data_),
                          requestReply->size_, rrc.con);
+    // std::unique_lock<std::mutex> lk(rrcMtx_);
+    // rrcMap_.erase(rrc.ck->buffer_id);
+    // cout << "send erase: " << rrc.ck->buffer_id << endl;
+    // lk.unlock();
+    // std::unique_lock<std::mutex> lk(rrcMtx_);
+    // rrcMap_.erase(rrc.ck->buffer_id);
+    // lk.unlock();
   }
 }
 
 void Protocol::enqueue_rma_msg(uint64_t buffer_id) {
   std::unique_lock<std::mutex> lk(rrcMtx_);
+  if (!rrcMap_.count(buffer_id)) {
+    cout << "enqueue none exist rma msg: " << buffer_id << endl;
+    return;
+  }
   auto requestReply = rrcMap_[buffer_id];
   lk.unlock();
   auto rrc = requestReply->get_rrc();
@@ -557,6 +568,9 @@ void Protocol::handle_rma_msg(std::shared_ptr<RequestReply> requestReply) {
     }
     case REPLICATE_PUT_REPLY: {
       // cout << "replicate put" << endl;
+      std::unique_lock<std::mutex> lk(rrcMtx_);
+      rrcMap_.erase(rrc.ck->buffer_id);
+      lk.unlock();
       char *buffer = static_cast<char *>(rrc.ck->buffer);
       //////////// DRAM ////////////
       rrc.address = allocatorProxy_->allocate_and_write(
@@ -590,6 +604,10 @@ void Protocol::handle_rma_msg(std::shared_ptr<RequestReply> requestReply) {
 
 void Protocol::reclaim_dram_buffer(uint64_t key) {
   std::unique_lock<std::mutex> lk(replicateMtx_);
+  if (!replicateMap_.count(key)) {
+    cout << "none reclaim dram buffer" << endl;
+    return;
+  }
   auto reply = replicateMap_[key];
   auto rrc = reply->get_rrc();
   networkServer_->reclaim_dram_buffer(&rrc);

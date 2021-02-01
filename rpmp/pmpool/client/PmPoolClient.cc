@@ -204,13 +204,14 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
   auto pRequest = std::make_shared<ProxyRequest>(prc);
   proxyRequestHandler_->addTask(pRequest);
   ProxyRequestReplyContext prrc = proxyRequestHandler_->get(pRequest);
+  proxyRequestHandler_->addRequest(pRequest);
   std::shared_ptr<Channel> channel = getChannel(*prrc.nodes.begin());
   std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
   std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
 
   RequestContext rc = {};
   rc.type = PUT;
-  rc.rid = rid_++;
+  rc.rid = prc.rid;
   rc.size = size;
   rc.address = 0;
   // allocate memory for RMA read from client.
@@ -276,7 +277,7 @@ uint64_t PmPoolClient::get(const string &key, char *value, uint64_t size) {
 
   RequestContext rc = {};
   rc.type = GET;
-  rc.rid = rid_++;
+  rc.rid = prc.rid;
   rc.size = size;
   rc.address = 0;
   // allocate memory for RMA read from client.
@@ -321,7 +322,7 @@ vector<block_meta> PmPoolClient::getMeta(const string &key) {
 
   RequestContext rc = {};
   rc.type = GET_META;
-  rc.rid = rid_++;
+  rc.rid = prc.rid;
   rc.address = 0;
   rc.key = key_uint;
   auto request = std::make_shared<Request>(rc);
@@ -347,7 +348,7 @@ int PmPoolClient::del(const string &key) {
 
   RequestContext rc = {};
   rc.type = DELETE;
-  rc.rid = rid_++;
+  rc.rid = prc.rid;
   rc.key = key_uint;
   auto request = std::make_shared<Request>(rc);
   requestHandler->addTask(request);

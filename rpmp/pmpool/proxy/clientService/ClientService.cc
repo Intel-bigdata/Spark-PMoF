@@ -61,12 +61,18 @@ ClientService::ClientService(std::shared_ptr<Config> config, std::shared_ptr<Log
  config_(config), log_(log) ,proxyServer_(proxyServer){}
 
 ClientService::~ClientService() {
+  // for (auto worker : workers_) {
+  //   worker->stop();
+  //   worker->join();
+  // }
     worker_->stop();
     worker_->join();
 }
 
 void ClientService::enqueue_recv_msg(std::shared_ptr<ProxyRequest> request) {
   worker_->addTask(request);
+  // ProxyRequestContext rc = request->get_rc();
+  // workers_[rc.rid % 4]->addTask(request);
 }
 
 void ClientService::handle_recv_msg(std::shared_ptr<ProxyRequest> request) {
@@ -137,6 +143,11 @@ bool ClientService::startService() {
   shutdownCallback_ = std::make_shared<ProxyShutdownCallback>();
   connectCallback_ = std::make_shared<ProxyConnectCallback>();
 
+  // for (int i = 0; i < 4; i++) {
+  //   auto worker = std::make_shared<Worker>(shared_from_this());
+  //   worker->start();
+  //   workers_.push_back(std::move(worker));
+  // }
   worker_ = std::make_shared<Worker>(shared_from_this());
   worker_->start();
 
@@ -161,6 +172,8 @@ void ClientService::notifyClient(uint64_t key) {
     ck->size = reply->size_;
     rrc.con->send(ck);
     prrcMap_.erase(key);
+  } else {
+    cout << "Proxy request reply does not exist" << endl;
   }
 }
 

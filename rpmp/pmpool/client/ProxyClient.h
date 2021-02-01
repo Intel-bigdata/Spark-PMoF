@@ -41,6 +41,7 @@ class ProxyRequestHandler : public ThreadWrapper {
   explicit ProxyRequestHandler(std::shared_ptr<ProxyClient> proxyClient);
   ~ProxyRequestHandler();
   void addTask(std::shared_ptr<ProxyRequest> request);
+  void addRequest(std::shared_ptr<ProxyRequest> request);
   void reset();
   int entry() override;
   void abort() override {}

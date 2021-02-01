@@ -88,6 +88,7 @@ public:
     private:
     void enqueue_finalize_msg(std::shared_ptr<ProxyRequestReply> reply);
     void handle_finalize_msg(std::shared_ptr<ProxyRequestReply> reply);
+    // std::vector<std::shared_ptr<Worker>> workers_;
     std::shared_ptr<Worker> worker_;
     std::shared_ptr<ChunkMgr> chunkMgr_;
     std::shared_ptr<Config> config_;
