@@ -157,8 +157,8 @@ bool ClientService::startService() {
   server_->set_shutdown_callback(shutdownCallback_.get());
 
   server_->start();
-  server_->listen(config_->get_proxy_ip().c_str(), config_->get_proxy_port().c_str());
-  log_->get_console_log()->info("Proxy server started at {0}:{1}", config_->get_proxy_ip(), config_->get_proxy_port());
+  server_->listen(config_->get_proxy_ip().c_str(), config_->get_client_service_port().c_str());
+  log_->get_console_log()->info("Proxy client service started at {0}:{1}", config_->get_proxy_ip(), config_->get_client_service_port());
   return true;
 }
 

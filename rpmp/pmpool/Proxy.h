@@ -39,7 +39,7 @@ public:
     std::shared_ptr<Config> config_;
     std::shared_ptr<Log> log_;
     std::shared_ptr<ConsistentHash> consistentHash_;
-    int loadBalanceFactor_;
+    uint32_t loadBalanceFactor_;
     std::shared_ptr<Server> server_;
     std::string dataServerPort_;
     uint32_t dataReplica_;

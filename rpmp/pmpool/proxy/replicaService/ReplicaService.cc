@@ -173,9 +173,8 @@ bool ReplicaService::startService() {
   server_->set_shutdown_callback(shutdownCallback_.get());
 
   server_->start();
-  //TODO replica service port
-  server_->listen(config_->get_proxy_ip().c_str(), "12340");
-  log_->get_console_log()->info("ReplicaService started at {0}", config_->get_proxy_ip());
+  server_->listen(config_->get_proxy_ip().c_str(), config_->get_replica_service_port().c_str());
+  log_->get_console_log()->info("ReplicaService started at {0}:{1}", config_->get_proxy_ip(), config_->get_replica_service_port());
   return true;
 }
 

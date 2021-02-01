@@ -16,7 +16,7 @@ class ConsistentHash {
   public:
     ConsistentHash(){};
 
-    void addNode(PhysicalNode physicalNode, int loadBalanceFactor){
+    void addNode(PhysicalNode physicalNode, uint32_t loadBalanceFactor){
       nodes.insert(physicalNode.getKey());
       for (int i = 0; i < loadBalanceFactor; i++){
         VirtualNode virtualNode = {physicalNode, i};

@@ -46,7 +46,7 @@ class Config {
       configs.insert(pair<string,string>(RPMP_NODE_LIST, DEFAULT_RPMP_NODE_LIST));  
       configs.insert(pair<string,string>(RPMP_NETWORK_HEARTBEAT_INTERVAL, DEFAULT_RPMP_NETWORK_HEARTBEAT_INTERVAL));  
       configs.insert(pair<string,string>(RPMP_NETWORK_PROXY_ADDRESS, DEFAULT_RPMP_NETWORK_PROXY_ADDRESS));  
-      configs.insert(pair<string,string>(RPMP_NETWORK_PROXY_PORT, DEFAULT_RPMP_NETWORK_PROXY_PORT));
+      configs.insert(pair<string,string>(RPMP_PROXY_CLIENT_SERVICE_PORT, DEFAULT_RPMP_PROXY_CLIENT_SERVICE_PORT));
       configs.insert(pair<string,string>(RPMP_NETWORK_SERVER_ADDRESS, DEFAULT_RPMP_NETWORK_SERVER_ADDRESS));
       configs.insert(pair<string,string>(RPMP_NETWORK_SERVER_PORT, DEFAULT_RPMP_NETWORK_SERVER_PORT));  
       configs.insert(pair<string,string>(RPMP_NETWORK_WORKER, DEFAULT_RPMP_NETWORK_WORKER));  
@@ -59,6 +59,8 @@ class Config {
       configs.insert(pair<string,string>(RPMP_LOG_PATH, DEFAULT_RPMP_LOG_PATH));
       configs.insert(pair<string,string>(RPMP_DATA_REPLICA, DEFAULT_RPMP_DATA_REPLICA));
       configs.insert(pair<string,string>(RPMP_DATA_MINREPLICA, DEFAULT_RPMP_DATA_MINREPLICA));
+      configs.insert(pair<string,string>(RPMP_PROXY_REPLICA_SERVICE_PORT, DEFAULT_RPMP_PROXY_REPLICA_SERVICE_PORT));
+      configs.insert(pair<string,string>(RPMP_PROXY_LOAD_BALANCE_FACTOR, DEFAULT_RPMP_PROXY_LOAD_BALANCE_FACTOR));
       return 0;
     }
 
@@ -88,6 +90,10 @@ class Config {
         boost::split(nodes, configs.find(RPMP_NODE_LIST)->second, boost::is_any_of(","), boost::token_compress_on);
         set_nodes(nodes);
 
+        set_replica_service_port(configs.find(RPMP_PROXY_REPLICA_SERVICE_PORT)->second);
+
+        set_load_balance_factor(stoi(configs.find(RPMP_PROXY_LOAD_BALANCE_FACTOR)->second));
+
         set_data_minReplica(stoi(configs.find(RPMP_DATA_MINREPLICA)->second));
 
         set_data_replica(stoi(configs.find(RPMP_DATA_REPLICA)->second));
@@ -98,7 +104,7 @@ class Config {
 
         set_ip(configs.find(RPMP_NETWORK_SERVER_ADDRESS)->second);
 
-        set_proxy_port(configs.find(RPMP_NETWORK_PROXY_PORT)->second);
+        set_client_service_port(configs.find(RPMP_PROXY_CLIENT_SERVICE_PORT)->second);
 
         set_port(configs.find(RPMP_NETWORK_SERVER_PORT)->second);
 
@@ -307,8 +313,8 @@ class Config {
     void set_heartbeat_interval(int heatbeatInterval) {heatbeat_interval_ = heatbeatInterval;}
     int get_heartbeat_interval() {return heatbeat_interval_;}
 
-    void set_proxy_port(string port) {proxy_port_ = port;}
-    string get_proxy_port() {return proxy_port_;}
+    void set_client_service_port(string port) {proxy_client_service_port_ = port;}
+    string get_client_service_port() {return proxy_client_service_port_;}
 
     void set_proxy_ip(string ip) {proxy_ip_ = ip;}
     string get_proxy_ip() {return proxy_ip_;}
@@ -318,6 +324,12 @@ class Config {
 
     void set_data_minReplica(uint32_t replica) {minReplica_ = replica;}
     uint32_t get_data_minReplica() {return minReplica_;}
+
+    void set_replica_service_port(string port) {proxy_replica_service_port_ = port;}
+    string get_replica_service_port() {return proxy_replica_service_port_;}
+
+    void set_load_balance_factor(uint32_t factor) {load_balance_factor_ = factor;}
+    uint32_t get_load_balance_factor() {return load_balance_factor_;}
 
   private:
     string ip_;
@@ -332,15 +344,17 @@ class Config {
     string log_level_;
     vector<string> nodes_;
     int heatbeat_interval_;
-    string proxy_port_;
+    string proxy_client_service_port_;
     string proxy_ip_;
     uint32_t replica_;
     uint32_t minReplica_;
+    string proxy_replica_service_port_;
+    uint32_t load_balance_factor_;
 
 const string RPMP_NODE_LIST = "rpmp.node.list";
 const string RPMP_NETWORK_HEARTBEAT_INTERVAL = "rpmp.network.heartbeat-interval";
 const string RPMP_NETWORK_PROXY_ADDRESS = "rpmp.network.proxy.address";
-const string RPMP_NETWORK_PROXY_PORT = "rpmp.network.proxy.port";
+const string RPMP_PROXY_CLIENT_SERVICE_PORT = "rpmp.proxy.client.service.port";
 const string RPMP_NETWORK_SERVER_ADDRESS = "rpmp.network.server.address";
 const string RPMP_NETWORK_SERVER_PORT = "rpmp.network.server.port";
 const string RPMP_NETWORK_WORKER = "rpmp.network.worker";
@@ -353,10 +367,12 @@ const string RPMP_LOG_LEVEL = "rpmp.log.level";
 const string RPMP_LOG_PATH = "rpmp.log.path";
 const string RPMP_DATA_REPLICA = "rpmp.data.replica";
 const string RPMP_DATA_MINREPLICA = "rpmp.data.minreplica";
+const string RPMP_PROXY_REPLICA_SERVICE_PORT = "rpmp.proxy.replica.service.port";
+const string RPMP_PROXY_LOAD_BALANCE_FACTOR = "rpmp.proxy.loadBalanceFactor";
 const string DEFAULT_RPMP_NODE_LIST = "172.168.0.209,172.168.0.40";
 const string DEFAULT_RPMP_NETWORK_HEARTBEAT_INTERVAL = "5";
 const string DEFAULT_RPMP_NETWORK_PROXY_ADDRESS = "172.168.0.209";
-const string DEFAULT_RPMP_NETWORK_PROXY_PORT = "12348";
+const string DEFAULT_RPMP_PROXY_CLIENT_SERVICE_PORT = "12348";
 const string DEFAULT_RPMP_NETWORK_SERVER_ADDRESS = "172.168.0.209";
 const string DEFAULT_RPMP_NETWORK_SERVER_PORT = "12346";
 const string DEFAULT_RPMP_NETWORK_WORKER = "10";
@@ -369,6 +385,8 @@ const string DEFAULT_RPMP_LOG_LEVEL = "warn";
 const string DEFAULT_RPMP_LOG_PATH = "/tmp/rpmp.log";
 const string DEFAULT_RPMP_DATA_REPLICA = "3";
 const string DEFAULT_RPMP_DATA_MINREPLICA = "1";
+const string DEFAULT_RPMP_PROXY_REPLICA_SERVICE_PORT = "12340";
+const string DEFAULT_RPMP_PROXY_LOAD_BALANCE_FACTOR = "5";
 };
 
 #endif  // PMPOOL_CONFIG_H_

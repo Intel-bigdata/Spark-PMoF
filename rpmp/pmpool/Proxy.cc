@@ -18,8 +18,7 @@ Proxy::~Proxy() {
 }
 
 bool Proxy::launchServer() {
-  //TODO get load balance from config
-  loadBalanceFactor_ = 5;
+  loadBalanceFactor_ = config_->get_load_balance_factor();
   consistentHash_ = std::make_shared<ConsistentHash>();
   dataServerPort_ = config_->get_port();
   dataReplica_ = config_->get_data_replica();
