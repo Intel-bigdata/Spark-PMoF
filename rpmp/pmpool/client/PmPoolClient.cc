@@ -63,6 +63,9 @@ std::shared_ptr<Channel> PmPoolClient::getChannel(PhysicalNode node) {
 
 int PmPoolClient::init() {
   auto res = proxyClient_->initProxyClient(proxyRequestHandler_);
+  if (res) {
+    throw "Failed to init proxy client";
+  }
   proxyRequestHandler_->start();
   return res;
 }

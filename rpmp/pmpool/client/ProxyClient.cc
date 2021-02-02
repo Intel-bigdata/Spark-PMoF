@@ -179,8 +179,20 @@ int ProxyClient::initProxyClient(std::shared_ptr<ProxyRequestHandler> requestHan
   client_->start();
   int res = client_->connect(proxy_address_.c_str(), proxy_port_.c_str());
   unique_lock<mutex> lk(con_mtx);
-  while (!connected_) {
-    con_v.wait(lk);
+  auto start = std::chrono::steady_clock::now();
+  while (!con_v.wait_for(lk, 50ms, [start, this] {
+    auto current = std::chrono::steady_clock::now();
+    auto elapse = current - start;
+    if (elapse > 10s) {
+      fprintf(stderr, "Client connection spent %ld s, time out\n",
+              std::chrono::duration_cast<std::chrono::seconds>(elapse).count());
+      return true;
+    }
+    return this->connected_;
+  })) {
+  }
+  if (!connected_) {
+    return -1;
   }
 
   return 0;
