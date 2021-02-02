@@ -41,11 +41,13 @@ class ProxyRequestHandler : public ThreadWrapper {
   explicit ProxyRequestHandler(std::shared_ptr<ProxyClient> proxyClient);
   ~ProxyRequestHandler();
   void addTask(std::shared_ptr<ProxyRequest> request);
+  // add replica request to wait for replication response from proxy
   void addRequest(std::shared_ptr<ProxyRequest> request);
   void reset();
   int entry() override;
   void abort() override {}
   void notify(std::shared_ptr<ProxyRequestReply> requestReply);
+  // wait proxy response and get reply
   ProxyRequestReplyContext get(std::shared_ptr<ProxyRequest> request);
   string getAddress(uint64_t hashValue);
 
@@ -128,12 +130,8 @@ class ProxyClient : public std::enable_shared_from_this<ProxyClient> {
   ProxyClient(const string& proxy_address, const string& proxy_port);
   ~ProxyClient();
   int initProxyClient(std::shared_ptr<ProxyRequestHandler> requestHandler);
-  // string getAddress(uint64_t hashValue);
-  // string getAddress(string key);
   void send(const char* data, uint64_t size);
-  void received(char* data);
   void setConnection(Connection* connection);
-  // void addTask(std::shared_ptr<ProxyRequest> request);
   void shutdown();
   void wait();
   void reset();
