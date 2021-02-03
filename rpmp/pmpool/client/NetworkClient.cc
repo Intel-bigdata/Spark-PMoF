@@ -107,7 +107,7 @@ uint64_t RequestHandler::wait(std::shared_ptr<Request> request) {
   return res;
 }
 
-RequestReplyContext &RequestHandler::get(std::shared_ptr<Request> request) {
+RequestReplyContext RequestHandler::get(std::shared_ptr<Request> request) {
   auto ctx = inflight_insert_or_get(request);
   unique_lock<mutex> lk(ctx->mtx_reply);
   while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request] {
@@ -184,6 +184,13 @@ void RequestHandler::handleRequest(std::shared_ptr<Request> request) {
     }
     case PUT: {
       expectedReturnType = PUT_REPLY;
+      request->encode();
+      networkClient_->send(reinterpret_cast<char *>(request->data_),
+                           request->size_);
+      break;
+    }
+    case REPLICATE_PUT: {
+      expectedReturnType = REPLICATE_PUT_REPLY;
       request->encode();
       networkClient_->send(reinterpret_cast<char *>(request->data_),
                            request->size_);
@@ -281,9 +288,20 @@ int NetworkClient::init(std::shared_ptr<RequestHandler> requestHandler) {
   client_->start();
   int res = client_->connect(remote_address_.c_str(), remote_port_.c_str());
   unique_lock<mutex> lk(con_mtx);
-  while (!connected_) {
-    std::cout<<"NetworkClient from " <<this->getRemoteAddress()<<":" << this->getRemotePort()<<" wait to be connected to server"<<std::endl;
-    con_v.wait(lk);
+  auto start = std::chrono::steady_clock::now();
+  while (!con_v.wait_for(lk, 50ms, [start, this] {
+    auto current = std::chrono::steady_clock::now();
+    auto elapse = current - start;
+    if (elapse > 10s) {
+      fprintf(stderr, "Client connection spent %ld s, time out\n",
+              std::chrono::duration_cast<std::chrono::seconds>(elapse).count());
+      return true;
+    }
+    return this->connected_;
+  })) {
+  }
+  if (!connected_) {
+    return -1;
   }
 
   circularBuffer_ =

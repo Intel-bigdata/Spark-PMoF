@@ -29,10 +29,12 @@
 #include <utility>
 #include <vector>
 #include <map>
+#include <unordered_set>
 
 #include "pmpool/Base.h"
 #include "pmpool/Common.h"
 #include "pmpool/ThreadWrapper.h"
+#include "pmpool/proxy/PhysicalNode.h"
 
 class NetworkClient;
 class RequestHandler;
@@ -49,6 +51,11 @@ using std::vector;
 struct Channel{
   std::shared_ptr<NetworkClient> networkClient;
   std::shared_ptr<RequestHandler> requestHandler;
+};
+
+struct NodeInfo {
+  std::string ip;
+  std::string port;
 };
 
 class PmPoolClient {
@@ -94,7 +101,7 @@ class PmPoolClient {
 
   void shutdown();
   void wait();
-  std::shared_ptr<Channel> getChannel(string node);
+  std::shared_ptr<Channel> getChannel(PhysicalNode node);
 
  private:
   shared_ptr<ProxyRequestHandler> proxyRequestHandler_;
@@ -106,6 +113,7 @@ class PmPoolClient {
   bool op_finished;
   std::map<string, std::shared_ptr<Channel>> channels;
   std::mutex channel_mtx;
+  std::unordered_set<std::string> deadNodes;
 };
 
 #endif  // PMPOOL_CLIENT_PMPOOLCLIENT_H_

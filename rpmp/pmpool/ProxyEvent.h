@@ -5,33 +5,68 @@
 #include <HPNL/Connection.h>
 
 #include <vector>
+#include <unordered_set>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/unordered_set.hpp>
 
 #include "pmpool/Base.h"
+#include "pmpool/proxy/PhysicalNode.h"
 
 using std::vector;
+using std::unordered_set;
 
 class ProxyClientRecvCallback;
 class ProxyRequestHandler;
 class ProxyServer;
+class ClientService;
+class Proxy;
 
 enum ProxyOpType : uint32_t {
-  GET_HOSTS = 1
+  GET_HOSTS = 1,
+  GET_REPLICA,
+  P_PUT,
+  P_PUT_REPLY,
+  P_GET,
+  P_GET_REPLY
 };
 
-/**
- * @brief Define two types of event in this file: Request, RequestReply
- * Request: a event that client creates and sends to server.
- * RequestReply: a event that server creates and sends to client.
- * RequestContext and RequestReplyContext include the context information of the
- * previous two events.
- */
+struct ProxyRequestMsg {
+  template<class Archive>
+  void serialize(Archive& ar, const unsigned int version) {
+    ar &type;
+    ar &rid;
+    ar &key;
+  }
+  uint32_t type;
+  uint64_t rid;
+  uint64_t key;
+};
+
+struct ProxyRequestReplyMsg {
+  template<class Archive>
+  void serialize(Archive& ar, const unsigned int version) {
+    ar &type;
+    ar &success;
+    ar &rid;
+    ar &key;
+    ar &nodes;
+  }
+  uint32_t type;
+  uint32_t success;
+  uint64_t rid;
+  uint64_t key;
+  unordered_set<PhysicalNode, PhysicalNodeHash> nodes;
+};
+
 struct ProxyRequestReplyContext {
   ProxyOpType type;
   uint32_t success;
   uint64_t rid;
   uint64_t key;
   Connection* con;
-  std::string host;
+  unordered_set<PhysicalNode, PhysicalNodeHash> nodes;
 };
 
 class ProxyRequestReply {
@@ -48,6 +83,8 @@ class ProxyRequestReply {
  private:
   std::mutex data_lock_;
   friend ProxyServer;
+  friend ClientService;
+  friend Proxy;
   char* data_ = nullptr;
   uint64_t size_ = 0;
   ProxyRequestReplyContext requestReplyContext_;
@@ -69,10 +106,8 @@ class ProxyRequest {
   ProxyRequestContext& get_rc();
   void encode();
   void decode();
-  //#ifdef DEBUG
   char* getData() { return data_; }
   uint64_t getSize() { return size_; }
-  //#endif
 
  private:
   std::mutex data_lock_;

@@ -59,7 +59,7 @@ class RequestHandler : public ThreadWrapper {
   void abort() override {}
   void notify(std::shared_ptr<RequestReply> requestReply);
   uint64_t wait(std::shared_ptr<Request> request);
-  RequestReplyContext &get(std::shared_ptr<Request> request);
+  RequestReplyContext get(std::shared_ptr<Request> request);
 
  private:
   std::shared_ptr<NetworkClient> networkClient_;

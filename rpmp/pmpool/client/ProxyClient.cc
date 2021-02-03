@@ -55,13 +55,13 @@ void ProxyRequestHandler::inflight_erase(std::shared_ptr<ProxyRequest> request) 
   inflight_.erase(request->requestContext_.rid);
 }
 
-string ProxyRequestHandler::get(std::shared_ptr<ProxyRequest> request) {
+ProxyRequestReplyContext ProxyRequestHandler::get(std::shared_ptr<ProxyRequest> request) {
   auto ctx = inflight_insert_or_get(request);
   unique_lock<mutex> lk(ctx->mtx_reply);
   while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request] {
     auto current = std::chrono::steady_clock::now();
     auto elapse = current - ctx->start;
-    if (elapse > 10s) {
+    if (elapse > 30s) {
       ctx->op_failed = true;
       fprintf(stderr, "Request [TYPE %ld] spent %ld s, time out\n",
               request->requestContext_.type,
@@ -76,13 +76,14 @@ string ProxyRequestHandler::get(std::shared_ptr<ProxyRequest> request) {
     throw;
   }
   inflight_erase(request);
-  return res.host;
+  return res;
 }
 
 void ProxyRequestHandler::notify(std::shared_ptr<ProxyRequestReply> requestReply) {
   const std::lock_guard<std::mutex> lock(inflight_mtx_);
   auto rid = requestReply->get_rrc().rid;
   if (inflight_.count(rid) == 0) {
+    cout << "No exist reply to notify: " << rid << endl;
     return;
   }
   auto ctx = inflight_[rid];
@@ -91,6 +92,10 @@ void ProxyRequestHandler::notify(std::shared_ptr<ProxyRequestReply> requestReply
   auto rrc = requestReply->get_rrc();
   ctx->requestReplyContext = rrc;
   ctx->cv_reply.notify_one();
+}
+
+void ProxyRequestHandler::addRequest(std::shared_ptr<ProxyRequest> request) {
+  inflight_insert_or_get(request);
 }
 
 void ProxyRequestHandler::handleRequest(std::shared_ptr<ProxyRequest> request) {
@@ -105,6 +110,7 @@ ProxyClientConnectCallback::ProxyClientConnectCallback(std::shared_ptr<ProxyClie
 }
 
 void ProxyClientConnectCallback::operator()(void *param_1, void *param_2) {
+  cout << "ProxyClientConnectCallback" << endl;
   auto connection = static_cast<Connection*>(param_1);
   proxyClient_->setConnection(connection);
 }
@@ -173,8 +179,20 @@ int ProxyClient::initProxyClient(std::shared_ptr<ProxyRequestHandler> requestHan
   client_->start();
   int res = client_->connect(proxy_address_.c_str(), proxy_port_.c_str());
   unique_lock<mutex> lk(con_mtx);
-  while (!connected_) {
-    con_v.wait(lk);
+  auto start = std::chrono::steady_clock::now();
+  while (!con_v.wait_for(lk, 50ms, [start, this] {
+    auto current = std::chrono::steady_clock::now();
+    auto elapse = current - start;
+    if (elapse > 10s) {
+      fprintf(stderr, "Client connection spent %ld s, time out\n",
+              std::chrono::duration_cast<std::chrono::seconds>(elapse).count());
+      return true;
+    }
+    return this->connected_;
+  })) {
+  }
+  if (!connected_) {
+    return -1;
   }
 
   return 0;

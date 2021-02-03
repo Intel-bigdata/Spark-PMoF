@@ -136,7 +136,7 @@ class CircularBuffer {
     if (found == -1) {
       std::cerr << "Can't find a " << alloc_num << " * " << buffer_size_
                 << " sized buffer. " << std::endl;
-      throw;
+      throw "Cannot get buffer";
     } else {
       *offset = found;
 #ifdef DEBUG

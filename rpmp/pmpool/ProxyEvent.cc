@@ -1,3 +1,5 @@
+#include <sstream>
+
 #include "pmpool/ProxyEvent.h"
 
 ProxyRequest::ProxyRequest(ProxyRequestContext requestContext)
@@ -22,7 +24,7 @@ ProxyRequestContext &ProxyRequest::get_rc() { return requestContext_; }
 void ProxyRequest::encode() {
   const std::lock_guard<std::mutex> lock(data_lock_);
   ProxyOpType rt = requestContext_.type;
-  assert(rt == GET_HOSTS);
+  // assert(rt == GET_HOSTS);
   size_ = sizeof(ProxyRequestMsg);
   data_ = static_cast<char *>(std::malloc(sizeof(ProxyRequestMsg)));
   ProxyRequestMsg *requestMsg = (ProxyRequestMsg *)data_;
@@ -72,14 +74,13 @@ void ProxyRequestReply::encode() {
   requestReplyMsg.success = requestReplyContext_.success;
   requestReplyMsg.rid = requestReplyContext_.rid;
   requestReplyMsg.key = requestReplyContext_.key;
-  auto msg_size = sizeof(requestReplyMsg);
-  size_ = msg_size;
-
-  size_t host_length = requestReplyContext_.host.length() + 1;
-  size_ += host_length;
+  requestReplyMsg.nodes = requestReplyContext_.nodes;
+  std::ostringstream os;
+  boost::archive::text_oarchive ao(os);
+  ao << requestReplyMsg;
+  size_ = os.str().length()+1;
   data_ = static_cast<char *>(std::malloc(size_));
-  memcpy(data_, &requestReplyMsg, msg_size);
-  memcpy(data_ + msg_size, requestReplyContext_.host.c_str(), host_length);
+  memcpy(data_, os.str().c_str(), size_);
 }
 
 void ProxyRequestReply::decode() {
@@ -90,14 +91,15 @@ void ProxyRequestReply::decode() {
     std::cerr << err_msg << std::endl;
     throw;
   }
-  ProxyRequestReplyMsg *requestReplyMsg = (ProxyRequestReplyMsg *)data_;
-  requestReplyContext_.type = (ProxyOpType)requestReplyMsg->type;
-  requestReplyContext_.success = requestReplyMsg->success;
-  requestReplyContext_.rid = requestReplyMsg->rid;
-  requestReplyContext_.key = requestReplyMsg->key;
-  uint64_t host_size = size_ - sizeof(ProxyRequestReplyMsg);
-  char* tmp = static_cast<char*>(malloc(host_size));
-  memcpy(tmp, data_ + sizeof(ProxyRequestReplyMsg), host_size);
-  requestReplyContext_.host = std::string(tmp);
-  std::free(tmp);
+  ProxyRequestReplyMsg requestReplyMsg;
+  std::string str(data_);
+  std::istringstream is(str);
+  boost::archive::text_iarchive ia(is);
+  ia >> requestReplyMsg;
+  // ProxyRequestReplyMsg *requestReplyMsg = (ProxyRequestReplyMsg *)data_;
+  requestReplyContext_.type = (ProxyOpType)requestReplyMsg.type;
+  requestReplyContext_.success = requestReplyMsg.success;
+  requestReplyContext_.rid = requestReplyMsg.rid;
+  requestReplyContext_.key = requestReplyMsg.key;
+  requestReplyContext_.nodes = requestReplyMsg.nodes;
 }

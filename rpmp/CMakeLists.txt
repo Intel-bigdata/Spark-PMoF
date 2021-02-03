@@ -24,7 +24,7 @@ fetch_googletest(
   ${PROJECT_BINARY_DIR}/googletest
 )
 
-find_package(Boost REQUIRED COMPONENTS program_options)
+find_package(Boost REQUIRED COMPONENTS program_options serialization)
 if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
 endif()
@@ -43,9 +43,9 @@ add_subdirectory(benchmark)
 
 add_executable(main main.cc)
 add_executable(chashtest test/chash_test.cc)
-add_executable(proxy ProxyServer.cc)
+add_executable(proxyMain ProxyMain.cc)
 add_executable(client Client.cc)
 target_link_libraries(chashtest pmpool spdlog)
 target_link_libraries(main pmpool spdlog)
-target_link_libraries(proxy pmpool spdlog)
+target_link_libraries(proxyMain pmpool spdlog)
 target_link_libraries(client pmpool spdlog)

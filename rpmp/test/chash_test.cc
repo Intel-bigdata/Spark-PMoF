@@ -12,18 +12,23 @@ xxh::hash64_t hash2(string key){
 }
 
 void consistent_hash_test(){
-  ConsistentHash<PhysicalNode> *consistentHash = new ConsistentHash<PhysicalNode>();
+  ConsistentHash *consistentHash = new ConsistentHash();
   /**
    *
-   * Create two physical nodes
+   * Create physical nodes
    *
    **/
-  PhysicalNode *physicalNode = new PhysicalNode("host1");
   int loadBalanceFactor = 5;
-  consistentHash->addNode(*physicalNode, loadBalanceFactor);
-
-  PhysicalNode *physicalNode2 = new PhysicalNode("host2");
-  consistentHash->addNode(*physicalNode2, 3);
+  PhysicalNode *physicalNode1 = new PhysicalNode("host1", "12345");
+  consistentHash->addNode(*physicalNode1, loadBalanceFactor);
+  PhysicalNode *physicalNode2 = new PhysicalNode("host1", "12346");
+  consistentHash->addNode(*physicalNode2, loadBalanceFactor);
+  PhysicalNode *physicalNode3 = new PhysicalNode("host2", "12345");
+  consistentHash->addNode(*physicalNode3, loadBalanceFactor);
+  PhysicalNode *physicalNode4 = new PhysicalNode("host2", "12346");
+  consistentHash->addNode(*physicalNode4, loadBalanceFactor);
+  PhysicalNode *physicalNode5 = new PhysicalNode("host3", "12345");
+  consistentHash->addNode(*physicalNode5, loadBalanceFactor);
 
   /**
    *
@@ -35,11 +40,19 @@ void consistent_hash_test(){
   cout << "getdNode: " << node.getKey() << endl;
 
   /**
+   * Get physical nodes for a shuffle block and block replication
+   * */
+  cout << "get nodes for replication" << endl;
+  unordered_set<PhysicalNode, PhysicalNodeHash> pNodes = consistentHash->getNodes(shuffle_key, 3);
+  for (auto pNode : pNodes) {
+    cout << "getNode: " << pNode.getKey() << endl;
+  }
+  /**
    *
    * Remove one physical node
    *
    **/
-  consistentHash->removeNode(*physicalNode);
+  consistentHash->removeNode(*physicalNode4);
 
 
   /**

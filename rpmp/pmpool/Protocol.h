@@ -33,6 +33,7 @@ class Protocol;
 class NetworkServer;
 class Config;
 class Log;
+class DataServerService;
 
 using moodycamel::BlockingConcurrentQueue;
 using std::make_shared;
@@ -173,6 +174,8 @@ class Protocol : public std::enable_shared_from_this<Protocol> {
   void enqueue_rma_msg(uint64_t buffer_id);
   void handle_rma_msg(std::shared_ptr<RequestReply> requestReply);
 
+  void reclaim_dram_buffer(uint64_t key);
+
  public:
   std::shared_ptr<Config> config_;
   std::shared_ptr<Log> log_;
@@ -181,6 +184,7 @@ class Protocol : public std::enable_shared_from_this<Protocol> {
  private:
   std::shared_ptr<NetworkServer> networkServer_;
   std::shared_ptr<AllocatorProxy> allocatorProxy_;
+  std::shared_ptr<DataServerService> dataService_;
 
   std::shared_ptr<RecvCallback> recvCallback_;
   std::shared_ptr<SendCallback> sendCallback_;
@@ -197,6 +201,9 @@ class Protocol : public std::enable_shared_from_this<Protocol> {
   std::mutex rrcMtx_;
   std::unordered_map<uint64_t, std::shared_ptr<RequestReply>> rrcMap_;
   uint64_t time;
+
+  std::mutex replicateMtx_;
+  std::map<uint64_t, std::shared_ptr<RequestReply>> replicateMap_;
 };
 
 #endif  // PMPOOL_PROTOCOL_H_
