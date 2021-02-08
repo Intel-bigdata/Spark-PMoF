@@ -1,5 +1,6 @@
 package org.apache.spark.storage.pmof
 
+import java.io.File
 import java.nio.ByteBuffer
 
 import org.apache.spark.internal.Logging
@@ -26,6 +27,7 @@ private[spark] class PersistentMemoryHandler(
   val pmMetaHandler: PersistentMemoryMetaHandler = new PersistentMemoryMetaHandler(root_dir)
   var device: String = pmMetaHandler.getShuffleDevice(shuffleId)
   var poolFile = ""
+  var isFsdaxFile = false
   if(device == "") {
     //this shuffleId haven't been written before, choose a new device
     val path_array_list = new java.util.ArrayList[String](path_list.asJava)
@@ -34,6 +36,7 @@ private[spark] class PersistentMemoryHandler(
     val dev = Paths.get(device)
     if (Files.isDirectory(dev)) {
       // this is fsdax, add a subfile
+      isFsdaxFile = true
       poolFile = device + "/shuffle_block_" + UUID.randomUUID().toString()
       logInfo("This is a fsdax, filename:" + poolFile)
     } else {
@@ -84,6 +87,7 @@ private[spark] class PersistentMemoryHandler(
   def close(): Unit = synchronized {
     pmpool.close()
     pmMetaHandler.remove()
+    if(isFsdaxFile) new File(poolFile).delete()
   }
 
   def getRootAddr(): Long = {
