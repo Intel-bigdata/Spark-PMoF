@@ -85,9 +85,20 @@ private[spark] class PersistentMemoryHandler(
   }
 
   def close(): Unit = synchronized {
-    pmpool.close()
-    pmMetaHandler.remove()
-    if(isFsdaxFile) new File(poolFile).delete()
+      if (isFsdaxFile) {
+      try {
+        if (new File(poolFile).delete()) {
+          logInfo("File deleted successfully: " + poolFile)
+        } else {
+          logWarning("Failed to delete file: " + poolFile)
+        }
+      } catch {
+        case e: Exception => e.printStackTrace()
+      }
+    } else {
+      pmpool.close()
+      pmMetaHandler.remove()
+    }
   }
 
   def getRootAddr(): Long = {
