@@ -25,7 +25,7 @@ class Proxy : public std::enable_shared_from_this<Proxy>{
 public:
     explicit Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Redis> redis);
     ~Proxy();
-    bool launchServer();
+    bool launchServer(string current_host_ip);
     void wait();
     void enqueue_recv_msg(std::shared_ptr<ProxyRequest> request);
     void handle_recv_msg(std::shared_ptr<ProxyRequest> request);

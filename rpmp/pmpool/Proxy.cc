@@ -22,7 +22,38 @@ Proxy::~Proxy() {
     // worker_->join();
 }
 
-bool Proxy::launchServer() {
+bool Proxy::launchServer(string current_host_ip) {
+    if (isActiveProxy(current_host_ip)) {
+      return launchActiveService();
+    }
+  return launchStandbyService();
+}
+
+bool isActiveProxy(string current_host_ip) {
+  if (current_host_ip.empty()) {
+    return true;
+  }
+  vector<string> proxies = config_->get_proxy_ips();
+  // Only proxy node will trigger the launch. So if there is
+  // only one proxy configured, the current node is active proxy.
+  if (proxies.size() == 1) {
+    return true;
+  }
+  if (std::find(proxies.begin(), proxies.end(),
+                current_host_ip) == proxies.end()) {
+    log_->get_file_log()->error("Incorrect host ip is given!");
+    return false;
+  }
+  // All proxy nodes share same config file. The first node
+  // in the config will serve as active proxy. Other nodes
+  // will be standby.
+  if (proxies[0] == current_host_ip) {
+    return true;
+  }
+  return false;
+}
+
+bool Proxy::launchActiveService() {
   nodeManager_ = std::make_shared<NodeManager>(config_, log_, redis_);
   nodeManager_->init();
   loadBalanceFactor_ = config_->get_load_balance_factor();
@@ -34,6 +65,11 @@ bool Proxy::launchServer() {
   replicaService_ = std::make_shared<ReplicaService>(config_, log_, shared_from_this());
   replicaService_->startService();
   return true;
+}
+
+bool Proxy::launchStandbyService() {
+  vector<string> proxies = config_->get_proxy_ips();
+
 }
 
 void Proxy::addNode(PhysicalNode physicalNode) {

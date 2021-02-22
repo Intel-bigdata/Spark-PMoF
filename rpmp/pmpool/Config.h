@@ -88,9 +88,7 @@ class Config {
           }
         }
 
-        vector<string> nodes;
-        boost::split(nodes, configs.find(RPMP_NODE_LIST)->second, boost::is_any_of(","), boost::token_compress_on);
-        set_nodes(nodes);
+        set_nodes(configs.find(RPMP_NODE_LIST)->second);
 
         set_replica_service_port(configs.find(RPMP_PROXY_REPLICA_SERVICE_PORT)->second);
 
@@ -104,7 +102,7 @@ class Config {
 
         set_heartbeat_port(configs.find(RPMP_NETWORK_HEARTBEAT_PORT)->second);
 
-        set_proxy_ip(configs.find(RPMP_NETWORK_PROXY_ADDRESS)->second);
+        set_proxy_ips(configs.find(RPMP_NETWORK_PROXY_ADDRESS)->second);
 
         set_ip(configs.find(RPMP_NETWORK_SERVER_ADDRESS)->second);
 
@@ -314,14 +312,31 @@ class Config {
     string get_log_level() { return log_level_; }
     void set_log_level(string log_level) { log_level_ = log_level; }
 
-    void set_nodes(vector<string> nodes) {nodes_ = nodes;}
+    void set_nodes(string configured_nodes) {
+      vector<string> nodes;
+      boost::split(nodes, configured_nodes, boost::is_any_of(","), boost::token_compress_on);
+      nodes_ = nodes;
+    }
     vector<string> get_nodes() {return nodes_;}
 
     void set_client_service_port(string port) {proxy_client_service_port_ = port;}
     string get_client_service_port() {return proxy_client_service_port_;}
 
+    // TODO: need to be removed.
     void set_proxy_ip(string ip) {proxy_ip_ = ip;}
-    string get_proxy_ip() {return proxy_ip_;}
+    void set_proxy_ips(string proxy_ips) {
+      vector<string> proxies;
+      boost::split(proxies, proxy_ips, boost::is_any_of(","), boost::token_compress_on);
+      proxy_ips_ = proxies;
+    }
+    // TODO: need to be removed. Still keep it for compatibility consideration.
+    string get_proxy_ip() {
+      // return proxy_ip_;
+      return proxy_ips_[0];
+    }
+    vector<string> get_proxy_ips() {
+      return proxy_ips_;
+    }
 
     void set_data_replica(uint32_t replica) {replica_ = replica;}
     uint32_t get_data_replica() {return replica_;}
@@ -362,7 +377,9 @@ class Config {
     vector<string> nodes_;
     int heatbeat_interval_;
     string proxy_client_service_port_;
+    // TODO: need to be removed.
     string proxy_ip_;
+    vector<string> proxy_ips_;
     uint32_t replica_;
     uint32_t minReplica_;
     string proxy_replica_service_port_;
