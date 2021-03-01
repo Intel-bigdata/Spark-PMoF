@@ -1,4 +1,16 @@
-bin=$(pwd)
+#!/usr/bin/env bash
+
+if [ -L ${BASH_SOURCE-$0} ]; then
+  FWDIR=$(dirname $(readlink "${BASH_SOURCE-$0}"))
+else
+  FWDIR=$(dirname "${BASH_SOURCE-$0}")
+fi
+
+if [[ -z "${RPMP_HOME}" ]]; then
+  export RPMP_HOME="$(cd "${FWDIR}/.."; pwd)"
+fi
+export BIN_HOME="$RPMP_HOME/bin"
+export CONFIG_HOME="$RPMP_HOME/config"
 
 #Keep this arg for future use.
 USER_VARGS=
@@ -16,7 +28,7 @@ while [ $# != 0 ]; do
   esac
 done
 
-CONFIG_FILE="./config/rpmp.conf"
+CONFIG_FILE="$CONFIG_HOME/rpmp.conf"
 PROXY_ADDR_KEY="rpmp.network.proxy.address"
 SERVER_ADDR_KEY="rpmp.network.server.address"
 PROXY_ADDR=
@@ -37,12 +49,12 @@ IFS=','
 for addr in $PROXY_ADDR; do
   echo "Starting RPMP proxy on $addr.."
   #Pass addr to RPMP proxy
-  ssh $addr "cd $bin; ./proxyMain $addr"
+  ssh $addr "cd $RPMP_HOME; ./proxyMain $addr"
 done
 
 #Start RPMP server
 for addr in $SERVER_ADDR; do
   echo "Starting RPMP server on $addr.."
   #Pass addr to RPMP server
-  ssh $addr "cd $bin; ./main $addr"
+  ssh $addr "cd $RPMP_HOME; ./main $addr"
 done
