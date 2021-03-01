@@ -34,7 +34,7 @@ int ServerMain(int argc, char **argv) {
       std::make_shared<DataServer>(config, log);
   log->get_file_log()->info("start to initialize data server.");
   CHK_ERR("data server init", dataServer->init());
-  log->get_file_log()->info("data server initailized.");
+  log->get_file_log()->info("data server initialized.");
   dataServer->wait();
    
   return 0;
