@@ -36,13 +36,13 @@ IFS=','
 #Start RPMP proxy
 for addr in $PROXY_ADDR; do
   echo "Starting RPMP proxy on $addr.."
-  #Pass addr to proxy
+  #Pass addr to RPMP proxy
   ssh $addr "cd $bin; ./proxyMain $addr"
 done
 
 #Start RPMP server
 for addr in $SERVER_ADDR; do
   echo "Starting RPMP server on $addr.."
-  #Pass addr to server
+  #Pass addr to RPMP server
   ssh $addr "cd $bin; ./main $addr"
 done
