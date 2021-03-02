@@ -59,4 +59,16 @@ struct block_meta {
   int r_key;
 };
 
+struct HeartbeatRequestMsg {
+  uint32_t type;
+  uint64_t rid;
+  uint64_t host_ip_hash;
+};
+
+struct HeartbeatRequestReplyMsg {
+  uint32_t type;
+  uint32_t success;
+  uint64_t rid;
+};
+
 #endif  // PMPOOL_BASE_H_

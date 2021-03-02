@@ -11,7 +11,8 @@ int main(int argc, char* argv[]){
     CHK_ERR("init config", config->init(argc, argv));
   }
   std::shared_ptr<Log> log = std::make_shared<Log>(config.get());
-  std::shared_ptr<Proxy> proxyServer = std::make_shared<Proxy>(config, log);
+  std::shared_ptr<Redis> redis = std::make_shared<Redis>(config, log);
+  std::shared_ptr<Proxy> proxyServer = std::make_shared<Proxy>(config, log, redis);
   proxyServer->launchServer();
   proxyServer->wait();
   return 0;

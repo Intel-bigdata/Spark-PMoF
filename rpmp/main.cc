@@ -13,6 +13,7 @@
 #include "pmpool/DataServer.h"
 #include "pmpool/Base.h"
 #include "pmpool/Log.h"
+#include "pmpool/HeartbeatClient.h"
 
 /**
  * @brief program entry of RPMP server
@@ -29,6 +30,12 @@ int ServerMain(int argc, char **argv) {
   }
   /// initialize Log class
   std::shared_ptr<Log> log = std::make_shared<Log>(config.get());
+
+  /// initialize heartbeat client
+  std::shared_ptr<HeartbeatClient> heartbeatClient = std::make_shared<HeartbeatClient>(config,log);
+  CHK_ERR("heartbeat client init", heartbeatClient->init());
+  log->get_console_log()->info("heartbeat client initialized");
+
   /// initialize DataServer class
   std::shared_ptr<DataServer> dataServer =
       std::make_shared<DataServer>(config, log);

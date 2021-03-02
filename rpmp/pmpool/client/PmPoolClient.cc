@@ -12,8 +12,6 @@
 #include "NetworkClient.h"
 #include "pmpool/Digest.h"
 #include "pmpool/Event.h"
-#include "pmpool/Protocol.h"
-#include "pmpool/ProxyEvent.h"
 #include "pmpool/client/ProxyClient.h"
 
 PmPoolClient::PmPoolClient(const string &proxy_address,

@@ -1,0 +1,143 @@
+#ifndef SPARK_PMOF_HEARTBEAT_H
+#define SPARK_PMOF_HEARTBEAT_H
+
+#include <utility>
+#include <memory>
+#include <string>
+
+#include <HPNL/Callback.h>
+#include <HPNL/Client.h>
+#include "pmpool/ThreadWrapper.h"
+#include "pmpool/HeartbeatEvent.h"
+
+#include "pmpool/queue/blockingconcurrentqueue.h"
+#include "pmpool/queue/concurrentqueue.h"
+
+class Connection;
+class ChunkMgr;
+class HeartbeatClient;
+class Config;
+class Log;
+
+using namespace std;
+using std::make_shared;
+using moodycamel::BlockingConcurrentQueue;
+
+class HeartbeatRequestHandler : public ThreadWrapper {
+public:
+  explicit HeartbeatRequestHandler(std::shared_ptr<HeartbeatClient> heartbeatClient);
+  ~HeartbeatRequestHandler();
+  void addTask(std::shared_ptr<HeartbeatRequest> request);
+  void reset();
+  int entry() override;
+  void abort() override {}
+  void notify(std::shared_ptr<HeartbeatRequestReply> requestReply);
+  int get(std::shared_ptr<HeartbeatRequest> request);
+  int heartbeat(uint64_t host_hash);
+
+private:
+  std::shared_ptr<HeartbeatClient> heartbeatClient_;
+  BlockingConcurrentQueue<std::shared_ptr<HeartbeatRequest>> pendingRequestQueue_;
+  uint64_t total_num = 0;
+  uint64_t begin = 0;
+  uint64_t end = 0;
+  uint64_t time = 0;
+  struct InflightHeartbeatRequestContext {
+    std::mutex mtx_reply;
+    std::condition_variable cv_reply;
+    std::mutex mtx_returned;
+    std::chrono::time_point<std::chrono::steady_clock> start;
+    bool op_finished = false;
+    bool op_failed = false;
+    InflightHeartbeatRequestContext() { start = std::chrono::steady_clock::now(); }
+    HeartbeatRequestReplyContext requestReplyContext;
+    HeartbeatRequestReplyContext &get_rrc() { return requestReplyContext; }
+  };
+  std::unordered_map<uint64_t, std::shared_ptr<HeartbeatRequestHandler::InflightHeartbeatRequestContext>>
+          inflight_;
+  std::mutex inflight_mtx_;
+
+  std::shared_ptr<HeartbeatRequestHandler::InflightHeartbeatRequestContext> inflight_insert_or_get(
+          std::shared_ptr<HeartbeatRequest>);
+  void inflight_erase(std::shared_ptr<HeartbeatRequest> request);
+  void handleRequest(std::shared_ptr<HeartbeatRequest> request);
+};
+
+class HeartbeatShutdownCallback : public Callback {
+public:
+  explicit HeartbeatShutdownCallback() {}
+  ~HeartbeatShutdownCallback() override = default;
+  void operator()(void* param_1, void* param_2) {};
+};
+
+
+class HeartbeatConnectCallback : public Callback {
+public:
+  explicit HeartbeatConnectCallback(std::shared_ptr<HeartbeatClient> heartbeatClient);
+  ~HeartbeatConnectCallback() override = default;
+  void operator()(void* param_1, void* param_2);
+private:
+  std::shared_ptr<HeartbeatClient> heartbeatClient_;
+};
+
+class HeartbeatRecvCallback : public Callback {
+public:
+  HeartbeatRecvCallback();
+  HeartbeatRecvCallback(std::shared_ptr<ChunkMgr> chunkMgr, std::shared_ptr<HeartbeatRequestHandler> requestHandler);
+  ~HeartbeatRecvCallback() override = default;
+  void operator()(void* param_1, void* param_2);
+
+private:
+  std::shared_ptr<ChunkMgr> chunkMgr_;
+  std::shared_ptr<HeartbeatRequestHandler> requestHandler_;
+  std::mutex mtx;
+};
+
+class HeartbeatSendCallback : public Callback {
+
+public:
+  explicit HeartbeatSendCallback(std::shared_ptr<ChunkMgr> chunkMgr) : chunkMgr_(chunkMgr) {}
+  ~HeartbeatSendCallback() override = default;
+  void operator()(void* param_1, void* param_2);
+
+private:
+  std::shared_ptr<ChunkMgr> chunkMgr_;
+};
+
+class HeartbeatClient: public std::enable_shared_from_this<HeartbeatClient>{
+public:
+  HeartbeatClient(std::shared_ptr<Config> config, std::shared_ptr<Log> log);
+  ~HeartbeatClient();
+  int init();
+  int heartbeat();
+  int breakdown();
+  void send(const char* data, uint64_t size);
+  void setConnection(Connection* connection);
+  int initHeartbeatClient();
+  void shutdown();
+  void wait();
+  void reset();
+
+private:
+  atomic<uint64_t> rid_ = {0};
+  std::string host_ip_;
+  uint64_t host_ip_hash_;
+
+  std::shared_ptr<HeartbeatRequestHandler> heartbeatRequestHandler_;
+  std::shared_ptr<Config> config_;
+  std::shared_ptr<Log> log_;
+  std::shared_ptr<Client> client_;
+  std::shared_ptr<ChunkMgr> chunkMgr_;
+
+  std::shared_ptr<HeartbeatShutdownCallback> shutdownCallback;
+  std::shared_ptr<HeartbeatConnectCallback> connectCallback;
+  std::shared_ptr<HeartbeatRecvCallback> recvCallback;
+  std::shared_ptr<HeartbeatSendCallback> sendCallback;
+  Connection* heartbeat_connection_;
+
+  std::mutex con_mtx;
+  std::condition_variable con_v;
+  bool connected_;
+};
+
+#endif //SPARK_PMOF_HEARTBEAT_H

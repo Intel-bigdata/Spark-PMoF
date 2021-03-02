@@ -61,6 +61,8 @@ class Config {
       configs.insert(pair<string,string>(RPMP_DATA_MINREPLICA, DEFAULT_RPMP_DATA_MINREPLICA));
       configs.insert(pair<string,string>(RPMP_PROXY_REPLICA_SERVICE_PORT, DEFAULT_RPMP_PROXY_REPLICA_SERVICE_PORT));
       configs.insert(pair<string,string>(RPMP_PROXY_LOAD_BALANCE_FACTOR, DEFAULT_RPMP_PROXY_LOAD_BALANCE_FACTOR));
+      configs.insert(pair<string,string>(RPMP_METASTORE_REDIS_IP, DEFAULT_RPMP_METASTORE_REDIS_IP));
+      configs.insert(pair<string,string>(RPMP_METASTORE_REDIS_PORT, DEFAULT_RPMP_METASTORE_REDIS_PORT));
       return 0;
     }
 
@@ -100,6 +102,8 @@ class Config {
 
         set_heartbeat_interval(stoi(configs.find(RPMP_NETWORK_HEARTBEAT_INTERVAL)->second));
 
+        set_heartbeat_port(configs.find(RPMP_NETWORK_HEARTBEAT_PORT)->second);
+
         set_proxy_ip(configs.find(RPMP_NETWORK_PROXY_ADDRESS)->second);
 
         set_ip(configs.find(RPMP_NETWORK_SERVER_ADDRESS)->second);
@@ -113,6 +117,9 @@ class Config {
         set_network_buffer_num(stoi(configs.find(RPMP_NETWORK_BUFFER_NUMBER)->second));
 
         set_network_worker_num(stoi(configs.find(RPMP_NETWORK_WORKER)->second));
+
+        set_metastore_redis_ip(configs.find(RPMP_METASTORE_REDIS_IP)->second);
+        set_metastore_redis_port(configs.find(RPMP_METASTORE_REDIS_PORT)->second); 
 
         set_log_path(configs.find(RPMP_LOG_PATH)->second);
         set_log_level(configs.find(RPMP_LOG_LEVEL)->second);
@@ -310,9 +317,6 @@ class Config {
     void set_nodes(vector<string> nodes) {nodes_ = nodes;}
     vector<string> get_nodes() {return nodes_;}
 
-    void set_heartbeat_interval(int heatbeatInterval) {heatbeat_interval_ = heatbeatInterval;}
-    int get_heartbeat_interval() {return heatbeat_interval_;}
-
     void set_client_service_port(string port) {proxy_client_service_port_ = port;}
     string get_client_service_port() {return proxy_client_service_port_;}
 
@@ -330,6 +334,19 @@ class Config {
 
     void set_load_balance_factor(uint32_t factor) {load_balance_factor_ = factor;}
     uint32_t get_load_balance_factor() {return load_balance_factor_;}
+
+    void set_heartbeat_interval(int heartbeatInterval) {heartbeat_interval_ = heartbeatInterval;}
+    int get_heartbeat_interval() {return heartbeat_interval_;}
+
+    void set_heartbeat_port(string heartbeat_port){heartbeat_port_ = heartbeat_port;}
+    string get_heartbeat_port(){return heartbeat_port_;}
+
+    void set_metastore_redis_ip(string redis_ip){redis_ip_ = redis_ip;};
+    string get_metastore_redis_ip(){return redis_ip_; };
+
+    void set_metastore_redis_port(string redis_port){redis_port_ = redis_port;};
+    string get_metastore_redis_port(){return redis_port_;};
+
 
   private:
     string ip_;
@@ -350,9 +367,14 @@ class Config {
     uint32_t minReplica_;
     string proxy_replica_service_port_;
     uint32_t load_balance_factor_;
+    int heartbeat_interval_;
+    string heartbeat_port_;
+    string redis_ip_;
+    string redis_port_;
 
 const string RPMP_NODE_LIST = "rpmp.node.list";
 const string RPMP_NETWORK_HEARTBEAT_INTERVAL = "rpmp.network.heartbeat-interval";
+const string RPMP_NETWORK_HEARTBEAT_PORT = "rpmp.network.heartbeat.port";
 const string RPMP_NETWORK_PROXY_ADDRESS = "rpmp.network.proxy.address";
 const string RPMP_PROXY_CLIENT_SERVICE_PORT = "rpmp.proxy.client.service.port";
 const string RPMP_NETWORK_SERVER_ADDRESS = "rpmp.network.server.address";
@@ -369,8 +391,11 @@ const string RPMP_DATA_REPLICA = "rpmp.data.replica";
 const string RPMP_DATA_MINREPLICA = "rpmp.data.minreplica";
 const string RPMP_PROXY_REPLICA_SERVICE_PORT = "rpmp.proxy.replica.service.port";
 const string RPMP_PROXY_LOAD_BALANCE_FACTOR = "rpmp.proxy.loadBalanceFactor";
+const string RPMP_METASTORE_REDIS_IP = "rpmp.metastore.redis.ip";
+const string RPMP_METASTORE_REDIS_PORT = "rpmp.metastore.redis.port";
 const string DEFAULT_RPMP_NODE_LIST = "172.168.0.209,172.168.0.40";
 const string DEFAULT_RPMP_NETWORK_HEARTBEAT_INTERVAL = "5";
+const string DEFAULT_RPMP_NETWORK_HEARTBEAT_PORT = "12355";
 const string DEFAULT_RPMP_NETWORK_PROXY_ADDRESS = "172.168.0.209";
 const string DEFAULT_RPMP_PROXY_CLIENT_SERVICE_PORT = "12348";
 const string DEFAULT_RPMP_NETWORK_SERVER_ADDRESS = "172.168.0.209";
@@ -387,6 +412,8 @@ const string DEFAULT_RPMP_DATA_REPLICA = "3";
 const string DEFAULT_RPMP_DATA_MINREPLICA = "1";
 const string DEFAULT_RPMP_PROXY_REPLICA_SERVICE_PORT = "12340";
 const string DEFAULT_RPMP_PROXY_LOAD_BALANCE_FACTOR = "5";
+const string DEFAULT_RPMP_METASTORE_REDIS_IP = "127.0.0.1";
+const string DEFAULT_RPMP_METASTORE_REDIS_PORT = "6379";
 };
 
 #endif  // PMPOOL_CONFIG_H_
