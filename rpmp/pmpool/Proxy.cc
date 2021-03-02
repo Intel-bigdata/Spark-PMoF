@@ -5,12 +5,17 @@
 
 #include <iostream>
 #include <string>
+#include <thread>
 #include "Proxy.h"
+
+#include "hiredis/hiredis.h"
+#include "pmpool/proxy/metastore/Redis.h"
+#include "json/json.h"
 
 using namespace std;
 
-Proxy::Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log) :
- config_(config), log_(log) {}
+Proxy::Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Redis> redis) :
+ config_(config), log_(log), redis_(redis) {}
 
 Proxy::~Proxy() {
     // worker_->stop();
@@ -18,6 +23,8 @@ Proxy::~Proxy() {
 }
 
 bool Proxy::launchServer() {
+  nodeManager_ = std::make_shared<NodeManager>(config_, log_, redis_);
+  nodeManager_->init();
   loadBalanceFactor_ = config_->get_load_balance_factor();
   consistentHash_ = std::make_shared<ConsistentHash>();
   dataServerPort_ = config_->get_port();

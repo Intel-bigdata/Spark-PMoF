@@ -22,6 +22,7 @@ class DataList;
 class AllocatorProxy;
 class NetworkServer;
 class Log;
+class HeartbeatClient;
 
 /**
  * @brief DataServer is designed as distributed remote memory pool.
@@ -42,6 +43,7 @@ class DataServer {
   std::shared_ptr<NetworkServer> networkServer_;
   std::shared_ptr<AllocatorProxy> allocatorProxy_;
   std::shared_ptr<Protocol> protocol_;
+  std::shared_ptr<HeartbeatClient> heartbeatClient_;
 };
 
 #endif  // PMPOOL_DATASERVER_H_
