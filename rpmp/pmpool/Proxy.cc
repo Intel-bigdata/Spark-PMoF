@@ -14,23 +14,30 @@
 
 using namespace std;
 
-Proxy::Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Redis> redis) :
- config_(config), log_(log), redis_(redis) {}
+Proxy::Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Redis> redis, string currentHostAddr) :
+ config_(config), log_(log), redis_(redis), currentHostAddr_(currentHostAddr) {}
 
 Proxy::~Proxy() {
     // worker_->stop();
     // worker_->join();
 }
 
-bool Proxy::launchServer(string current_host_ip) {
-    if (isActiveProxy(current_host_ip)) {
-      return launchActiveService();
-    }
+bool Proxy::launchServer() {
+  if (isActiveProxy(currentHostAddr_)) {
+    return launchActiveService();
+  }
   return launchStandbyService();
 }
 
-bool isActiveProxy(string current_host_ip) {
-  if (current_host_ip.empty()) {
+/**
+ * Judge whether the current proxy is active according to proxy
+ * hosts order in the configuration.
+ *
+ * @param currentHostAddr the host address of current proxy.
+ * @return  true if the current proxy should be active.
+ */
+bool isActiveProxy(string currentHostAddr) {
+  if (currentHostAddr.empty()) {
     return true;
   }
   vector<string> proxies = config_->get_proxy_ips();
@@ -40,14 +47,14 @@ bool isActiveProxy(string current_host_ip) {
     return true;
   }
   if (std::find(proxies.begin(), proxies.end(),
-                current_host_ip) == proxies.end()) {
+                currentHostAddr) == proxies.end()) {
     log_->get_file_log()->error("Incorrect host ip is given!");
     return false;
   }
   // All proxy nodes share same config file. The first node
   // in the config will serve as active proxy. Other nodes
   // will be standby.
-  if (proxies[0] == current_host_ip) {
+  if (proxies[0] == currentHostAddr) {
     return true;
   }
   return false;

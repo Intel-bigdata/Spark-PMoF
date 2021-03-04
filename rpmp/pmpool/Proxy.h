@@ -23,9 +23,11 @@ class Proxy;
 
 class Proxy : public std::enable_shared_from_this<Proxy>{
 public:
-    explicit Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Redis> redis);
+    explicit Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Redis> redis, std::string currentHostAddr);
     ~Proxy();
-    bool launchServer(string current_host_ip);
+    bool launchServer();
+    bool launchActiveService();
+    bool launchStandbyService();
     void wait();
     void enqueue_recv_msg(std::shared_ptr<ProxyRequest> request);
     void handle_recv_msg(std::shared_ptr<ProxyRequest> request);
@@ -40,6 +42,7 @@ public:
     std::shared_ptr<NodeManager> nodeManager_;
     std::shared_ptr<ChunkMgr> chunkMgr_;
     std::shared_ptr<Config> config_;
+    std::string currentHostAddr_;
     std::shared_ptr<Log> log_;
     std::shared_ptr<Redis> redis_;
     std::shared_ptr<ConsistentHash> consistentHash_;
