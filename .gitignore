@@ -1,2 +1,6 @@
 rpmp/build
 .vscode
+.idea
+*.patch
+*.diff
+
