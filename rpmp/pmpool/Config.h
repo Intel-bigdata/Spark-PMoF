@@ -390,7 +390,7 @@ class Config {
     string redis_port_;
 
 const string RPMP_NODE_LIST = "rpmp.node.list";
-const string RPMP_NETWORK_HEARTBEAT_INTERVAL = "rpmp.network.heartbeat-interval";
+const string RPMP_NETWORK_HEARTBEAT_INTERVAL = "rpmp.network.heartbeat-interval.sec";
 const string RPMP_NETWORK_HEARTBEAT_PORT = "rpmp.network.heartbeat.port";
 const string RPMP_NETWORK_PROXY_ADDRESS = "rpmp.network.proxy.address";
 const string RPMP_PROXY_CLIENT_SERVICE_PORT = "rpmp.proxy.client.service.port";
@@ -405,9 +405,9 @@ const string RPMP_NETWORK_BUFFER_SIZE = "rpmp.network.buffer.size";
 const string RPMP_LOG_LEVEL = "rpmp.log.level";
 const string RPMP_LOG_PATH = "rpmp.log.path";
 const string RPMP_DATA_REPLICA = "rpmp.data.replica";
-const string RPMP_DATA_MINREPLICA = "rpmp.data.minreplica";
+const string RPMP_DATA_MINREPLICA = "rpmp.data.min.replica";
 const string RPMP_PROXY_REPLICA_SERVICE_PORT = "rpmp.proxy.replica.service.port";
-const string RPMP_PROXY_LOAD_BALANCE_FACTOR = "rpmp.proxy.loadBalanceFactor";
+const string RPMP_PROXY_LOAD_BALANCE_FACTOR = "rpmp.proxy.load-balance-factor";
 const string RPMP_METASTORE_REDIS_IP = "rpmp.metastore.redis.ip";
 const string RPMP_METASTORE_REDIS_PORT = "rpmp.metastore.redis.port";
 const string DEFAULT_RPMP_NODE_LIST = "172.168.0.209,172.168.0.40";
