@@ -95,8 +95,8 @@ key_3 --> block_meta_list_3[block_meta, block_meta, block_meta]
 */
 class pmemkv {
   public:
-    explicit pmemkv(const char* dev_path_) : pmem_pool(nullptr), dev_path(dev_path_), bp(nullptr) {
-      if (create()) {
+    explicit pmemkv(const char* dev_path_, long size) : pmem_pool(nullptr), dev_path(dev_path_), bp(nullptr) {
+      if (create(size)) {
         int res = open();
         if (res) {
           std::cout << "failed to open pmem pool, errmsg: " << pmemobj_errormsg() << std::endl; 
@@ -447,12 +447,12 @@ class pmemkv {
       return (uint64_t)pmem_pool;
     }
   private:
-    int create() {
+    int create(long size) {
       // debug setting
       int sds_write_value = 0;
       pmemobj_ctl_set(nullptr, "sds.at_create", &sds_write_value);
 
-      pmem_pool = pmemobj_create(dev_path, PMEMKV_LAYOUT_NAME, 0, 0666);
+      pmem_pool = pmemobj_create(dev_path, PMEMKV_LAYOUT_NAME, size, 0666);
       if (pmem_pool == nullptr) {
         return -1;
       }
