@@ -32,7 +32,7 @@ int ServerMain(int argc, char **argv) {
   std::shared_ptr<Log> log = std::make_shared<Log>(config.get());
 
   /// initialize heartbeat client
-  std::shared_ptr<HeartbeatClient> heartbeatClient = std::make_shared<HeartbeatClient>(config,log);
+  std::shared_ptr<HeartbeatClient> heartbeatClient = std::make_shared<HeartbeatClient>(config, log);
   CHK_ERR("heartbeat client init", heartbeatClient->init());
   log->get_console_log()->info("heartbeat client initialized");
 

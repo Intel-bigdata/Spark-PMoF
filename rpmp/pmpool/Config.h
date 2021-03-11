@@ -102,7 +102,7 @@ class Config {
 
         set_heartbeat_port(configs.find(RPMP_NETWORK_HEARTBEAT_PORT)->second);
 
-        set_proxy_ips(configs.find(RPMP_NETWORK_PROXY_ADDRESS)->second);
+        set_proxy_addrs(configs.find(RPMP_NETWORK_PROXY_ADDRESS)->second);
 
         set_ip(configs.find(RPMP_NETWORK_SERVER_ADDRESS)->second);
 
@@ -324,18 +324,18 @@ class Config {
 
     // TODO: need to be removed.
     void set_proxy_ip(string ip) {proxy_ip_ = ip;}
-    void set_proxy_ips(string proxy_ips) {
+    void set_proxy_addrs(string proxy_ips) {
       vector<string> proxies;
       boost::split(proxies, proxy_ips, boost::is_any_of(","), boost::token_compress_on);
-      proxy_ips_ = proxies;
+      proxy_addrs_ = proxies;
     }
     // TODO: need to be removed. Still keep it for compatibility consideration.
     string get_proxy_ip() {
       // return proxy_ip_;
-      return proxy_ips_[0];
+      return proxy_addrs_[0];
     }
-    vector<string> get_proxy_ips() {
-      return proxy_ips_;
+    vector<string> get_proxy_addrs() {
+      return proxy_addrs_;
     }
 
     void set_data_replica(uint32_t replica) {replica_ = replica;}
@@ -379,7 +379,7 @@ class Config {
     string proxy_client_service_port_;
     // TODO: need to be removed.
     string proxy_ip_;
-    vector<string> proxy_ips_;
+    vector<string> proxy_addrs_;
     uint32_t replica_;
     uint32_t minReplica_;
     string proxy_replica_service_port_;

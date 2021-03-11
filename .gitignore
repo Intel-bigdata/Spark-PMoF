@@ -1,4 +1,5 @@
 rpmp/build
+rpmp/cmake-build-debug/
 .vscode
 .idea
 *.patch

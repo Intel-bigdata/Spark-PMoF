@@ -24,7 +24,7 @@ HeartbeatRequestHandler::~HeartbeatRequestHandler() {
 void HeartbeatRequestHandler::reset() {
   this->stop();
   this->join();
-  heartbeatClient_.reset();
+  heartbeatClient_->reset();
 }
 
 void HeartbeatRequestHandler::addTask(std::shared_ptr<HeartbeatRequest> request) {
@@ -104,11 +104,11 @@ void HeartbeatRequestHandler::handleRequest(std::shared_ptr<HeartbeatRequest> re
   heartbeatClient_->send(reinterpret_cast<char *>(request->data_), request->size_);
 }
 
-HeartbeatConnectCallback::HeartbeatConnectCallback(std::shared_ptr<HeartbeatClient> heartbeatClient) {
+HeartbeatConnectedCallback::HeartbeatConnectedCallback(std::shared_ptr<HeartbeatClient> heartbeatClient) {
   heartbeatClient_ = heartbeatClient;
 }
 
-void HeartbeatConnectCallback::operator()(void *param_1, void *param_2) {
+void HeartbeatConnectedCallback::operator()(void *param_1, void *param_2) {
   auto connection = static_cast<Connection*>(param_1);
   heartbeatClient_->setConnection(connection);
 }
@@ -132,6 +132,12 @@ void HeartbeatRecvCallback::operator()(void *param_1, void *param_2) {
   requestReply->decode();
   requestHandler_->notify(requestReply);
   chunkMgr_->reclaim(ck, static_cast<Connection *>(ck->con));
+}
+
+/**
+ * TODO: let RPMP server find new active proxy in shutdown call back function.
+ */
+void HeartbeatShutdownCallback::operator()(void* param_1, void* param_2) {
 }
 
 std::string exec(const char* cmd) {
@@ -212,37 +218,89 @@ int HeartbeatClient::initHeartbeatClient() {
   if ((client_->init()) != 0) {
     return -1;
   }
-  int buffer_size_ = 65536;
-  int buffer_number_ = 64;
-  chunkMgr_ = std::make_shared<ChunkPool>(client_.get(), buffer_size_,
-                                          buffer_number_);
+  const int buffer_size = 65536;
+  const int buffer_number = 64;
+  chunkMgr_ = std::make_shared<ChunkPool>(client_.get(), buffer_size,
+                                          buffer_number);
 
   client_->set_chunk_mgr(chunkMgr_.get());
 
   shutdownCallback = std::make_shared<HeartbeatShutdownCallback>();
-  connectCallback =
-          std::make_shared<HeartbeatConnectCallback>(shared_from_this());
+  connectedCallback =
+          std::make_shared<HeartbeatConnectedCallback>(shared_from_this());
   recvCallback = std::make_shared<HeartbeatRecvCallback>(chunkMgr_, heartbeatRequestHandler_);
   sendCallback = std::make_shared<HeartbeatSendCallback>(chunkMgr_);
 
   client_->set_shutdown_callback(shutdownCallback.get());
-  client_->set_connected_callback(connectCallback.get());
+  client_->set_connected_callback(connectedCallback.get());
   client_->set_recv_callback(recvCallback.get());
   client_->set_send_callback(sendCallback.get());
 
   client_->start();
-  string proxy_address = config_->get_proxy_ip();
-  string heartbeat_port = config_->get_heartbeat_port();
-  log_->get_console_log()->info(proxy_address);
-  log_->get_console_log()->info(heartbeat_port);
-  int res = client_->connect(proxy_address.c_str(), heartbeat_port.c_str());
+  return build_connection();
+}
 
+/**
+ * TODO: for standby proxy, need check whether it is possible to connect to itself.
+ */
+int HeartbeatClient::build_connection() {
+  vector<string> proxy_addrs = config_->get_proxy_addrs();
+  string heartbeat_port = config_->get_heartbeat_port();
+  for (int i = 0; i< proxy_addrs.size(); i++) {
+    log_->get_console_log()->info("Trying to connect to " + proxy_address + ":" + heartbeat_port);
+    auto res = build_connection(proxy_addrs[i]);
+    if (res == 0) {
+      return 0;
+    }
+  }
+  log_->get_console_log()->info("Failed to connect to an active proxy!");
+  return -1;
+}
+
+/**
+ * For standby proxy use, try to connect to all other proxies.
+ */
+int HeartbeatClient::build_connection_with_exclusion(string excludedProxy) {
+  vector<string> proxy_addrs = config_->get_proxy_addrs();
+  string heartbeat_port = config_->get_heartbeat_port();
+  for (int i = 0; i< proxy_addrs.size(); i++) {
+    // Skip excluded proxy.
+    if (prox_addrs[i] == excludedProxy) {
+      continue;
+    }
+    log_->get_console_log()->info("Trying to connect to " + proxy_address + ":" + heartbeat_port);
+    auto res = build_connection(proxy_addrs[i]);
+    if (res == 0) {
+      return 0;
+    }
+  }
+  log_->get_console_log()->info("Failed to connect to an active proxy!");
+  return -1;
+}
+
+int HeartbeatClient::build_connection(string proxy_addr) {
+  /// TODO: needs to support multiple proxies.
+  connected_ = false;
+  int res = client_->connect(proxy_addr.c_str(), heartbeat_port.c_str());
+  if (res == -1) {
+    return -1;
+  }
+  // wait for ConnectedCallback to be executed.
   unique_lock<mutex> lk(con_mtx);
   while (!connected_) {
     con_v.wait(lk);
   }
-
+  activeProxyAddr_ = proxy_addr;
   return 0;
+}
+
+string HeartbeatClient::getActiveProxyAddr() {
+  return activeProxyAddr_;
+}
+
+// For standby proxy use.
+void::HeartbeatClient::set_shutdown_callback(Callback* shutdownCallback) {
+  client_->set_shutdown_callback(shutdownCallback);
 }
 
 void HeartbeatClient::shutdown() {
@@ -255,7 +313,7 @@ void HeartbeatClient::wait() {
 
 void HeartbeatClient::reset(){
   shutdownCallback.reset();
-  connectCallback.reset();
+  connectedCallback.reset();
   recvCallback.reset();
   sendCallback.reset();
   if (heartbeat_connection_ != nullptr) {

@@ -5,6 +5,7 @@
 #include <HPNL/ChunkMgr.h>
 #include <HPNL/Connection.h>
 
+#include "pmpool/HeartbeatClient.h"
 #include "pmpool/proxy/ConsistentHash.h"
 #include "pmpool/ProxyEvent.h"
 #include "pmpool/ThreadWrapper.h"
@@ -28,6 +29,9 @@ public:
     bool launchServer();
     bool launchActiveService();
     bool launchStandbyService();
+    bool shouldBecomeActiveProxy();
+    int build_connection_with_new_active_proxy();
+    void stopStandbyService();
     void wait();
     void enqueue_recv_msg(std::shared_ptr<ProxyRequest> request);
     void handle_recv_msg(std::shared_ptr<ProxyRequest> request);
@@ -54,6 +58,21 @@ public:
     std::shared_ptr<ReplicaService> replicaService_;
     std::unordered_map<uint64_t, std::unordered_set<PhysicalNode, PhysicalNodeHash>> replicaMap_;
     std::mutex replica_mtx;
+    // Standby service
+    std::shared_ptr<HeartbeatClient> heartbeatClient_;
+};
+
+/**
+ * A callback to take action when the built connection is shut down.
+ */
+class ActiveProxyShutdownCallback : public Callback {
+public:
+    explicit ActiveProxyShutdownCallback(std::shared_ptr<Prox> proxy) {}
+    ~ActiveProxyShutdownCallback() override = default;
+    void operator()(void* param_1, void* param_2);
+
+private:
+    std::shared_ptr<Proxy> proxy_;
 };
 
 #endif //RPMP_PROXY_H
