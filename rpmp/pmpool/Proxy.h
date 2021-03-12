@@ -27,9 +27,11 @@ public:
     explicit Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Redis> redis, std::string currentHostAddr);
     ~Proxy();
     bool launchServer();
+    bool isActiveProxy(string currentHostAddr);
     bool launchActiveService();
     bool launchStandbyService();
     bool shouldBecomeActiveProxy();
+    std::string getLastActiveProxy();
     int build_connection_with_new_active_proxy();
     void stopStandbyService();
     void wait();
@@ -67,7 +69,7 @@ public:
  */
 class ActiveProxyShutdownCallback : public Callback {
 public:
-    explicit ActiveProxyShutdownCallback(std::shared_ptr<Prox> proxy) {}
+    explicit ActiveProxyShutdownCallback(std::shared_ptr<Proxy> proxy);
     ~ActiveProxyShutdownCallback() override = default;
     void operator()(void* param_1, void* param_2);
 

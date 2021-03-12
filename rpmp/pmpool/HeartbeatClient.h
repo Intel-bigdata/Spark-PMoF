@@ -117,7 +117,7 @@ public:
   int initHeartbeatClient();
   int build_connection();
   int build_connection_with_exclusion(string excludedProxy);
-  int build_connection(string proxy_addr);
+  int build_connection(string proxy_addr, string heartbeat_port);
   void set_shutdown_callback(Callback* shutdownCallback);
   string getActiveProxyAddr();
   void shutdown();

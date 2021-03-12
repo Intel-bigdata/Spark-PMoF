@@ -39,7 +39,7 @@ bool Proxy::launchServer() {
  * @param currentHostAddr   the host address of current proxy.
  * @return  true if the current proxy should be active.
  */
-bool isActiveProxy(string currentHostAddr) {
+bool Proxy::isActiveProxy(string currentHostAddr) {
   // Directly launch proxy case.
   if (currentHostAddr.empty()) {
     return true;
@@ -110,11 +110,11 @@ bool Proxy::shouldBecomeActiveProxy() {
 /**
  * Get last active proxy according to HeartbeatClient's successfully built connection previously.
  */
-bool Proxy::getLastActiveProxy() {
-  heartbeatClient_->getActiveProxyAddr();
+string Proxy::getLastActiveProxy() {
+  return heartbeatClient_->getActiveProxyAddr();
 }
 
-void ActiveProxyShutdownCallback::ActiveProxyShutdownCallback(std::shared_ptr<Proxy> proxy) {
+ActiveProxyShutdownCallback::ActiveProxyShutdownCallback(std::shared_ptr<Proxy> proxy) {
   proxy_ = proxy;
 }
 

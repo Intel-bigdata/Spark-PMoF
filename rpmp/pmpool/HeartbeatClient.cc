@@ -247,8 +247,8 @@ int HeartbeatClient::build_connection() {
   vector<string> proxy_addrs = config_->get_proxy_addrs();
   string heartbeat_port = config_->get_heartbeat_port();
   for (int i = 0; i< proxy_addrs.size(); i++) {
-    log_->get_console_log()->info("Trying to connect to " + proxy_address + ":" + heartbeat_port);
-    auto res = build_connection(proxy_addrs[i]);
+    log_->get_console_log()->info("Trying to connect to " + proxy_addrs[i] + ":" + heartbeat_port);
+    auto res = build_connection(proxy_addrs[i], heartbeat_port);
     if (res == 0) {
       return 0;
     }
@@ -265,11 +265,11 @@ int HeartbeatClient::build_connection_with_exclusion(string excludedProxy) {
   string heartbeat_port = config_->get_heartbeat_port();
   for (int i = 0; i < proxy_addrs.size(); i++) {
     // Skip excluded proxy.
-    if (prox_addrs[i] == excludedProxy) {
+    if (proxy_addrs[i] == excludedProxy) {
       continue;
     }
-    log_->get_console_log()->info("Trying to connect to " + proxy_address + ":" + heartbeat_port);
-    auto res = build_connection(proxy_addrs[i]);
+    log_->get_console_log()->info("Trying to connect to " + proxy_addrs[i] + ":" + heartbeat_port);
+    auto res = build_connection(proxy_addrs[i], heartbeat_port);
     if (res == 0) {
       return 0;
     }
@@ -278,7 +278,7 @@ int HeartbeatClient::build_connection_with_exclusion(string excludedProxy) {
   return -1;
 }
 
-int HeartbeatClient::build_connection(string proxy_addr) {
+int HeartbeatClient::build_connection(string proxy_addr, string heartbeat_port) {
   // reset to false to consider the possible re-connection to a new active proxy.
   connected_ = false;
   int res = client_->connect(proxy_addr.c_str(), heartbeat_port.c_str());
