@@ -1,7 +1,5 @@
 #include "NodeManager.h"
 
-using namespace std;
-
 #include "HPNL/Callback.h"
 #include "HPNL/Connection.h"
 #include "HPNL/ChunkMgr.h"

@@ -4,6 +4,7 @@
 #include <utility>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <HPNL/Callback.h>
 #include <HPNL/Client.h>
@@ -19,7 +20,7 @@ class HeartbeatClient;
 class Config;
 class Log;
 
-/// TODO: remove or keep.
+/// TODO: remove or keep it in .cc file.
 using namespace std;
 using std::make_shared;
 using moodycamel::BlockingConcurrentQueue;

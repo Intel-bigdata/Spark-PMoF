@@ -14,7 +14,8 @@ int main(int argc, char* argv[]){
   std::shared_ptr<Redis> redis = std::make_shared<Redis>(config, log);
   // Host ip will be passed from command line through a launch script.
   // It is consistent with user-specified ip in the configuration.
-  string currentHostAddr;
+  std::string currentHostAddr;
+  // Directly launch proxy case.
   if (argc < 2) {
       currentHostAddr = "";
   }
