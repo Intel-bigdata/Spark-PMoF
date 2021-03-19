@@ -29,7 +29,12 @@ bool Proxy::launchServer() {
   if (isActiveProxy(currentHostAddr_)) {
     return launchActiveService();
   }
-  return launchStandbyService();
+  // If no active proxy is found at start time, the current proxy should be active.
+  if (!launchStandbyService()) {
+    stopStandbyService();
+    return launchActiveService();
+  }
+  return 0;
 }
 
 /**
@@ -52,7 +57,7 @@ bool Proxy::isActiveProxy(string currentHostAddr) {
   }
   if (std::find(proxies.begin(), proxies.end(),
                 currentHostAddr) == proxies.end()) {
-    log_->get_file_log()->error("Incorrect host address is given!");
+    log_->get_file_log()->error("Incorrect proxy address is configured for current host!");
     return false;
   }
   // All proxy nodes share same config file. The first node
@@ -66,6 +71,7 @@ bool Proxy::isActiveProxy(string currentHostAddr) {
 
 /// TODO: add fencing service to make sure only one proxy is active.
 bool Proxy::launchActiveService() {
+  log_->get_console_log()->info("Launch active proxy services..");
   nodeManager_ = std::make_shared<NodeManager>(config_, log_, redis_);
   nodeManager_->init();
   loadBalanceFactor_ = config_->get_load_balance_factor();
@@ -80,13 +86,18 @@ bool Proxy::launchActiveService() {
 }
 
 bool Proxy::launchStandbyService() {
+  log_->get_console_log()->info("Launch standby proxy services..");
   vector<string> proxies = config_->get_proxy_addrs();
   heartbeatClient_ = std::make_shared<HeartbeatClient>(config_, log_);
-  /// TODO: consider case: failed to connect to the predefined active proxy in start time.
-  heartbeatClient_->init();
+  // To avoid unnecessarily trying to connect to itself.
+  heartbeatClient_->setExcludedProxy(currentHostAddr_);
+  int res = heartbeatClient_->init();
+  if (res == -1) {
+    return false;
+  }
   std::shared_ptr<ActiveProxyShutdownCallback> shutdownCallback =
       std::make_shared<ActiveProxyShutdownCallback>(shared_from_this());
-  heartbeatClient_->set_shutdown_callback(shutdownCallback.get());
+  heartbeatClient_->set_active_proxy_shutdown_callback(shutdownCallback.get());
   return true;
 }
 
@@ -111,6 +122,7 @@ bool Proxy::shouldBecomeActiveProxy() {
  * Get last active proxy according to HeartbeatClient's successfully built connection previously.
  */
 string Proxy::getLastActiveProxy() {
+  log_->get_console_log()->info("Last active proxy addr: {0}", heartbeatClient_->getActiveProxyAddr());
   return heartbeatClient_->getActiveProxyAddr();
 }
 
@@ -128,7 +140,7 @@ void ActiveProxyShutdownCallback::operator()(void* param_1, void* param_2) {
     proxy_->launchActiveService();
   } else {
     /// TODO: wait for 5s, can be optimized.
-    /// New active proxy needs some time to launch services connect to new active proxy.
+    /// New active proxy needs some time to launch services.
     sleep(5);
     int res = proxy_->build_connection_with_new_active_proxy();
     if (res == 0) {
@@ -152,6 +164,7 @@ int Proxy::build_connection_with_new_active_proxy() {
  * ActiveProxyShutdownCallback -> stopStandbyService -> ActiveProxyShutdownCallback.
  */
 void Proxy::stopStandbyService() {
+  log_->get_console_log()->info("Shutting down standby services..");
   heartbeatClient_->reset();
   heartbeatClient_.reset();
 }
@@ -189,6 +202,9 @@ void Proxy::notifyClient(uint64_t key) {
 
 /// TODO: for standby service, the below two services are not created.
 void Proxy::wait() {
-    clientService_->wait();
-    replicaService_->wait();
+  while (true) {
+    sleep(10);
+  }
+//  clientService_->wait();
+//  replicaService_->wait();
 }

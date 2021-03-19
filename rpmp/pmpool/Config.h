@@ -66,6 +66,8 @@ class Config {
       return 0;
     }
 
+    /// TODO: This path depends on where user launches the program.
+    /// TODO: Should be fixed by using absolute path according to passed RPMP_HOME.
     int readFromFile(string file = "../config/rpmp.conf"){
       setDefault();
       std::ifstream infile(file);
@@ -347,7 +349,7 @@ class Config {
     }
 
     void set_current_proxy_addr(string current_proxy_addr) {
-      current_proxy_addr_=current_proxy_addr;
+      current_proxy_addr_ = current_proxy_addr;
     }
     string get_current_proxy_addr() {
       return current_proxy_addr_;

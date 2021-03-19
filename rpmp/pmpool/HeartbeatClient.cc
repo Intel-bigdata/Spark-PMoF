@@ -63,10 +63,13 @@ void HeartbeatRequestHandler::inflight_erase(std::shared_ptr<HeartbeatRequest> r
 int HeartbeatRequestHandler::get(std::shared_ptr<HeartbeatRequest> request) {
   auto ctx = inflight_insert_or_get(request);
   unique_lock<mutex> lk(ctx->mtx_reply);
-  while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request] {
+  const int heartbeatInverval = heartbeatClient_->get_heartbeat_interval();
+  // timeout in sec depneds on the configured heartbeat interval.
+  const std::chrono::seconds timeoutInSec(2 * heartbeatInverval);
+  while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request, timeoutInSec] {
     auto current = std::chrono::steady_clock::now();
     auto elapse = current - ctx->start;
-    if (elapse > 10s) {
+    if (elapse > timeoutInSec) {
       ctx->op_failed = true;
       fprintf(stderr, "Request [TYPE %ld] spent %ld s, time out\n",
               request->requestContext_.type,
@@ -78,7 +81,7 @@ int HeartbeatRequestHandler::get(std::shared_ptr<HeartbeatRequest> request) {
   }
   auto res = ctx->get_rrc();
   if (ctx->op_failed) {
-    throw;
+    throw "Failed to send heart beat to active proxy.";
   }
   inflight_erase(request);
   return res.success;
@@ -155,6 +158,7 @@ std::string exec(const char* cmd) {
 
 HeartbeatClient::HeartbeatClient(std::shared_ptr<Config> config, std::shared_ptr<Log> log)
         : config_(config), log_(log) {
+  heartbeatInterval_ = config->get_heartbeat_interval();
   XXHash *hashFactory = new XXHash();
   std::string result = exec("ip a");
 
@@ -191,7 +195,13 @@ int HeartbeatClient::heartbeat() {
 
     auto heartbeatRequest = std::make_shared<HeartbeatRequest>(hrc);
     heartbeatRequestHandler_->addTask(heartbeatRequest);
-    heartbeatRequestHandler_->get(heartbeatRequest);
+    try {
+      heartbeatRequestHandler_->get(heartbeatRequest);
+    } catch (char const* e) {
+      log_->get_console_log()->info(e);
+      shutdown();
+      break;
+    }
   }
 }
 
@@ -205,8 +215,8 @@ void HeartbeatClient::send(const char *data, uint64_t size) {
 int HeartbeatClient::init(){
   heartbeatRequestHandler_ = make_shared<HeartbeatRequestHandler>(shared_from_this());
   auto res = initHeartbeatClient();
-  heartbeatRequestHandler_->start();
   if (res != -1){
+    heartbeatRequestHandler_->start();
     std::thread t_heartbeat(&HeartbeatClient::heartbeat, shared_from_this());
     t_heartbeat.detach();
   }
@@ -246,6 +256,9 @@ int HeartbeatClient::initHeartbeatClient() {
 int HeartbeatClient::build_connection() {
   vector<string> proxy_addrs = config_->get_proxy_addrs();
   string heartbeat_port = config_->get_heartbeat_port();
+  if (!excludedProxy_.empty()) {
+    return build_connection_with_exclusion(excludedProxy_);
+  }
   for (int i = 0; i< proxy_addrs.size(); i++) {
     log_->get_console_log()->info("Trying to connect to " + proxy_addrs[i] + ":" + heartbeat_port);
     auto res = build_connection(proxy_addrs[i], heartbeat_port);
@@ -274,22 +287,31 @@ int HeartbeatClient::build_connection_with_exclusion(string excludedProxy) {
       return 0;
     }
   }
-  log_->get_console_log()->error("Failed to connect to an active proxy!");
+  log_->get_console_log()->info("Failed to connect to an active proxy!");
   return -1;
 }
 
 int HeartbeatClient::build_connection(string proxy_addr, string heartbeat_port) {
   // reset to false to consider the possible re-connection to a new active proxy.
   connected_ = false;
+  // res can be 0 even though remote proxy is shut down.
   int res = client_->connect(proxy_addr.c_str(), heartbeat_port.c_str());
   if (res == -1) {
     return -1;
   }
   // wait for ConnectedCallback to be executed.
   unique_lock<mutex> lk(con_mtx);
+  // TODO: looks not a loop.
   while (!connected_) {
-    con_v.wait(lk);
+    // TODO: sometimes segmentation fault occurs.
+    if (con_v.wait_for(lk, std::chrono::seconds(2)) == std::cv_status::timeout) {
+      break;
+    }
   }
+  if (!connected_) {
+    return -1;
+  }
+  log_->get_console_log()->info("Successfully connected to active proxy: " + proxy_addr);
   activeProxyAddr_ = proxy_addr;
   return 0;
 }
@@ -299,12 +321,20 @@ string HeartbeatClient::getActiveProxyAddr() {
 }
 
 // For standby proxy use.
-void::HeartbeatClient::set_shutdown_callback(Callback* shutdownCallback) {
-  client_->set_shutdown_callback(shutdownCallback);
+void::HeartbeatClient::set_active_proxy_shutdown_callback(Callback* activeProxyShutdownCallback) {
+  activeProxyShutdownCallback_ = activeProxyShutdownCallback;
+//  client_->set_shutdown_callback(shutdownCallback.get());
 }
 
 void HeartbeatClient::shutdown() {
   client_->shutdown();
+  if (activeProxyShutdownCallback_) {
+    activeProxyShutdownCallback_->operator()(nullptr, nullptr);
+  }
+}
+
+void HeartbeatClient::shutdown(Connection* conn) {
+  client_->shutdown(conn);
 }
 
 void HeartbeatClient::wait() {
@@ -324,3 +354,14 @@ void HeartbeatClient::reset(){
     client_.reset();
   }
 }
+
+int HeartbeatClient::get_heartbeat_interval() {
+  return heartbeatInterval_;
+}
+
+// Directly letting standby proxy try to connect to itself can sometimes cause issues.
+// Also it is for efficiency consideration.
+void HeartbeatClient::setExcludedProxy(string proxyAddr) {
+  excludedProxy_ = proxyAddr;
+}
+
