@@ -240,7 +240,7 @@ class Config {
         }
         if (vm.count("paths")) {
           set_pool_paths(vm["paths"].as<vector<string>>());
-        } else {
+        } else if (pool_paths_.empty()) {
           std::cerr << "No PMem devices input, check '--paths' pls" << std::endl;
           std::cout << desc << '\n';
           throw;
