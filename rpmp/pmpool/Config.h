@@ -199,7 +199,7 @@ class Config {
                   "network_buffer_num,nbn", value<int>()->default_value(16),
                   "set network buffer number")("network_worker,nw",
                     value<int>()->default_value(1),
-                    "set network wroker number")(
+                    "set network worker number")(
                       "paths,ps", value<vector<string>>()->multitoken(),
                       "set memory pool path")("sizes,ss",
                         value<vector<uint64_t>>()->multitoken(),
@@ -209,7 +209,10 @@ class Config {
                             "log,l", value<string>()->default_value("/tmp/rpmp.log"),
                             "set rpmp log file path")("log_level,ll",
                               value<string>()->default_value("warn"),
-                              "set log level");
+                              "set log level")("current_proxy_addr,cpa",
+                                  value<string>()->default_value(""),
+                                  "Set current proxy address, applicable to proxy node."
+                                  );
 
         command_line_parser parser{argc, argv};
         parsed_options parsed_options = parser.options(desc).run();
@@ -221,11 +224,16 @@ class Config {
           std::cout << desc << '\n';
           throw;
         }
+        /// TODO: set when provided?
         set_ip(vm["address"].as<string>());
         set_port(vm["port"].as<string>());
         set_network_buffer_size(vm["network_buffer_size"].as<int>());
         set_network_buffer_num(vm["network_buffer_num"].as<int>());
         set_network_worker_num(vm["network_worker"].as<int>());
+        // Applicable to proxy node.
+        if (vm.count("current_proxy_addr")) {
+          set_current_proxy_addr(vm["current_proxy_addr"].as<string>());
+        }
         // pool_paths_.push_back("/dev/dax0.0");
         if (vm.count("sizes")) {
           set_pool_sizes(vm["sizes"].as<vector<uint64_t>>());
@@ -338,6 +346,13 @@ class Config {
       return proxy_addrs_;
     }
 
+    void set_current_proxy_addr(string current_proxy_addr) {
+      current_proxy_addr_=current_proxy_addr;
+    }
+    string get_current_proxy_addr() {
+      return current_proxy_addr_;
+    }
+
     void set_data_replica(uint32_t replica) {replica_ = replica;}
     uint32_t get_data_replica() {return replica_;}
 
@@ -379,6 +394,8 @@ class Config {
     string proxy_client_service_port_;
     // TODO: need to be removed.
     string proxy_ip_;
+    // Applicable to proxy node.
+    string current_proxy_addr_;
     vector<string> proxy_addrs_;
     uint32_t replica_;
     uint32_t minReplica_;
