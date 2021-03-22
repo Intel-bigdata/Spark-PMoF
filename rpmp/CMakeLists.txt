@@ -51,3 +51,5 @@ target_link_libraries(chashtest pmpool spdlog hiredis jsoncpp)
 target_link_libraries(main pmpool spdlog hiredis jsoncpp)
 target_link_libraries(proxyMain pmpool spdlog hiredis jsoncpp)
 target_link_libraries(client pmpool spdlog hiredis jsoncpp)
+
+file(COPY ${PROJECT_SOURCE_DIR}/config DESTINATION .)
