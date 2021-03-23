@@ -318,6 +318,10 @@ int NodeManager::checkNode(){
   int gap = 2;
   while(true){
     sleep(heartbeatInterval * gap);
+    int exist = redis_->exists(NODE_STATUS);
+    if (exist == 0){
+      continue;
+    }
     string rawJson = redis_->get(NODE_STATUS);
     const auto rawJsonLength = static_cast<int>(rawJson.length());
     JSONCPP_STRING err;
