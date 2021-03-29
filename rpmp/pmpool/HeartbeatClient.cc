@@ -24,7 +24,7 @@ HeartbeatRequestHandler::~HeartbeatRequestHandler() {
 void HeartbeatRequestHandler::reset() {
   this->stop();
   this->join();
-  heartbeatClient_->reset();
+  heartbeatClient_.reset();
 }
 
 void HeartbeatRequestHandler::addTask(std::shared_ptr<HeartbeatRequest> request) {
