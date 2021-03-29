@@ -4,6 +4,7 @@
 #include <utility>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <HPNL/Callback.h>
 #include <HPNL/Client.h>
@@ -19,6 +20,7 @@ class HeartbeatClient;
 class Config;
 class Log;
 
+/// TODO: remove or keep it in .cc file.
 using namespace std;
 using std::make_shared;
 using moodycamel::BlockingConcurrentQueue;
@@ -67,14 +69,13 @@ class HeartbeatShutdownCallback : public Callback {
 public:
   explicit HeartbeatShutdownCallback() {}
   ~HeartbeatShutdownCallback() override = default;
-  void operator()(void* param_1, void* param_2) {};
+  void operator()(void* param_1, void* param_2);
 };
 
-
-class HeartbeatConnectCallback : public Callback {
+class HeartbeatConnectedCallback : public Callback {
 public:
-  explicit HeartbeatConnectCallback(std::shared_ptr<HeartbeatClient> heartbeatClient);
-  ~HeartbeatConnectCallback() override = default;
+  explicit HeartbeatConnectedCallback(std::shared_ptr<HeartbeatClient> heartbeatClient);
+  ~HeartbeatConnectedCallback() override = default;
   void operator()(void* param_1, void* param_2);
 private:
   std::shared_ptr<HeartbeatClient> heartbeatClient_;
@@ -114,9 +115,17 @@ public:
   void send(const char* data, uint64_t size);
   void setConnection(Connection* connection);
   int initHeartbeatClient();
+  int build_connection();
+  int build_connection_with_exclusion(string excludedProxy);
+  int build_connection(string proxy_addr, string heartbeat_port);
+  void set_active_proxy_shutdown_callback(Callback* shutdownCallback);
+  string getActiveProxyAddr();
   void shutdown();
+  void shutdown(Connection* conn);
   void wait();
   void reset();
+  int get_heartbeat_interval();
+  void setExcludedProxy(string proxyAddr);
 
 private:
   atomic<uint64_t> rid_ = {0};
@@ -126,18 +135,23 @@ private:
   std::shared_ptr<HeartbeatRequestHandler> heartbeatRequestHandler_;
   std::shared_ptr<Config> config_;
   std::shared_ptr<Log> log_;
+  int heartbeatInterval_;
   std::shared_ptr<Client> client_;
   std::shared_ptr<ChunkMgr> chunkMgr_;
 
   std::shared_ptr<HeartbeatShutdownCallback> shutdownCallback;
-  std::shared_ptr<HeartbeatConnectCallback> connectCallback;
+  std::shared_ptr<HeartbeatConnectedCallback> connectedCallback;
   std::shared_ptr<HeartbeatRecvCallback> recvCallback;
   std::shared_ptr<HeartbeatSendCallback> sendCallback;
   Connection* heartbeat_connection_;
+  std::string activeProxyAddr_;
 
   std::mutex con_mtx;
   std::condition_variable con_v;
   bool connected_;
+
+  Callback* activeProxyShutdownCallback_;
+  string excludedProxy_;
 };
 
 #endif //SPARK_PMOF_HEARTBEAT_H

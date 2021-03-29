@@ -1,7 +1,5 @@
 #include "NodeManager.h"
 
-using namespace std;
-
 #include "HPNL/Callback.h"
 #include "HPNL/Connection.h"
 #include "HPNL/ChunkMgr.h"
@@ -392,11 +390,8 @@ bool NodeManager::launchServer()
   server_->set_shutdown_callback(shutdownCallback_.get());
 
   server_->start();
-  server_->listen(config_->get_proxy_ip().c_str(), config_->get_heartbeat_port().c_str());
-  log_->get_file_log()->info("NodeManager server started at ", config_->get_proxy_ip(), ":", config_->get_heartbeat_port());
-  log_->get_console_log()->info("NodeManager server started at ");
-  log_->get_console_log()->info(config_->get_proxy_ip());
-  log_->get_console_log()->info(config_->get_heartbeat_port());
+  server_->listen(config_->get_current_proxy_addr().c_str(), config_->get_heartbeat_port().c_str());
+  log_->get_console_log()->info("NodeManager server started at {0}:{1}", config_->get_current_proxy_addr(), config_->get_heartbeat_port());
   server_->wait();
   return true;
 }

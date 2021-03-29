@@ -5,6 +5,7 @@
 #include <HPNL/ChunkMgr.h>
 #include <HPNL/Connection.h>
 
+#include "pmpool/HeartbeatClient.h"
 #include "pmpool/proxy/ConsistentHash.h"
 #include "pmpool/ProxyEvent.h"
 #include "pmpool/ThreadWrapper.h"
@@ -23,9 +24,16 @@ class Proxy;
 
 class Proxy : public std::enable_shared_from_this<Proxy>{
 public:
-    explicit Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Redis> redis);
+    explicit Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Redis> redis, std::string currentHostAddr);
     ~Proxy();
     bool launchServer();
+    bool isActiveProxy(string currentHostAddr);
+    bool launchActiveService();
+    bool launchStandbyService();
+    bool shouldBecomeActiveProxy();
+    std::string getLastActiveProxy();
+    int build_connection_with_new_active_proxy();
+    void stopStandbyService();
     void wait();
     void enqueue_recv_msg(std::shared_ptr<ProxyRequest> request);
     void handle_recv_msg(std::shared_ptr<ProxyRequest> request);
@@ -40,6 +48,7 @@ public:
     std::shared_ptr<NodeManager> nodeManager_;
     std::shared_ptr<ChunkMgr> chunkMgr_;
     std::shared_ptr<Config> config_;
+    std::string currentHostAddr_;
     std::shared_ptr<Log> log_;
     std::shared_ptr<Redis> redis_;
     std::shared_ptr<ConsistentHash> consistentHash_;
@@ -51,6 +60,21 @@ public:
     std::shared_ptr<ReplicaService> replicaService_;
     std::unordered_map<uint64_t, std::unordered_set<PhysicalNode, PhysicalNodeHash>> replicaMap_;
     std::mutex replica_mtx;
+    // Standby service
+    std::shared_ptr<HeartbeatClient> heartbeatClient_;
+};
+
+/**
+ * A callback to take action when the built connection is shut down.
+ */
+class ActiveProxyShutdownCallback : public Callback {
+public:
+    explicit ActiveProxyShutdownCallback(std::shared_ptr<Proxy> proxy);
+    ~ActiveProxyShutdownCallback() override = default;
+    void operator()(void* param_1, void* param_2);
+
+private:
+    std::shared_ptr<Proxy> proxy_;
 };
 
 #endif //RPMP_PROXY_H

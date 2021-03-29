@@ -66,6 +66,8 @@ class Config {
       return 0;
     }
 
+    /// TODO: This path depends on where user launches the program.
+    /// TODO: Should be fixed by using absolute path according to passed RPMP_HOME.
     int readFromFile(string file = "../config/rpmp.conf"){
       setDefault();
       std::ifstream infile(file);
@@ -88,9 +90,7 @@ class Config {
           }
         }
 
-        vector<string> nodes;
-        boost::split(nodes, configs.find(RPMP_NODE_LIST)->second, boost::is_any_of(","), boost::token_compress_on);
-        set_nodes(nodes);
+        set_nodes(configs.find(RPMP_NODE_LIST)->second);
 
         set_replica_service_port(configs.find(RPMP_PROXY_REPLICA_SERVICE_PORT)->second);
 
@@ -104,7 +104,7 @@ class Config {
 
         set_heartbeat_port(configs.find(RPMP_NETWORK_HEARTBEAT_PORT)->second);
 
-        set_proxy_ip(configs.find(RPMP_NETWORK_PROXY_ADDRESS)->second);
+        set_proxy_addrs(configs.find(RPMP_NETWORK_PROXY_ADDRESS)->second);
 
         set_ip(configs.find(RPMP_NETWORK_SERVER_ADDRESS)->second);
 
@@ -201,7 +201,7 @@ class Config {
                   "network_buffer_num,nbn", value<int>()->default_value(16),
                   "set network buffer number")("network_worker,nw",
                     value<int>()->default_value(1),
-                    "set network wroker number")(
+                    "set network worker number")(
                       "paths,ps", value<vector<string>>()->multitoken(),
                       "set memory pool path")("sizes,ss",
                         value<vector<uint64_t>>()->multitoken(),
@@ -211,7 +211,10 @@ class Config {
                             "log,l", value<string>()->default_value("/tmp/rpmp.log"),
                             "set rpmp log file path")("log_level,ll",
                               value<string>()->default_value("warn"),
-                              "set log level");
+                              "set log level")("current_proxy_addr,cpa",
+                                  value<string>()->default_value(""),
+                                  "Set current proxy address, applicable to proxy node."
+                                  );
 
         command_line_parser parser{argc, argv};
         parsed_options parsed_options = parser.options(desc).run();
@@ -223,18 +226,23 @@ class Config {
           std::cout << desc << '\n';
           throw;
         }
+        /// TODO: set when provided?
         set_ip(vm["address"].as<string>());
         set_port(vm["port"].as<string>());
         set_network_buffer_size(vm["network_buffer_size"].as<int>());
         set_network_buffer_num(vm["network_buffer_num"].as<int>());
         set_network_worker_num(vm["network_worker"].as<int>());
+        // Applicable to proxy node.
+        if (vm.count("current_proxy_addr")) {
+          set_current_proxy_addr(vm["current_proxy_addr"].as<string>());
+        }
         // pool_paths_.push_back("/dev/dax0.0");
         if (vm.count("sizes")) {
           set_pool_sizes(vm["sizes"].as<vector<uint64_t>>());
         }
         if (vm.count("paths")) {
           set_pool_paths(vm["paths"].as<vector<string>>());
-        } else {
+        } else if (pool_paths_.empty()) {
           std::cerr << "No PMem devices input, check '--paths' pls" << std::endl;
           std::cout << desc << '\n';
           throw;
@@ -314,14 +322,38 @@ class Config {
     string get_log_level() { return log_level_; }
     void set_log_level(string log_level) { log_level_ = log_level; }
 
-    void set_nodes(vector<string> nodes) {nodes_ = nodes;}
+    void set_nodes(string configured_nodes) {
+      vector<string> nodes;
+      boost::split(nodes, configured_nodes, boost::is_any_of(","), boost::token_compress_on);
+      nodes_ = nodes;
+    }
     vector<string> get_nodes() {return nodes_;}
 
     void set_client_service_port(string port) {proxy_client_service_port_ = port;}
     string get_client_service_port() {return proxy_client_service_port_;}
 
+    // TODO: need to be removed.
     void set_proxy_ip(string ip) {proxy_ip_ = ip;}
-    string get_proxy_ip() {return proxy_ip_;}
+    void set_proxy_addrs(string proxy_ips) {
+      vector<string> proxies;
+      boost::split(proxies, proxy_ips, boost::is_any_of(","), boost::token_compress_on);
+      proxy_addrs_ = proxies;
+    }
+    // TODO: need to be removed. Still keep it for compatibility consideration.
+    string get_proxy_ip() {
+      // return proxy_ip_;
+      return proxy_addrs_[0];
+    }
+    vector<string> get_proxy_addrs() {
+      return proxy_addrs_;
+    }
+
+    void set_current_proxy_addr(string current_proxy_addr) {
+      current_proxy_addr_ = current_proxy_addr;
+    }
+    string get_current_proxy_addr() {
+      return current_proxy_addr_;
+    }
 
     void set_data_replica(uint32_t replica) {replica_ = replica;}
     uint32_t get_data_replica() {return replica_;}
@@ -362,7 +394,11 @@ class Config {
     vector<string> nodes_;
     int heatbeat_interval_;
     string proxy_client_service_port_;
+    // TODO: need to be removed.
     string proxy_ip_;
+    // Applicable to proxy node.
+    string current_proxy_addr_;
+    vector<string> proxy_addrs_;
     uint32_t replica_;
     uint32_t minReplica_;
     string proxy_replica_service_port_;
@@ -373,7 +409,7 @@ class Config {
     string redis_port_;
 
 const string RPMP_NODE_LIST = "rpmp.node.list";
-const string RPMP_NETWORK_HEARTBEAT_INTERVAL = "rpmp.network.heartbeat-interval";
+const string RPMP_NETWORK_HEARTBEAT_INTERVAL = "rpmp.network.heartbeat-interval.sec";
 const string RPMP_NETWORK_HEARTBEAT_PORT = "rpmp.network.heartbeat.port";
 const string RPMP_NETWORK_PROXY_ADDRESS = "rpmp.network.proxy.address";
 const string RPMP_PROXY_CLIENT_SERVICE_PORT = "rpmp.proxy.client.service.port";
@@ -388,9 +424,9 @@ const string RPMP_NETWORK_BUFFER_SIZE = "rpmp.network.buffer.size";
 const string RPMP_LOG_LEVEL = "rpmp.log.level";
 const string RPMP_LOG_PATH = "rpmp.log.path";
 const string RPMP_DATA_REPLICA = "rpmp.data.replica";
-const string RPMP_DATA_MINREPLICA = "rpmp.data.minreplica";
+const string RPMP_DATA_MINREPLICA = "rpmp.data.min.replica";
 const string RPMP_PROXY_REPLICA_SERVICE_PORT = "rpmp.proxy.replica.service.port";
-const string RPMP_PROXY_LOAD_BALANCE_FACTOR = "rpmp.proxy.loadBalanceFactor";
+const string RPMP_PROXY_LOAD_BALANCE_FACTOR = "rpmp.proxy.load-balance-factor";
 const string RPMP_METASTORE_REDIS_IP = "rpmp.metastore.redis.ip";
 const string RPMP_METASTORE_REDIS_PORT = "rpmp.metastore.redis.port";
 const string DEFAULT_RPMP_NODE_LIST = "172.168.0.209,172.168.0.40";

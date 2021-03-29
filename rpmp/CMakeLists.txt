@@ -43,6 +43,8 @@ add_subdirectory(pmpool)
 add_subdirectory(test)
 add_subdirectory(benchmark)
 
+file(COPY bin/start-rpmp.sh DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+
 add_executable(main main.cc)
 add_executable(chashtest test/chash_test.cc)
 add_executable(proxyMain ProxyMain.cc)
