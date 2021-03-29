@@ -117,13 +117,14 @@ make && make install
 Take below configs as a sample.
 
 ### Proxy settings
-Set proxy address and other proxy service's preference.
+Set proxy address and other proxy service's preference. You can deploy multiple proxy servers for HA. To achieve this,
+multiple proxy addresses, separated by comma, should be specified for `rpmp.network.proxy.address`.
 
 ```
 rpmp.network.proxy.address 172.168.0.40
 rpmp.proxy.client.service.port 12350
 rpmp.proxy.replica.service.port 12340
-rpmp.network.heartbeat-interval 5
+rpmp.network.heartbeat-interval.sec 5
 rpmp.network.heartbeat.port 12355
 ```
 
@@ -145,7 +146,7 @@ Set registered namespaces and memory settings of each namespace.
 ### Replica settings
 ```
 rpmp.data.replica 2
-rpmp.data.minreplica 2
+rpmp.data.min.replica 2
 ```
 
 Set minimal replica and preferred replica. 
@@ -154,7 +155,7 @@ Set minimal replica and preferred replica.
 ### Put and get
 Change directory to {RPMP-HOME}/build/bin
  - Launch proxy 
- ```./proxyMain```
+ ```./proxyMain --current_proxy_addr {addr}```
  - Launch RPMP nodes according to config  
  ```./main```
  - Launch put and get executor
