@@ -326,6 +326,7 @@ void::HeartbeatClient::set_active_proxy_shutdown_callback(Callback* activeProxyS
 //  client_->set_shutdown_callback(shutdownCallback.get());
 }
 
+///TODO: looks client should not be shutdown.
 void HeartbeatClient::shutdown() {
   client_->shutdown();
   if (activeProxyShutdownCallback_) {

@@ -12,6 +12,7 @@
 
 #include <HPNL/ChunkMgr.h>
 #include <HPNL/Server.h>
+#include "pmpool/HeartbeatClient.h"
 
 #include <memory>
 
@@ -44,6 +45,19 @@ class DataServer {
   std::shared_ptr<AllocatorProxy> allocatorProxy_;
   std::shared_ptr<Protocol> protocol_;
   std::shared_ptr<HeartbeatClient> heartbeatClient_;
+};
+
+/**
+ * A callback to take action when the built connection is shut down.
+ */
+class ActiveProxyShutdownCallback : public Callback {
+public:
+    explicit ActiveProxyShutdownCallback(std::shared_ptr<HeartbeatClient> heartbeatClient);
+    ~ActiveProxyShutdownCallback() override = default;
+    void operator()(void* param_1, void* param_2);
+
+private:
+    std::shared_ptr<HeartbeatClient> heartbeatClient_;
 };
 
 #endif  // PMPOOL_DATASERVER_H_
