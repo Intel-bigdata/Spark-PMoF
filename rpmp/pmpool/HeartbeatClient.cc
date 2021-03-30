@@ -296,6 +296,7 @@ int HeartbeatClient::build_connection(string proxy_addr, string heartbeat_port) 
   connected_ = false;
   // res can be 0 even though remote proxy is shut down.
   int res = client_->connect(proxy_addr.c_str(), heartbeat_port.c_str());
+  log_->get_console_log()->info("Debug..{0}", res);
   if (res == -1) {
     return -1;
   }
@@ -303,12 +304,14 @@ int HeartbeatClient::build_connection(string proxy_addr, string heartbeat_port) 
   unique_lock<mutex> lk(con_mtx);
   // TODO: looks not a loop.
   while (!connected_) {
+    log_->get_console_log()->info("Debug..1");
     // TODO: sometimes segmentation fault occurs.
-    if (con_v.wait_for(lk, std::chrono::seconds(2)) == std::cv_status::timeout) {
+    if (con_v.wait_for(lk, std::chrono::seconds(3)) == std::cv_status::timeout) {
       break;
     }
   }
   if (!connected_) {
+    log_->get_console_log()->info("Debug..2");
     return -1;
   }
   log_->get_console_log()->info("Successfully connected to active proxy: " + proxy_addr);
