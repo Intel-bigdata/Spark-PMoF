@@ -10,8 +10,10 @@
 #include "pmpool/DataServer.h"
 
 #include "pmpool/AllocatorProxy.h"
+#include "pmpool/Callback.h"
 #include "pmpool/Config.h"
 #include "pmpool/Digest.h"
+#include "pmpool/HeartbeatClient.h"
 #include "pmpool/Log.h"
 #include "pmpool/NetworkServer.h"
 #include "pmpool/Protocol.h"
@@ -23,9 +25,9 @@ int DataServer::init() {
   /// initialize heartbeat client
   heartbeatClient_ = std::make_shared<HeartbeatClient>(config_, log_);
   CHK_ERR("heartbeat client init", heartbeatClient_->init());
-  log->get_console_log()->info("heartbeat client initialized");
-  std::shared_ptr<ActiveProxyShutdownCallback> shutdownCallback =
-      std::make_shared<ActiveProxyShutdownCallback>(heartbeatClient_);
+  log_->get_console_log()->info("heartbeat client initialized");
+  std::shared_ptr<ConnectionShutdownCallback> shutdownCallback =
+      std::make_shared<ConnectionShutdownCallback>(heartbeatClient_);
   heartbeatClient_->set_active_proxy_shutdown_callback(shutdownCallback.get());
 
   networkServer_ = std::make_shared<NetworkServer>(config_, log_);
@@ -50,7 +52,7 @@ int DataServer::init() {
 
 void DataServer::wait() { networkServer_->wait(); }
 
-ActiveProxyShutdownCallback::ActiveProxyShutdownCallback(std::shared_ptr<HeartbeatClient> heartbeatClient) {
+ConnectionShutdownCallback::ConnectionShutdownCallback(std::shared_ptr<HeartbeatClient> heartbeatClient) {
   heartbeatClient_ = heartbeatClient;
 }
 
@@ -58,18 +60,14 @@ ActiveProxyShutdownCallback::ActiveProxyShutdownCallback(std::shared_ptr<Heartbe
  * Shutdown callback used to watch active proxy state. The current rpmp server should try to build connection with
  * a new active proxy.
  */
-void ActiveProxyShutdownCallback::operator()(void* param_1, void* param_2) {
+void ConnectionShutdownCallback::operator()(void* param_1, void* param_2) {
   /// TODO: wait for 5s, can be optimized.
   /// New active proxy needs some time to launch services.
   sleep(5);
   int res = heartbeatClient_->build_connection();
   int attempts = 0;
   while (res != 0 && attempts < 10) {
-    log_->get_console_log()->info("Try to find an active proxy again..");
     res = heartbeatClient_->build_connection();
     attempts++;
-  }
-  if (res != 0) {
-    log_->get_console_log()->info("Cannot find an active proxy!");
   }
 }
