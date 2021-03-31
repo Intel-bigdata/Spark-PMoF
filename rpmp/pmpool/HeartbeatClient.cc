@@ -194,6 +194,7 @@ int HeartbeatClient::heartbeat() {
     hrc.host_ip_hash = host_ip_hash_;
 
     auto heartbeatRequest = std::make_shared<HeartbeatRequest>(hrc);
+    ///TODO: is it necessary to add task?
     heartbeatRequestHandler_->addTask(heartbeatRequest);
     try {
       heartbeatRequestHandler_->get(heartbeatRequest);
