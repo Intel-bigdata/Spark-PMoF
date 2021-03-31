@@ -161,7 +161,6 @@ int DataServerService::build_connection(std::string proxy_addr) {
 }
 
 void DataServerService::setConnection(Connection *con) {
-  std::cout<<"NetworkClient from " << host_ <<" connected to proxy " << config_->get_proxy_ip()<<std::endl;
   std::unique_lock<std::mutex> lk(con_mtx);
   proxyCon_ = con;
   proxyConnected = true;

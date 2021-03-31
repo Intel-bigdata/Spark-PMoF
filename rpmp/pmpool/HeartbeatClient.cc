@@ -174,6 +174,7 @@ HeartbeatClient::~HeartbeatClient() {
 }
 
 void HeartbeatClient::setConnection(Connection *connection) {
+  log_->get_console_log()->info("Setting connection..");
   std::unique_lock<std::mutex> lk(con_mtx);
   heartbeat_connection_ = connection;
   connected_ = true;
@@ -183,7 +184,7 @@ void HeartbeatClient::setConnection(Connection *connection) {
 
 int HeartbeatClient::heartbeat() {
   int heartbeatInterval = config_->get_heartbeat_interval();
-  while(true){
+  while (true) {
     sleep(heartbeatInterval);
     #ifdef DEBUG
     cout<<"I'm alive"<<endl;
@@ -213,10 +214,10 @@ void HeartbeatClient::send(const char *data, uint64_t size) {
   heartbeat_connection_->send(chunk);
 }
 
-int HeartbeatClient::init(){
+int HeartbeatClient::init() {
   heartbeatRequestHandler_ = make_shared<HeartbeatRequestHandler>(shared_from_this());
   auto res = initHeartbeatClient();
-  if (res != -1){
+  if (res != -1) {
     heartbeatRequestHandler_->start();
     std::thread t_heartbeat(&HeartbeatClient::heartbeat, shared_from_this());
     t_heartbeat.detach();
@@ -260,7 +261,7 @@ int HeartbeatClient::build_connection() {
   if (!excludedProxy_.empty()) {
     return build_connection_with_exclusion(excludedProxy_);
   }
-  for (int i = 0; i< proxy_addrs.size(); i++) {
+  for (int i = 0; i < proxy_addrs.size(); i++) {
     log_->get_console_log()->info("Trying to connect to " + proxy_addrs[i] + ":" + heartbeat_port);
     auto res = build_connection(proxy_addrs[i], heartbeat_port);
     if (res == 0) {
@@ -332,7 +333,10 @@ void::HeartbeatClient::set_active_proxy_shutdown_callback(Callback* activeProxyS
 
 ///TODO: looks client should not be shutdown.
 void HeartbeatClient::shutdown() {
-  client_->shutdown();
+  if (heartbeat_connection_ != nullptr) {
+    heartbeat_connection_->shutdown();
+  }
+//  client_->shutdown();
   if (activeProxyShutdownCallback_) {
     activeProxyShutdownCallback_->operator()(nullptr, nullptr);
   }
