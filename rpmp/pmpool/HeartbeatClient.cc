@@ -138,7 +138,7 @@ void HeartbeatRecvCallback::operator()(void *param_1, void *param_2) {
 }
 
 /**
- * TODO: let RPMP server find new active proxy in shutdown call back function.
+ * TODO: let RPMP server find new active proxy in shutdown callback.
  */
 void HeartbeatShutdownCallback::operator()(void* param_1, void* param_2) {
 }
@@ -174,7 +174,6 @@ HeartbeatClient::~HeartbeatClient() {
 }
 
 void HeartbeatClient::setConnection(Connection *connection) {
-  log_->get_console_log()->info("Setting connection..");
   std::unique_lock<std::mutex> lk(con_mtx);
   heartbeat_connection_ = connection;
   connected_ = true;
@@ -207,7 +206,7 @@ int HeartbeatClient::heartbeat() {
     try {
       heartbeatRequestHandler_->get(heartbeatRequest);
     } catch (char const* e) {
-      log_->get_console_log()->info(e);
+      log_->get_console_log()->info("Heartbeat exception: {0}", e);
       // New active proxy may be connected. The loop will continue.
       onActiveProxyShutdown();
     }
@@ -306,7 +305,6 @@ int HeartbeatClient::build_connection(string proxy_addr, string heartbeat_port) 
   connected_ = false;
   // res can be 0 even though remote proxy is shut down.
   int res = client_->connect(proxy_addr.c_str(), heartbeat_port.c_str());
-  log_->get_console_log()->info("Debug..{0}", res);
   if (res == -1) {
     return -1;
   }
@@ -314,14 +312,12 @@ int HeartbeatClient::build_connection(string proxy_addr, string heartbeat_port) 
   unique_lock<mutex> lk(con_mtx);
   // TODO: looks not a loop.
   while (!connected_) {
-    log_->get_console_log()->info("Debug..1");
     // TODO: sometimes segmentation fault occurs.
     if (con_v.wait_for(lk, std::chrono::seconds(3)) == std::cv_status::timeout) {
       break;
     }
   }
   if (!connected_) {
-    log_->get_console_log()->info("Debug..2");
     return -1;
   }
   log_->get_console_log()->info("Successfully connected to active proxy: " + proxy_addr);
@@ -329,11 +325,15 @@ int HeartbeatClient::build_connection(string proxy_addr, string heartbeat_port) 
   return 0;
 }
 
+/**
+ * Get currently recorded active proxy addr. This proxy may have already
+ * been inactive when this function is called.
+ */
 string HeartbeatClient::getActiveProxyAddr() {
   return activeProxyAddr_;
 }
 
-// For standby proxy use.
+// For standby proxy & RPMP server use.
 void::HeartbeatClient::set_active_proxy_shutdown_callback(Callback* activeProxyShutdownCallback) {
   activeProxyShutdownCallback_ = activeProxyShutdownCallback;
 //  client_->set_shutdown_callback(shutdownCallback.get());

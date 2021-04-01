@@ -106,12 +106,6 @@ bool DataServerService::init() {
   proxyClient_->set_send_callback(sendCallback.get());
 
   proxyClient_->start();
-//  int res = proxyClient_->connect(config_->get_proxy_ip().c_str(), config_->get_replica_service_port().c_str());
-//  std::unique_lock<std::mutex> lk(con_mtx);
-//  while (!proxyConnected) {
-//    std::cout<<"NetworkClient from " << host_ <<" wait to be connected to proxy " << config_->get_proxy_ip()<<std::endl;
-//    con_v.wait(lk);
-//  }
   int res = build_connection();
   if (res == -1) {
     log_->get_console_log()->info("Failed to register data server!");
