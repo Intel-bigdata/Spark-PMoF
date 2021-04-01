@@ -120,6 +120,7 @@ public:
   int build_connection(string proxy_addr, string heartbeat_port);
   void set_active_proxy_shutdown_callback(Callback* shutdownCallback);
   string getActiveProxyAddr();
+  void onActiveProxyShutdown();
   void shutdown();
   void shutdown(Connection* conn);
   void wait();
@@ -149,6 +150,7 @@ private:
   std::mutex con_mtx;
   std::condition_variable con_v;
   bool connected_;
+  bool isTerminated_;
 
   Callback* activeProxyShutdownCallback_;
   string excludedProxy_;

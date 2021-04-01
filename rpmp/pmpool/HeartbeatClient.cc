@@ -186,6 +186,13 @@ int HeartbeatClient::heartbeat() {
   int heartbeatInterval = config_->get_heartbeat_interval();
   while (true) {
     sleep(heartbeatInterval);
+    if (isTerminated_) {
+      break;
+    }
+    if (!connected_) {
+      log_->get_console_log()->info("Waiting for connecting to an active proxy.");
+      continue;
+    }
     #ifdef DEBUG
     cout<<"I'm alive"<<endl;
     #endif
@@ -201,10 +208,11 @@ int HeartbeatClient::heartbeat() {
       heartbeatRequestHandler_->get(heartbeatRequest);
     } catch (char const* e) {
       log_->get_console_log()->info(e);
-      shutdown();
-      break;
+      // New active proxy may be connected. The loop will continue.
+      onActiveProxyShutdown();
     }
   }
+  log_->get_console_log()->info("Heartbeat thread is exiting..");
 }
 
 void HeartbeatClient::send(const char *data, uint64_t size) {
@@ -331,15 +339,21 @@ void::HeartbeatClient::set_active_proxy_shutdown_callback(Callback* activeProxyS
 //  client_->set_shutdown_callback(shutdownCallback.get());
 }
 
-///TODO: looks client should not be shutdown.
-void HeartbeatClient::shutdown() {
+/**
+ * Actions to be token when active proxy is unreachable.
+ */
+void HeartbeatClient::onActiveProxyShutdown() {
+  connected_ = false;
   if (heartbeat_connection_ != nullptr) {
     heartbeat_connection_->shutdown();
   }
-//  client_->shutdown();
   if (activeProxyShutdownCallback_) {
     activeProxyShutdownCallback_->operator()(nullptr, nullptr);
   }
+}
+
+void HeartbeatClient::shutdown() {
+  client_->shutdown();
 }
 
 void HeartbeatClient::shutdown(Connection* conn) {
@@ -362,6 +376,7 @@ void HeartbeatClient::reset(){
     client_->shutdown();
     client_.reset();
   }
+  isTerminated_ = true;
 }
 
 int HeartbeatClient::get_heartbeat_interval() {
