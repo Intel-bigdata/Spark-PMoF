@@ -138,7 +138,7 @@ void HeartbeatRecvCallback::operator()(void *param_1, void *param_2) {
 }
 
 /**
- * TODO: let RPMP server find new active proxy in shutdown call back function.
+ * TODO: let RPMP server find new active proxy in shutdown callback.
  */
 void HeartbeatShutdownCallback::operator()(void* param_1, void* param_2) {
 }
@@ -183,8 +183,15 @@ void HeartbeatClient::setConnection(Connection *connection) {
 
 int HeartbeatClient::heartbeat() {
   int heartbeatInterval = config_->get_heartbeat_interval();
-  while(true){
+  while (true) {
     sleep(heartbeatInterval);
+    if (isTerminated_) {
+      break;
+    }
+    if (!connected_) {
+      log_->get_console_log()->info("Waiting for connecting to an active proxy.");
+      continue;
+    }
     #ifdef DEBUG
     cout<<"I'm alive"<<endl;
     #endif
@@ -194,15 +201,17 @@ int HeartbeatClient::heartbeat() {
     hrc.host_ip_hash = host_ip_hash_;
 
     auto heartbeatRequest = std::make_shared<HeartbeatRequest>(hrc);
+    ///TODO: is it necessary to add task?
     heartbeatRequestHandler_->addTask(heartbeatRequest);
     try {
       heartbeatRequestHandler_->get(heartbeatRequest);
     } catch (char const* e) {
-      log_->get_console_log()->info(e);
-      shutdown();
-      break;
+      log_->get_console_log()->info("Heartbeat exception: {0}", e);
+      // New active proxy may be connected. The loop will continue.
+      onActiveProxyShutdown();
     }
   }
+  log_->get_console_log()->info("Heartbeat thread is exiting..");
 }
 
 void HeartbeatClient::send(const char *data, uint64_t size) {
@@ -212,10 +221,10 @@ void HeartbeatClient::send(const char *data, uint64_t size) {
   heartbeat_connection_->send(chunk);
 }
 
-int HeartbeatClient::init(){
+int HeartbeatClient::init() {
   heartbeatRequestHandler_ = make_shared<HeartbeatRequestHandler>(shared_from_this());
   auto res = initHeartbeatClient();
-  if (res != -1){
+  if (res != -1) {
     heartbeatRequestHandler_->start();
     std::thread t_heartbeat(&HeartbeatClient::heartbeat, shared_from_this());
     t_heartbeat.detach();
@@ -259,7 +268,7 @@ int HeartbeatClient::build_connection() {
   if (!excludedProxy_.empty()) {
     return build_connection_with_exclusion(excludedProxy_);
   }
-  for (int i = 0; i< proxy_addrs.size(); i++) {
+  for (int i = 0; i < proxy_addrs.size(); i++) {
     log_->get_console_log()->info("Trying to connect to " + proxy_addrs[i] + ":" + heartbeat_port);
     auto res = build_connection(proxy_addrs[i], heartbeat_port);
     if (res == 0) {
@@ -304,7 +313,7 @@ int HeartbeatClient::build_connection(string proxy_addr, string heartbeat_port) 
   // TODO: looks not a loop.
   while (!connected_) {
     // TODO: sometimes segmentation fault occurs.
-    if (con_v.wait_for(lk, std::chrono::seconds(2)) == std::cv_status::timeout) {
+    if (con_v.wait_for(lk, std::chrono::seconds(3)) == std::cv_status::timeout) {
       break;
     }
   }
@@ -316,21 +325,35 @@ int HeartbeatClient::build_connection(string proxy_addr, string heartbeat_port) 
   return 0;
 }
 
+/**
+ * Get currently recorded active proxy addr. This proxy may have already
+ * been inactive when this function is called.
+ */
 string HeartbeatClient::getActiveProxyAddr() {
   return activeProxyAddr_;
 }
 
-// For standby proxy use.
+// For standby proxy & RPMP server use.
 void::HeartbeatClient::set_active_proxy_shutdown_callback(Callback* activeProxyShutdownCallback) {
   activeProxyShutdownCallback_ = activeProxyShutdownCallback;
 //  client_->set_shutdown_callback(shutdownCallback.get());
 }
 
-void HeartbeatClient::shutdown() {
-  client_->shutdown();
+/**
+ * Actions to be token when active proxy is unreachable.
+ */
+void HeartbeatClient::onActiveProxyShutdown() {
+  connected_ = false;
+  if (heartbeat_connection_ != nullptr) {
+    heartbeat_connection_->shutdown();
+  }
   if (activeProxyShutdownCallback_) {
     activeProxyShutdownCallback_->operator()(nullptr, nullptr);
   }
+}
+
+void HeartbeatClient::shutdown() {
+  client_->shutdown();
 }
 
 void HeartbeatClient::shutdown(Connection* conn) {
@@ -353,6 +376,7 @@ void HeartbeatClient::reset(){
     client_->shutdown();
     client_.reset();
   }
+  isTerminated_ = true;
 }
 
 int HeartbeatClient::get_heartbeat_interval() {

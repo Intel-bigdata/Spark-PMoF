@@ -1,12 +1,3 @@
-/*
- * Filename: /mnt/spark-pmof/tool/rpmp/pmpool/Protocol.h
- * Path: /mnt/spark-pmof/tool/rpmp/pmpool
- * Created Date: Thursday, November 7th 2019, 3:48:52 pm
- * Author: root
- *
- * Copyright (c) 2019 Intel
- */
-
 #ifndef PMPOOL_PROTOCOL_H_
 #define PMPOOL_PROTOCOL_H_
 
@@ -175,6 +166,8 @@ class Protocol : public std::enable_shared_from_this<Protocol> {
   void handle_rma_msg(std::shared_ptr<RequestReply> requestReply);
 
   void reclaim_dram_buffer(uint64_t key);
+
+  std::shared_ptr<DataServerService> getDataService();
 
  public:
   std::shared_ptr<Config> config_;

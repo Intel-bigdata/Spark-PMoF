@@ -81,6 +81,7 @@ bool DataServerService::init() {
     worker->start();
     workers_.push_back(std::move(worker));
   }
+  /// TODO: use the one passed from start script.
   host_ = config_->get_ip();
   port_ = config_->get_port();
   proxyClient_ = std::make_shared<Client>(1, 32);
@@ -105,18 +106,55 @@ bool DataServerService::init() {
   proxyClient_->set_send_callback(sendCallback.get());
 
   proxyClient_->start();
-  int res = proxyClient_->connect(config_->get_proxy_ip().c_str(), config_->get_replica_service_port().c_str());
-  std::unique_lock<std::mutex> lk(con_mtx);
-  while (!proxyConnected) {
-    std::cout<<"NetworkClient from " << host_ <<" wait to be connected to proxy " << config_->get_proxy_ip()<<std::endl;
-    con_v.wait(lk);
+  int res = build_connection();
+  if (res == -1) {
+    log_->get_console_log()->info("Failed to register data server!");
+    return false;
   }
   registerDataServer();
+  return true;
+}
+
+int DataServerService::build_connection() {
+  std::vector<std::string> proxy_addrs = config_->get_proxy_addrs();
+  for (int i = 0; i< proxy_addrs.size(); i++) {
+    auto res = build_connection(proxy_addrs[i]);
+    if (res == 0) {
+      return 0;
+    }
+  }
+  log_->get_console_log()->info("Failed to connect to an active proxy!");
+  return -1;
+}
+
+int DataServerService::build_connection(std::string proxy_addr) {
+  // reset to false to consider the possible re-connection to a new active proxy.
+  proxyConnected = false;
+  std::string replica_service_port = config_->get_replica_service_port();
+  log_->get_console_log()->info("Trying to connect to " + proxy_addr + ":" + replica_service_port);
+  // res can be 0 even though remote proxy is shut down.
+  int res = proxyClient_->connect(proxy_addr.c_str(), replica_service_port.c_str());
+  if (res == -1) {
+    return -1;
+  }
+  // wait for ConnectedCallback to be executed.
+  std::unique_lock<std::mutex> lk(con_mtx);
+  // TODO: looks not a loop.
+  while (!proxyConnected) {
+    // TODO: sometimes segmentation fault occurs.
+    if (con_v.wait_for(lk, std::chrono::seconds(3)) == std::cv_status::timeout) {
+      break;
+    }
+  }
+  if (!proxyConnected) {
+    return -1;
+  }
+  log_->get_console_log()->info("Successfully connected to active proxy: " + proxy_addr);
+//  activeProxyAddr_ = proxy_addr;
   return 0;
 }
 
 void DataServerService::setConnection(Connection *con) {
-  std::cout<<"NetworkClient from " << host_ <<" connected to proxy " << config_->get_proxy_ip()<<std::endl;
   std::unique_lock<std::mutex> lk(con_mtx);
   proxyCon_ = con;
   proxyConnected = true;

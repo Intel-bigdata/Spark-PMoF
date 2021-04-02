@@ -1,12 +1,3 @@
-/*
- * Filename: /mnt/spark-pmof/tool/rpmp/pmpool/Protocol.cc
- * Path: /mnt/spark-pmof/tool/rpmp/pmpool
- * Created Date: Thursday, November 7th 2019, 3:48:52 pm
- * Author: root
- *
- * Copyright (c) 2019 Intel
- */
-
 #include "pmpool/Protocol.h"
 
 #include <assert.h>
@@ -591,4 +582,8 @@ void Protocol::reclaim_dram_buffer(uint64_t key) {
   networkServer_->reclaim_dram_buffer(&rrc);
   replicateMap_.erase(key);
   lk.unlock();
+}
+
+std::shared_ptr<DataServerService> Protocol::getDataService() {
+  return dataService_;
 }

@@ -89,6 +89,8 @@ public:
                             std::shared_ptr<Protocol> protocol);
  ~DataServerService();
  bool init();  // connect to proxy server
+ int build_connection();
+ int build_connection(std::string proxy_addr);
  void setConnection(Connection* connection);
  // register RPMP node to proxy
  void registerDataServer();
