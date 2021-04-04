@@ -191,7 +191,6 @@ void NodeManager::addOrUpdateRecord(Json::Value record){
     #endif
     Json::Value new_root;
     Json::Value new_data;
-    new_root["data"] = new_data;
     for(Json::ArrayIndex i = 0; i < size; i++){
       new_data[i][HOST] = recordArray[i][HOST];
       new_data[i][TIME] = recordArray[i][TIME];
@@ -201,6 +200,7 @@ void NodeManager::addOrUpdateRecord(Json::Value record){
     new_data[size][HOST] = record[HOST];
     new_data[size][TIME] = record[TIME];
     new_data[size][STATUS] = record[STATUS];
+    new_root["data"] = new_data;
     redis_->set(NODE_STATUS, rootToString(new_root));
     return;
   } 
