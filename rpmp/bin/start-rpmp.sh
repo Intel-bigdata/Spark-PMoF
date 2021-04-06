@@ -11,6 +11,9 @@ if [[ -z "${RPMP_HOME}" ]]; then
 fi
 export BIN_HOME="$RPMP_HOME/bin"
 export CONFIG_HOME="$RPMP_HOME/config"
+LOG_FILE_PATH="$RPMP_HOME/rpmp.log"
+PROXY_PID_FILE_PATH="/tmp/rpmp-proxy.pid"
+SERVER_PID_FILE_PATH="/tmp/rpmp-server.pid"
 
 #Keep this arg for future use.
 USER_VARGS=
@@ -43,18 +46,23 @@ while IFS= read -r line; do
     fi
 done < $CONFIG_FILE
 
+#TODO: check if current process is running
+
 #Separate address by ','.
 IFS=','
 #Start RPMP proxy
 for addr in $PROXY_ADDR; do
   echo "Starting RPMP proxy on $addr.."
   #Pass addr to RPMP proxy
-  ssh $addr "cd $RPMP_HOME; ./proxyMain $addr"
+  ssh $addr "cd $BIN_HOME; ./proxyMain --current_proxy_addr $addr >> $LOG_FILE_PATH & \
+  touch $PROXY_PID_FILE_PATH; echo '$!' > $PROXY_PID_FILE_PATH"
 done
 
+# TODO: parse addr in main.cc
 #Start RPMP server
 for addr in $SERVER_ADDR; do
   echo "Starting RPMP server on $addr.."
   #Pass addr to RPMP server
-  ssh $addr "cd $RPMP_HOME; ./main $addr"
+  ssh $addr "cd $BIN_HOME; ./main --addr $addr >> $LOG_FILE_PATH & \
+  touch $SERVER_PID_FILE_PATH; echo '$!' > $SERVER_PID_FILE_PATH"
 done
