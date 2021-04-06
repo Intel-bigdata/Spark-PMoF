@@ -7,13 +7,13 @@ else
 fi
 
 if [[ -z "${RPMP_HOME}" ]]; then
-  export RPMP_HOME="$(cd "${FWDIR}/.."; pwd)"
+  export RPMP_HOME=$(cd "${FWDIR}/.."; pwd)
 fi
-export BIN_HOME="$RPMP_HOME/bin"
-export CONFIG_HOME="$RPMP_HOME/config"
-LOG_FILE_PATH="$RPMP_HOME/rpmp.log"
-PROXY_PID_FILE_PATH="/tmp/rpmp-proxy.pid"
-SERVER_PID_FILE_PATH="/tmp/rpmp-server.pid"
+export BIN_HOME=$RPMP_HOME/bin
+export CONFIG_HOME=$RPMP_HOME/config
+LOG_FILE_PATH=$RPMP_HOME/rpmp.log
+PROXY_PID_FILE_PATH=/tmp/rpmp-proxy.pid
+SERVER_PID_FILE_PATH=/tmp/rpmp-server.pid
 
 #Keep this arg for future use.
 USER_VARGS=
@@ -54,8 +54,8 @@ IFS=','
 for addr in $PROXY_ADDR; do
   echo "Starting RPMP proxy on $addr.."
   #Pass addr to RPMP proxy
-  ssh $addr "cd $BIN_HOME; ./proxyMain --current_proxy_addr $addr >> $LOG_FILE_PATH & \
-  touch $PROXY_PID_FILE_PATH; echo '$!' > $PROXY_PID_FILE_PATH"
+  ssh $addr "cd ${BIN_HOME}; ./proxyMain --current_proxy_addr $addr >> ${LOG_FILE_PATH} & \
+  touch ${PROXY_PID_FILE_PATH}; echo \$! > ${PROXY_PID_FILE_PATH}"
 done
 
 # TODO: parse addr in main.cc
@@ -63,6 +63,6 @@ done
 for addr in $SERVER_ADDR; do
   echo "Starting RPMP server on $addr.."
   #Pass addr to RPMP server
-  ssh $addr "cd $BIN_HOME; ./main --addr $addr >> $LOG_FILE_PATH & \
-  touch $SERVER_PID_FILE_PATH; echo '$!' > $SERVER_PID_FILE_PATH"
+  ssh $addr "cd ${BIN_HOME}; ./main --addr $addr >> ${LOG_FILE_PATH} & \
+  touch ${SERVER_PID_FILE_PATH}; echo \$! > ${SERVER_PID_FILE_PATH}"
 done
