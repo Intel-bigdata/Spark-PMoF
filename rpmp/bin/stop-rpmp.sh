@@ -29,19 +29,19 @@ while IFS= read -r line; do
     fi
 done < $CONFIG_FILE
 
-."$BIN_HOME/common.sh"
+. "$BIN_HOME/common.sh"
 
 #Separate address by ','.
 IFS=','
 #Start RPMP proxy
 for addr in $PROXY_ADDR; do
-  echo "Starting RPMP proxy on $addr.."
+  echo "Stopping RPMP proxy on $addr.."
   #Pass addr to RPMP proxy
   ssh $addr "\$(typeset -f stop_process); stop_process $PROXY_PID_FILE_PATH"
 done
 
 #Start RPMP server
 for addr in $SERVER_ADDR; do
-  echo "Starting RPMP server on $addr.."
+  echo "Stopping RPMP server on $addr.."
   ssh $addr "\$(typeset -f stop_process); stop_process $SERVER_PID_FILE_PATH"
 done

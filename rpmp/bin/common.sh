@@ -8,7 +8,7 @@ function stop_process() {
   fi
 }
 
-funciton check_recorded_pid() {
+function check_recorded_pid() {
   PID_FILE_PATH=$1
   if [[ -f "${PID_FILE_PATH}" ]]; then
     pid=$(cat $PID_FILE_PATH)
