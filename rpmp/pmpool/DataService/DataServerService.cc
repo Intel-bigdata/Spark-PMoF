@@ -81,7 +81,7 @@ bool DataServerService::init() {
     worker->start();
     workers_.push_back(std::move(worker));
   }
-  /// TODO: use the one passed from start script.
+  /// The address is passed from start script.
   host_ = config_->get_ip();
   port_ = config_->get_port();
   proxyClient_ = std::make_shared<Client>(1, 32);

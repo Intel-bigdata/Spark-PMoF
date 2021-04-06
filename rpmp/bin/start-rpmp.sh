@@ -55,7 +55,8 @@ IFS=','
 for addr in $PROXY_ADDR; do
   echo "Starting RPMP proxy on $addr.."
   #Pass addr to RPMP proxy
-  ssh $addr "cd ${BIN_HOME}; ./proxyMain --current_proxy_addr $addr --log ${PROXY_LOG_FILE_PATH} >> ${PROXY_LOG_FILE_PATH} & \
+  ssh $addr "cd ${BIN_HOME}; mkdir -p ${PROXY_LOG_FILE_PATH}; \
+  ./proxyMain --current_proxy_addr $addr --log ${PROXY_LOG_FILE_PATH} >> ${PROXY_LOG_FILE_PATH} & \
   touch ${PROXY_PID_FILE_PATH}; echo \$! > ${PROXY_PID_FILE_PATH}"
 done
 
@@ -64,6 +65,7 @@ done
 for addr in $SERVER_ADDR; do
   echo "Starting RPMP server on $addr.."
   #Pass addr to RPMP server
-  ssh $addr "cd ${BIN_HOME}; ./main --address $addr --log ${SERVER_LOG_FILE_PATH} >> ${SERVER_LOG_FILE_PATH} & \
+  ssh $addr "cd ${BIN_HOME}; mkdir -p ${SERVER_LOG_FILE_PATH}; \
+  ./main --address $addr --log ${SERVER_LOG_FILE_PATH} >> ${SERVER_LOG_FILE_PATH} & \
   touch ${SERVER_PID_FILE_PATH}; echo \$! > ${SERVER_PID_FILE_PATH}"
 done
