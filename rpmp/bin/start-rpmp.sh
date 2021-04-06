@@ -11,7 +11,8 @@ if [[ -z "${RPMP_HOME}" ]]; then
 fi
 export BIN_HOME=$RPMP_HOME/bin
 export CONFIG_HOME=$RPMP_HOME/config
-LOG_FILE_PATH=$RPMP_HOME/rpmp.log
+PROXY_LOG_FILE_PATH=$RPMP_HOME/log/rpmp-proxy.log
+SERVER_LOG_FILE_PATH=$RPMP_HOME/log/rpmp-server.log
 PROXY_PID_FILE_PATH=/tmp/rpmp-proxy.pid
 SERVER_PID_FILE_PATH=/tmp/rpmp-server.pid
 
@@ -54,7 +55,7 @@ IFS=','
 for addr in $PROXY_ADDR; do
   echo "Starting RPMP proxy on $addr.."
   #Pass addr to RPMP proxy
-  ssh $addr "cd ${BIN_HOME}; ./proxyMain --current_proxy_addr $addr >> ${LOG_FILE_PATH} & \
+  ssh $addr "cd ${BIN_HOME}; ./proxyMain --current_proxy_addr $addr --log ${PROXY_LOG_FILE_PATH} >> ${PROXY_LOG_FILE_PATH} & \
   touch ${PROXY_PID_FILE_PATH}; echo \$! > ${PROXY_PID_FILE_PATH}"
 done
 
@@ -63,6 +64,6 @@ done
 for addr in $SERVER_ADDR; do
   echo "Starting RPMP server on $addr.."
   #Pass addr to RPMP server
-  ssh $addr "cd ${BIN_HOME}; ./main --addr $addr >> ${LOG_FILE_PATH} & \
+  ssh $addr "cd ${BIN_HOME}; ./main --address $addr --log ${SERVER_LOG_FILE_PATH} >> ${SERVER_LOG_FILE_PATH} & \
   touch ${SERVER_PID_FILE_PATH}; echo \$! > ${SERVER_PID_FILE_PATH}"
 done
