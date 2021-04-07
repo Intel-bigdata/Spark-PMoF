@@ -33,15 +33,16 @@ done < $CONFIG_FILE
 
 #Separate address by ','.
 IFS=','
-#Start RPMP proxy
+
+#Stop RPMP server
+for addr in $SERVER_ADDR; do
+  echo "Stopping RPMP server on $addr.."
+  ssh $addr "PID=\$(cat SERVER_PID_FILE_PATH 2>/dev/null); kill -9 \$PID > /dev/null 2>&1"
+done
+
+#Stop RPMP proxy
 for addr in $PROXY_ADDR; do
   echo "Stopping RPMP proxy on $addr.."
   #Pass addr to RPMP proxy
-  ssh $addr "\$(typeset -f stop_process); stop_process $PROXY_PID_FILE_PATH"
-done
-
-#Start RPMP server
-for addr in $SERVER_ADDR; do
-  echo "Stopping RPMP server on $addr.."
-  ssh $addr "\$(typeset -f stop_process); stop_process $SERVER_PID_FILE_PATH"
+  ssh $addr "PID=\$(cat $PROXY_PID_FILE_PATH 2>/dev/null); kill -9 \$PID > /dev/null 2>&1"
 done
