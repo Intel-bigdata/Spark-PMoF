@@ -149,15 +149,24 @@ rpmp.data.replica 2
 rpmp.data.min.replica 2
 ```
 
-Set minimal replica and preferred replica. 
+Set minimal replica and preferred replica.
+
+## Launch RPMP cluster
+Change directory to {RPMP-HOME}/build/bin
+- Launch proxy
+  ```./proxyMain --current_proxy_addr {addr}```
+- Launch RPMP nodes according to config  
+  ```./main``
+  
+Alternatively, you can leverage script to start/stop cluster services. To make stop script work as expected, 
+please note one node CANNOT plays two same roles, e.g., launch two proxy servers on one node.
+- Start cluster
+  ./start-rpmp.sh
+- Stop cluster
+  ./stop-rpmp.sh
 
 ## Benchmark
-### Put and get
-Change directory to {RPMP-HOME}/build/bin
- - Launch proxy 
- ```./proxyMain --current_proxy_addr {addr}```
- - Launch RPMP nodes according to config  
- ```./main```
+### Put and get`
  - Launch put and get executor
  ```./put_and_get```
-
+   
