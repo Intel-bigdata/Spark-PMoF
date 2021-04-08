@@ -159,10 +159,6 @@ int Proxy::build_connection_with_new_active_proxy() {
   return heartbeatClient_-> build_connection_with_exclusion(currentHostAddr_);
 }
 
-/**
- * TODO: needs to avoid cyclic calling.
- * ActiveProxyShutdownCallback -> stopStandbyService -> ActiveProxyShutdownCallback.
- */
 void Proxy::stopStandbyService() {
   log_->get_console_log()->info("Shutting down standby services..");
   heartbeatClient_->reset();

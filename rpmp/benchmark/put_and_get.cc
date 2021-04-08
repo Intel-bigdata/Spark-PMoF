@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
   std::cout << "Block key pattern is "
     << "block_" << map_id << "_*" << std::endl;
 
-  auto client = std::make_shared<PmPoolClient>(host, port);
+  auto client = std::make_shared<PmPoolClient>();
   client->init();
   std::cout << "start put." << std::endl;
   int start = 0;
