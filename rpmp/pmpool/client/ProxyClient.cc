@@ -191,12 +191,13 @@ int ProxyClient::initProxyClient() {
   return build_connection();
 }
 
-int HeartbeatClient::build_connection() {
+int ProxyClient::build_connection() {
   vector<string> proxy_addrs = config_->get_proxy_addrs();
-  string heartbeat_port = config_->get_heartbeat_port();
+  /// TODO: Need to confirm the port
+  string proxy_port = config_->get_port()();
   for (int i = 0; i < proxy_addrs.size(); i++) {
-    log_->get_console_log()->info("Trying to connect to " + proxy_addrs[i] + ":" + heartbeat_port);
-    auto res = build_connection(proxy_addrs[i], heartbeat_port);
+    log_->get_console_log()->info("Trying to connect to " + proxy_addrs[i] + ":" + proxy_port);
+    auto res = build_connection(proxy_addrs[i], proxy_port);
     if (res == 0) {
       return 0;
     }
@@ -205,11 +206,11 @@ int HeartbeatClient::build_connection() {
   return -1;
 }
 
-int HeartbeatClient::build_connection(string proxy_addr, string heartbeat_port) {
+int ProxyClient::build_connection(string proxy_addr, string proxy_port) {
   // reset to false to consider the possible re-connection to a new active proxy.
   connected_ = false;
   // res can be 0 even though remote proxy is shut down.
-  int res = client_->connect(proxy_addr.c_str(), heartbeat_port.c_str());
+  int res = client_->connect(proxy_addr.c_str(), proxy_port.c_str());
   if (res == -1) {
     return -1;
   }
