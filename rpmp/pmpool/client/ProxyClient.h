@@ -127,11 +127,16 @@ private:
 
 class ProxyClient : public std::enable_shared_from_this<ProxyClient> {
  public:
-  ProxyClient(const string& proxy_address, const string& proxy_port);
+  ProxyClient();
   ~ProxyClient();
-  int initProxyClient(std::shared_ptr<ProxyRequestHandler> requestHandler);
+  int initProxyClient();
   void send(const char* data, uint64_t size);
   void setConnection(Connection* connection);
+
+  int build_connection();
+  int build_connection(string proxy_addr, string proxy_port);
+  void onActiveProxyShutdown();
+  void set_active_proxy_shutdown_callback(Callback* activeProxyShutdownCallback);
 
   void addTask(std::shared_ptr<ProxyRequest> request);
   ProxyRequestReplyContext get(std::shared_ptr<ProxyRequest> request);

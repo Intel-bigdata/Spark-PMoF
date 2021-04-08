@@ -1,6 +1,6 @@
 
-#include "Config.h"
-#include "Log.h"
+#include "pmpool/Config.h"
+#include "pmpool/Log.h"
 #include "pmpool/client/ProxyClient.h"
 
 ProxyRequestHandler::ProxyRequestHandler(std::shared_ptr<ProxyClient> proxyClient)
@@ -158,7 +158,7 @@ void ProxyClient::send(const char *data, uint64_t size) {
 }
 
 int ProxyClient::initProxyClient() {
-  proxyRequestHandler_ = make_shared<ProxyRequestHandler>(shared_from_this);
+  proxyRequestHandler_ = make_shared<ProxyRequestHandler>(shared_from_this());
   proxyRequestHandler_->start();
 
   client_ = std::make_shared<Client>(1, 32);
@@ -175,7 +175,7 @@ int ProxyClient::initProxyClient() {
   shutdownCallback = std::make_shared<ProxyClientShutdownCallback>();
   connectCallback =
       std::make_shared<ProxyClientConnectCallback>(shared_from_this());
-  recvCallback = std::make_shared<ProxyClientRecvCallback>(chunkMgr_, requestHandler);
+  recvCallback = std::make_shared<ProxyClientRecvCallback>(chunkMgr_, proxyRequestHandler_);
   sendCallback = std::make_shared<ProxyClientSendCallback>(chunkMgr_);
 
   client_->set_shutdown_callback(shutdownCallback.get());
@@ -194,7 +194,7 @@ int ProxyClient::initProxyClient() {
 int ProxyClient::build_connection() {
   vector<string> proxy_addrs = config_->get_proxy_addrs();
   /// TODO: Need to confirm the port
-  string proxy_port = config_->get_port()();
+  string proxy_port = config_->get_port();
   for (int i = 0; i < proxy_addrs.size(); i++) {
     log_->get_console_log()->info("Trying to connect to " + proxy_addrs[i] + ":" + proxy_port);
     auto res = build_connection(proxy_addrs[i], proxy_port);
@@ -227,7 +227,8 @@ int ProxyClient::build_connection(string proxy_addr, string proxy_port) {
     return -1;
   }
   log_->get_console_log()->info("Successfully connected to active proxy: " + proxy_addr);
-  activeProxyAddr_ = proxy_addr;
+  // Looks no need to keep this addr.
+//  activeProxyAddr_ = proxy_addr;
   return 0;
 }
 

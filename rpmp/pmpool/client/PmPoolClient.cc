@@ -336,7 +336,7 @@ int PmPoolClient::del(const string &key) {
   prc.key = key_uint;
   auto pRequest = std::make_shared<ProxyRequest>(prc);
   proxyClient_->addTask(pRequest);
-  ProxyRequestReplyContext prrc = proxyRequestClient_->get(pRequest);
+  ProxyRequestReplyContext prrc = proxyClient_->get(pRequest);
   std::shared_ptr<Channel> channel = getChannel(*prrc.nodes.begin());
   std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
   std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
