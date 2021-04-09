@@ -264,14 +264,11 @@ void NodeManager::handle_recv_msg(std::shared_ptr<HeartbeatRequest> request)
   rrc.type = rc.type;
   rrc.success = 0;
   rrc.rid = rc.rid;
-  #ifdef DEBUG
+#ifdef DEBUG
   std::cout << "rid: " << to_string(rc.rid) << std::endl;
   std::cout << "host-hash: " << to_string(rc.host_ip_hash) << std::endl;
-  #endif
 
   map<uint64_t, string>::iterator it;
-
-  #ifdef DEBUG
   for (it = hashToNode_->begin(); it != hashToNode_->end(); it++)
   {
     std::cout << it->first  
@@ -279,7 +276,7 @@ void NodeManager::handle_recv_msg(std::shared_ptr<HeartbeatRequest> request)
               << it->second 
               << std::endl;
   }
-  #endif
+#endif
 
   if (hashToNode_->count(rc.host_ip_hash) > 0)
   {
