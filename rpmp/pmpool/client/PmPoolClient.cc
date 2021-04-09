@@ -14,10 +14,10 @@
 #include "pmpool/Event.h"
 #include "pmpool/client/ProxyClient.h"
 
-PmPoolClient::PmPoolClient() {
+PmPoolClient::PmPoolClient(const string &proxy_address, const string &proxy_port) {
   tx_finished = true;
   op_finished = false;
-  proxyClient_ = make_shared<ProxyClient>();
+  proxyClient_ = make_shared<ProxyClient>(proxy_address, proxy_port);
 }
 
 PmPoolClient::~PmPoolClient() {

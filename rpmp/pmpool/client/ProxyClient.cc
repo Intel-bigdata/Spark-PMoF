@@ -1,6 +1,7 @@
+#include <boost/program_options.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
 
-#include "pmpool/Config.h"
-#include "pmpool/Log.h"
 #include "pmpool/client/ProxyClient.h"
 
 ProxyRequestHandler::ProxyRequestHandler(std::shared_ptr<ProxyClient> proxyClient)
@@ -130,10 +131,14 @@ void ProxyClientRecvCallback::operator()(void *param_1, void *param_2) {
   chunkMgr_->reclaim(ck, static_cast<Connection *>(ck->con));
 }
 
-ProxyClient::ProxyClient() {
-  config_ = std::make_shared<Config>();
-  config->readFromFile();
-  log_ = std::make_shared<Log>(config.get());
+/**
+ * In RPMP HA mode, proxy_address is a string containing multiple proxies with "," separated.
+ */
+ProxyClient::ProxyClient(const string &proxy_address, const string &proxy_port) {
+  vector<string> proxies;
+  boost::split(proxies, proxy_address, boost::is_any_of(","), boost::token_compress_on);
+  proxy_addrs_ = proxies;
+  proxy_port_ = proxy_port;
 }
 
 ProxyClient::~ProxyClient() {
@@ -192,17 +197,14 @@ int ProxyClient::initProxyClient() {
 }
 
 int ProxyClient::build_connection() {
-  vector<string> proxy_addrs = config_->get_proxy_addrs();
-  /// TODO: Need to confirm the port
-  string proxy_port = config_->get_port();
-  for (int i = 0; i < proxy_addrs.size(); i++) {
-    log_->get_console_log()->info("Trying to connect to " + proxy_addrs[i] + ":" + proxy_port);
-    auto res = build_connection(proxy_addrs[i], proxy_port);
+  for (int i = 0; i < proxy_addrs_; i++) {
+    cout << "Trying to connect to " + proxy_addrs_[i] + ":" + proxy_port_ << endl;
+    auto res = build_connection(proxy_addrs_[i], proxy_port_);
     if (res == 0) {
       return 0;
     }
   }
-  log_->get_console_log()->info("Failed to connect to an active proxy!");
+  cout << "Failed to connect to an active proxy!" << endl;
   return -1;
 }
 
@@ -226,7 +228,7 @@ int ProxyClient::build_connection(string proxy_addr, string proxy_port) {
   if (!connected_) {
     return -1;
   }
-  log_->get_console_log()->info("Successfully connected to active proxy: " + proxy_addr);
+  cout << "Successfully connected to active proxy: " + proxy_addr << endl;
   // Looks no need to keep this addr.
 //  activeProxyAddr_ = proxy_addr;
   return 0;
@@ -243,7 +245,6 @@ ProxyRequestReplyContext ProxyClient::get(std::shared_ptr<ProxyRequest> request)
   try {
     return proxyRequestHandler_->get(request);
   } catch (char const* e) {
-    log_->get_console_log()->info("Proxy connection exception: {0}. Try to connect to an active proxy.", e);
     onActiveProxyShutdown();
     if (connected_) {
       // Ignore the exception case in below after new proxy connection is built.
@@ -273,9 +274,9 @@ void ProxyClient::onActiveProxyShutdown() {
     activeProxyShutdownCallback_->operator()(nullptr, nullptr);
   }
   if (connected_) {
-    log_->get_console_log()->info("Connected to a new active proxy.");
+    cout << "Connected to a new active proxy." << endl;
   } else {
-    log_->get_console_log()->info("No active proxy is found.");
+    cout << "No active proxy is found." << endl;
   }
 }
 

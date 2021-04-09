@@ -127,7 +127,8 @@ private:
 
 class ProxyClient : public std::enable_shared_from_this<ProxyClient> {
  public:
-  ProxyClient();
+  ProxyClient(const string &proxy_address, const string &proxy_port);
+  ProxyClient() = delete;
   ~ProxyClient();
   int initProxyClient();
   void send(const char* data, uint64_t size);
@@ -147,8 +148,8 @@ class ProxyClient : public std::enable_shared_from_this<ProxyClient> {
   void reset();
 
  private:
-  std::shared_ptr<Config> config_;
-  std::shared_ptr<Log> log_;
+  std::string proxy_addrs_;
+  std::string proxy_port_;
   std::shared_ptr<ProxyRequestHandler> proxyRequestHandler_;
   std::shared_ptr<Client> client_;
   std::shared_ptr<ChunkMgr> chunkMgr_;
