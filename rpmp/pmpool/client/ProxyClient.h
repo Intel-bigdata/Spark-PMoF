@@ -137,7 +137,7 @@ class ProxyClient : public std::enable_shared_from_this<ProxyClient> {
   int build_connection();
   int build_connection(string proxy_addr, string proxy_port);
   void onActiveProxyShutdown();
-  void set_active_proxy_shutdown_callback(Callback* activeProxyShutdownCallback);
+  void set_active_proxy_shutdown_callback(Callback* activeProxyDisconnectedCallback);
 
   void addTask(std::shared_ptr<ProxyRequest> request);
   ProxyRequestReplyContext get(std::shared_ptr<ProxyRequest> request);
@@ -148,7 +148,7 @@ class ProxyClient : public std::enable_shared_from_this<ProxyClient> {
   void reset();
 
  private:
-  std::string proxy_addrs_;
+  std::vector<string> proxy_addrs_;
   std::string proxy_port_;
   std::shared_ptr<ProxyRequestHandler> proxyRequestHandler_;
   std::shared_ptr<Client> client_;
@@ -163,16 +163,16 @@ class ProxyClient : public std::enable_shared_from_this<ProxyClient> {
   std::condition_variable con_v;
   bool connected_;
 
-  Callback* activeProxyShutdownCallback_;
+  Callback* activeProxyDisconnectedCallback_;
 };
 
 /**
  * A callback to take action when the built connection is shut down.
  */
-class ActiveProxyShutdownCallback : public Callback {
+class ActiveProxyDisconnectedCallback : public Callback {
 public:
-    explicit ActiveProxyShutdownCallback(std::shared_ptr<ProxyClient> proxyClient);
-    ~ActiveProxyShutdownCallback() override = default;
+    explicit ActiveProxyDisconnectedCallback(std::shared_ptr<ProxyClient> proxyClient);
+    ~ActiveProxyDisconnectedCallback() override = default;
     void operator()(void* param_1, void* param_2);
 
 private:

@@ -14,6 +14,9 @@
 #include "pmpool/Event.h"
 #include "pmpool/client/ProxyClient.h"
 
+/**
+ * In RPMP HA mode, proxy_address is a string containing multiple proxies with "," separated.
+ */
 PmPoolClient::PmPoolClient(const string &proxy_address, const string &proxy_port) {
   tx_finished = true;
   op_finished = false;

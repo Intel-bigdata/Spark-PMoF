@@ -60,7 +60,7 @@ struct NodeInfo {
 
 class PmPoolClient {
  public:
-  PmPoolClient();
+  PmPoolClient(const string &proxy_address, const string &proxy_port);
   ~PmPoolClient();
   int init();
 

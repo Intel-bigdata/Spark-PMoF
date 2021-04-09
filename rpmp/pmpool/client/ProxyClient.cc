@@ -190,15 +190,15 @@ int ProxyClient::initProxyClient() {
 
   client_->start();
 
-  std::shared_ptr<ActiveProxyShutdownCallback> callbackPtr =
-      std::make_shared<ActiveProxyShutdownCallback>(shared_from_this());
+  std::shared_ptr<ActiveProxyDisconnectedCallback> callbackPtr =
+      std::make_shared<ActiveProxyDisconnectedCallback>(shared_from_this());
   set_active_proxy_shutdown_callback(callbackPtr.get());
   return build_connection();
 }
 
 int ProxyClient::build_connection() {
-  for (int i = 0; i < proxy_addrs_; i++) {
-    cout << "Trying to connect to " + proxy_addrs_[i] + ":" + proxy_port_ << endl;
+  for (int i = 0; i < proxy_addrs_.size(); i++) {
+    cout << "Trying to connect to " << proxy_addrs_[i] << ":" << proxy_port_ << endl;
     auto res = build_connection(proxy_addrs_[i], proxy_port_);
     if (res == 0) {
       return 0;
@@ -258,8 +258,8 @@ void ProxyClient::addRequest(std::shared_ptr<ProxyRequest> request) {
   return  proxyRequestHandler_->addRequest(request);
 }
 
-void ProxyClient::set_active_proxy_shutdown_callback(Callback* activeProxyShutdownCallback) {
-  activeProxyShutdownCallback_ = activeProxyShutdownCallback;
+void ProxyClient::set_active_proxy_shutdown_callback(Callback* activeProxyDisconnectedCallback) {
+  activeProxyDisconnectedCallback_ = activeProxyDisconnectedCallback;
 }
 
 /**
@@ -270,8 +270,8 @@ void ProxyClient::onActiveProxyShutdown() {
   if (proxy_connection_ != nullptr) {
     proxy_connection_->shutdown();
   }
-  if (activeProxyShutdownCallback_) {
-    activeProxyShutdownCallback_->operator()(nullptr, nullptr);
+  if (activeProxyDisconnectedCallback_) {
+    activeProxyDisconnectedCallback_->operator()(nullptr, nullptr);
   }
   if (connected_) {
     cout << "Connected to a new active proxy." << endl;
@@ -303,7 +303,7 @@ void ProxyClient::reset(){
   }
 }
 
-ActiveProxyShutdownCallback::ActiveProxyShutdownCallback(std::shared_ptr<ProxyClient> proxyClient) {
+ActiveProxyDisconnectedCallback::ActiveProxyDisconnectedCallback(std::shared_ptr<ProxyClient> proxyClient) {
   proxyClient_ = proxyClient;
 }
 
@@ -311,7 +311,6 @@ ActiveProxyShutdownCallback::ActiveProxyShutdownCallback(std::shared_ptr<ProxyCl
  * Shutdown callback used to watch active proxy state. The current proxy should take action to
  * launch active proxy service if predefined condition is met.
  */
-void ActiveProxyShutdownCallback::operator()(void* param_1, void* param_2) {
+void ActiveProxyDisconnectedCallback::operator()(void* param_1, void* param_2) {
   proxyClient_->build_connection();
 }
-
