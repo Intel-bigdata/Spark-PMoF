@@ -143,7 +143,7 @@ ProxyClient::ProxyClient(const string &proxy_address, const string &proxy_port) 
 
 ProxyClient::~ProxyClient() {
 #ifdef DUBUG
-  std::cout << "NetworkClient destructed" << std::endl;
+  std::cout << "ProxyClient destructed" << std::endl;
 #endif
 }
 
@@ -197,11 +197,15 @@ int ProxyClient::initProxyClient() {
 }
 
 int ProxyClient::build_connection() {
-  for (int i = 0; i < proxy_addrs_.size(); i++) {
-    cout << "Trying to connect to " << proxy_addrs_[i] << ":" << proxy_port_ << endl;
-    auto res = build_connection(proxy_addrs_[i], proxy_port_);
-    if (res == 0) {
-      return 0;
+  const int MAX_LOOPS = 5;
+  int loop = 0;
+  while (loop++ < MAX_LOOPS) {
+    for (int i = 0; i < proxy_addrs_.size(); i++) {
+      cout << "Trying to connect to " << proxy_addrs_[i] << ":" << proxy_port_ << endl;
+      auto res = build_connection(proxy_addrs_[i], proxy_port_);
+      if (res == 0) {
+        return 0;
+      }
     }
   }
   cout << "Failed to connect to an active proxy!" << endl;

@@ -75,8 +75,8 @@ class Config {
   string get_proxy_addrs() { return proxy_addrs_; }
   void set_proxy_addrs(string proxy_addrs) { proxy_addrs_ = proxy_addrs; }
 
-  string get_proxy_port() { return port_; }
-  void set_proxy_port(string port) { port_ = port; }
+  string get_proxy_port() { return proxy_port_; }
+  void set_proxy_port(string port) { proxy_port_ = port; }
 
   string get_log_path() { return log_path_; }
   void set_log_path(string log_path) { log_path_ = log_path; }
@@ -86,7 +86,7 @@ class Config {
 
  private:
   string proxy_addrs_;
-  string port_;
+  string proxy_port_;
   string log_path_;
   string log_level_;
   int map_id_ = 0;
