@@ -1,12 +1,3 @@
-/*
- * Filename: /mnt/spark-pmof/tool/rpmp/pmpool/Config.h
- * Path: /mnt/spark-pmof/tool/rpmp/pmpool
- * Created Date: Thursday, November 7th 2019, 3:48:52 pm
- * Author: root
- *
- * Copyright (c) 2019 Intel
- */
-
 #ifndef PMPOOL_CONFIG_H_
 #define PMPOOL_CONFIG_H_
 
@@ -33,11 +24,12 @@ class Config {
   int init(int argc, char **argv) {
     try {
       options_description desc{"Options"};
+      // TODO: remove meaningless default address
       desc.add_options()("help,h", "Help screen")(
           "address,a", value<string>()->default_value("172.168.0.209"),
-          "set the rdma server address")(
+          "set RPMP proxy server address")(
           "port,p", value<string>()->default_value("12348"),
-          "set the rdma server port")(
+          "set RPMP proxy server port")(
           "log,l", value<string>()->default_value("/tmp/rpmp.log"),
           "set rpmp log file path")("map_id,m", value<int>()->default_value(0),
                                     "map id")(
@@ -52,8 +44,8 @@ class Config {
         std::cout << desc << '\n';
         return -1;
       }
-      set_ip(vm["address"].as<string>());
-      set_port(vm["port"].as<string>());
+      set_proxy_addrs(vm["address"].as<string>());
+      set_proxy_port(vm["port"].as<string>());
       set_log_path(vm["log"].as<string>());
       set_map_id(vm["map_id"].as<int>());
       set_num_reqs(vm["req_num"].as<int>());
@@ -73,11 +65,11 @@ class Config {
   int get_num_threads() { return num_threads_; }
   void set_num_threads(int num_threads) { num_threads_ = num_threads; }
 
-  string get_ip() { return ip_; }
-  void set_ip(string ip) { ip_ = ip; }
+  string get_proxy_addrs() { return proxy_addrs_; }
+  void set_proxy_addrs(string proxy_addrs) { proxy_addrs_ = proxy_addrs; }
 
-  string get_port() { return port_; }
-  void set_port(string port) { port_ = port; }
+  string get_proxy_port() { return port_; }
+  void set_proxy_port(string port) { port_ = port; }
 
   string get_log_path() { return log_path_; }
   void set_log_path(string log_path) { log_path_ = log_path; }
@@ -86,7 +78,7 @@ class Config {
   void set_log_level(string log_level) { log_level_ = log_level; }
 
  private:
-  string ip_;
+  string proxy_addrs_;
   string port_;
   string log_path_;
   string log_level_;

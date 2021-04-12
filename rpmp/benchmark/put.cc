@@ -40,8 +40,8 @@ int main(int argc, char** argv) {
   int threads = config->get_num_threads();
   int map_id = config->get_map_id();
   int numReqs = config->get_num_reqs();
-  std::string host = config->get_ip();
-  std::string port = config->get_port();
+  std::string host = config->get_proxy_addrs();
+  std::string port = config->get_proxy_port();
 
   std::cout << "=================== Put ======================="
     << std::endl;

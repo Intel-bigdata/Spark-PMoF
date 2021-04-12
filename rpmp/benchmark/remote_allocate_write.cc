@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
   counter = 0;
   for (int i = 0; i < 4; i++) {
     auto client =
-        std::make_shared<PmPoolClient>(config->get_ip(), config->get_port());
+        std::make_shared<PmPoolClient>(config->get_proxy_addrs(), config->get_proxy_port());
     client->begin_tx();
     client->init();
     client->end_tx();

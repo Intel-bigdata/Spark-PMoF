@@ -106,8 +106,6 @@ class Config {
 
         set_proxy_addrs(configs.find(RPMP_NETWORK_PROXY_ADDRESS)->second);
 
-        set_raw_proxy_addrs(configs.find(RPMP_NETWORK_PROXY_ADDRESS)->second);
-
         set_ip(configs.find(RPMP_NETWORK_SERVER_ADDRESS)->second);
 
         set_client_service_port(configs.find(RPMP_PROXY_CLIENT_SERVICE_PORT)->second);
@@ -336,12 +334,6 @@ class Config {
 
     string get_client_service_port() { return proxy_client_service_port_; }
 
-    void set_raw_proxy_addrs(string proxy_addrs) { raw_proxy_addrs_ = proxy_addrs; }
-
-    string get_raw_proxy_addrs() {
-      return raw_proxy_addrs_;
-    }
-
     void set_proxy_addrs(string proxy_addrs) {
       vector<string> proxies;
       boost::split(proxies, proxy_addrs, boost::is_any_of(","), boost::token_compress_on);
@@ -397,8 +389,6 @@ class Config {
     vector<string> nodes_;
     int heatbeat_interval_;
     string proxy_client_service_port_;
-    // For RPMP client use in put/get test
-    string raw_proxy_addrs_;
     // Applicable to proxy node.
     string current_proxy_addr_;
     vector<string> proxy_addrs_;

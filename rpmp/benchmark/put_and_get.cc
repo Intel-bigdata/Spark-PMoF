@@ -90,8 +90,8 @@ int main(int argc, char** argv) {
   int threads = config->get_num_threads();
   int map_id = config->get_map_id();
   numReqs = config->get_num_reqs();
-  std::string proxy_addrs = config->get_raw_proxy_addrs();
-  std::string port = config->get_port();
+  std::string proxy_addrs = config->get_proxy_addrs();
+  std::string port = config->get_proxy_port();
 
   std::cout << "=================== Put and get ======================="
     << std::endl;
