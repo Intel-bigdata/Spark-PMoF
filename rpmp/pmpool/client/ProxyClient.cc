@@ -15,8 +15,6 @@ void ProxyRequestHandler::reset() {
   this->join();
   proxyClient_.reset();
 #ifdef DEBUG
-  std::cout << "Callback map is "
-            << (callback_map.empty() ? "empty" : "not empty") << std::endl;
   std::cout << "inflight map is " << (inflight_.empty() ? "empty" : "not empty")
             << std::endl;
 #endif
