@@ -18,6 +18,8 @@
 #include "pmpool/Config.h"
 #include "pmpool/Log.h"
 #include "pmpool/Proxy.h"
+#include "pmpool/proxy/metastore/Redis.h"
+#include "json/json.h"
 
 using moodycamel::BlockingConcurrentQueue;
 
@@ -78,7 +80,7 @@ class Worker : public ThreadWrapper {
 
 class ClientService : public std::enable_shared_from_this<ClientService>{
 public:
-    explicit ClientService(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Proxy> proxyServer);
+    explicit ClientService(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Proxy> proxyServer, std::shared_ptr<Redis> redis);
     ~ClientService();
     bool startService();
     void wait();
@@ -87,9 +89,19 @@ public:
     // notify RPMP client replication response
     void notifyClient(uint64_t key);
     private:
+    const string JOB_STATUS = "JOB_STATUS";
+    const string NODES = "NODES";
+    const string NODE = "NODE";
+    const string STATUS = "STATUS";
+    const string VALID = "VALID";
+    const string INVALID = "INVALID";
+    const string PENDING = "PENDING";
     void enqueue_finalize_msg(std::shared_ptr<ProxyRequestReply> reply);
     void handle_finalize_msg(std::shared_ptr<ProxyRequestReply> reply);
     // std::vector<std::shared_ptr<Worker>> workers_;
+    void constructJobStatus(Json::Value record, uint64_t key);
+    void addRecords(uint64_t key, unordered_set<PhysicalNode, PhysicalNodeHash> nodes);
+
     std::shared_ptr<Worker> worker_;
     std::shared_ptr<ChunkMgr> chunkMgr_;
     std::shared_ptr<Config> config_;
@@ -108,6 +120,9 @@ public:
     std::unordered_map<uint64_t, std::shared_ptr<ProxyRequestReply>> prrcMap_;
     std::mutex prrcMtx;
     std::shared_ptr<Proxy> proxyServer_;
+    std::shared_ptr <Redis> redis_;
+    int count = 0;
+
 };
 
-#endif //RPMP_PROXYCLIENTSERVICE_H
+#endif

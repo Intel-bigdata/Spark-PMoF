@@ -41,7 +41,7 @@ std::shared_ptr<Channel> PmPoolClient::getChannel(PhysicalNode node) {
   if (channels.count(node.getKey())) {
     return channels.find(node.getKey())->second;
   } else if (deadNodes.find(node.getKey()) != deadNodes.end()) {
-    throw "RPMP channle is dead";
+    throw "RPMP channel is dead";
   } else {
     std::shared_ptr<Channel> channel = std::make_shared<Channel>();
     channel->networkClient =
