@@ -138,7 +138,7 @@ void NetworkServer::read(std::shared_ptr<RequestReply> rr) {
   auto rrc = rr->get_rrc();
 #ifdef DEBUG
   printf("[NetworkServer::read] dest is %ld-%d, src is %ld-%d\n",
-         rrc->ck->buffer, rrc->ck->size, rrc->src_address, rrc->size);
+         rrc.ck->buffer, rrc.ck->size, rrc.src_address, rrc.size);
 #endif
   rrc.con->read(rrc.ck, 0, rrc.size, rrc.src_address, rrc.src_rkey);
 }
@@ -147,7 +147,7 @@ void NetworkServer::write(std::shared_ptr<RequestReply> rr) {
   auto rrc = rr->get_rrc();
 #ifdef DEBUG
   printf("[NetworkServer::write] src is %ld-%d, dest is %ld-%d\n",
-         rrc->ck->buffer, rrc->ck->size, rrc->src_address, rrc->size);
+         rrc.ck->buffer, rrc.ck->size, rrc.src_address, rrc.size);
 #endif
   rrc.con->write(rrc.ck, 0, rrc.size, rrc.src_address, rrc.src_rkey);
 }
