@@ -68,7 +68,8 @@ int main(int argc, char** argv) {
 
   std::cout << "=================== Get ======================="
     << std::endl;
-  std::cout << "RPMP server is " << host << ":" << port << std::endl;
+  std::cout << "RPMP proxy address(s): " << host << std::endl;
+  std::cout << "RPMP proxy port: " << port << std::endl;
   std::cout << "Total Num Requests is " << numReqs << std::endl;
   std::cout << "Total Num Threads is " << threads << std::endl;
   std::cout << "Block key pattern is "

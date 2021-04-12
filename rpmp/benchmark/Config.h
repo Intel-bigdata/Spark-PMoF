@@ -26,15 +26,17 @@ class Config {
       options_description desc{"Options"};
       // TODO: remove meaningless default address
       desc.add_options()("help,h", "Help screen")(
-          "address,a", value<string>()->default_value("172.168.0.209"),
-          "set RPMP proxy server address")(
-          "port,p", value<string>()->default_value("12348"),
-          "set RPMP proxy server port")(
+          "address,a", value<string>()->default_value(""),
+          "Set RPMP proxy server address. Please combine all proxy addresses with comma separated "
+          "if HA mode is enabled.")(
+          "port,p", value<string>()->default_value("12350"),
+          "Set RPMP client service port of proxy server, consistent with the value set "
+          "for `rpmp.proxy.client.service.port` on proxy side")(
           "log,l", value<string>()->default_value("/tmp/rpmp.log"),
-          "set rpmp log file path")("map_id,m", value<int>()->default_value(0),
-                                    "map id")(
-          "req_num,r", value<int>()->default_value(2048), "number of requests")(
-          "threads,t", value<int>()->default_value(8), "number of threads");
+          "Set rpmp log file path")("map_id,m", value<int>()->default_value(0),
+                                    "Set map id")(
+          "req_num,r", value<int>()->default_value(2048), "Set number of requests")(
+          "threads,t", value<int>()->default_value(8), "Set number of threads");
 
       variables_map vm;
       store(parse_command_line(argc, argv, desc), vm);
@@ -44,6 +46,11 @@ class Config {
         std::cout << desc << '\n';
         return -1;
       }
+      if (vm["address"].as<string>().empty()) {
+        std::cout << "Please specify RPMP proxy address(s)!\n";
+        return -1;
+      }
+
       set_proxy_addrs(vm["address"].as<string>());
       set_proxy_port(vm["port"].as<string>());
       set_log_path(vm["log"].as<string>());
