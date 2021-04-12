@@ -86,6 +86,7 @@ NodeManager::NodeManager(std::shared_ptr<Config> config, std::shared_ptr<Log> lo
   hashToNode_ = new map<uint64_t, string>();
   for (std::string node : config_->get_nodes())
   {
+    cout<<"NodeManager::node: "<<node<<endl;
     XXHash *hashFactory = new XXHash();
     uint64_t hashValue = hashFactory->hash(node);
     hashToNode_->insert(std::make_pair(hashValue, node));
@@ -122,7 +123,10 @@ int64_t NodeManager::getCurrentTime(){
   return ms.count();
 }
 
-
+/**
+ * For debug usage
+ * 
+ **/
 void NodeManager::printNodeStatus(){
   string rawJson = redis_->get(NODE_STATUS);
   const auto rawJsonLength = static_cast<int>(rawJson.length());
@@ -147,6 +151,9 @@ void NodeManager::printNodeStatus(){
   }
 }
 
+/**
+ * Construct Node Status Table 
+ **/
 void NodeManager::constructNodeStatus(Json::Value record){
   Json::Value root;
   Json::Value data;
@@ -156,11 +163,15 @@ void NodeManager::constructNodeStatus(Json::Value record){
   root["data"] = data;
   string json_str = rootToString(root);
   #ifdef DEBUG
-  cout<<"json string is: "<<json_str<<endl;
+  cout<<"NodeManager::constructNodeStatus::json_str "<<json_str<<endl;
   #endif
   redis_->set(NODE_STATUS, json_str);
 }
 
+
+/**
+ * Add a new record if new host is connected or update existed host's status
+ **/
 void NodeManager::addOrUpdateRecord(Json::Value record){
   int exist = redis_->exists(NODE_STATUS);
   if (exist == 0){
@@ -260,6 +271,7 @@ void NodeManager::handle_recv_msg(std::shared_ptr<HeartbeatRequest> request)
 
   map<uint64_t, string>::iterator it;
 
+  #ifdef DEBUG
   for (it = hashToNode_->begin(); it != hashToNode_->end(); it++)
   {
     std::cout << it->first  
@@ -267,6 +279,7 @@ void NodeManager::handle_recv_msg(std::shared_ptr<HeartbeatRequest> request)
               << it->second 
               << std::endl;
   }
+  #endif
 
   if (hashToNode_->count(rc.host_ip_hash) > 0)
   {

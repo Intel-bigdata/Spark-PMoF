@@ -78,7 +78,7 @@ bool Proxy::launchActiveService() {
   consistentHash_ = std::make_shared<ConsistentHash>();
   dataServerPort_ = config_->get_port();
   dataReplica_ = config_->get_data_replica();
-  clientService_ = std::make_shared<ClientService>(config_, log_, shared_from_this());
+  clientService_ = std::make_shared<ClientService>(config_, log_, shared_from_this(), redis_);
   clientService_->startService();
   replicaService_ = std::make_shared<ReplicaService>(config_, log_, shared_from_this());
   replicaService_->startService();
