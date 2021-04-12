@@ -90,18 +90,17 @@ int main(int argc, char** argv) {
   int threads = config->get_num_threads();
   int map_id = config->get_map_id();
   numReqs = config->get_num_reqs();
-  std::string host = config->get_ip();
+  std::string proxy_addrs = config->get_raw_proxy_addrs();
   std::string port = config->get_port();
 
   std::cout << "=================== Put and get ======================="
     << std::endl;
-  std::cout << "RPMP server is " << host << ":" << port << std::endl;
   std::cout << "Total Num Requests is " << numReqs << std::endl;
   std::cout << "Total Num Threads is " << threads << std::endl;
   std::cout << "Block key pattern is "
     << "block_" << map_id << "_*" << std::endl;
 
-  auto client = std::make_shared<PmPoolClient>(host, port);
+  auto client = std::make_shared<PmPoolClient>(proxy_addrs, port);
   client->init();
   std::cout << "start put." << std::endl;
   int start = 0;
