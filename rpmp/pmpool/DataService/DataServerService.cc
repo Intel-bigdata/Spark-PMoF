@@ -150,7 +150,6 @@ int DataServerService::build_connection(std::string proxy_addr) {
     return -1;
   }
   log_->get_console_log()->info("Successfully connected to active proxy: " + proxy_addr);
-//  activeProxyAddr_ = proxy_addr;
   return 0;
 }
 

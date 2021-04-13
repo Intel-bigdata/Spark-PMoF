@@ -64,7 +64,7 @@ int HeartbeatRequestHandler::get(std::shared_ptr<HeartbeatRequest> request) {
   auto ctx = inflight_insert_or_get(request);
   unique_lock<mutex> lk(ctx->mtx_reply);
   const int heartbeatInverval = heartbeatClient_->get_heartbeat_interval();
-  // timeout in sec depneds on the configured heartbeat interval.
+  // timeout in sec depends on the configured heartbeat interval.
   const std::chrono::seconds timeoutInSec(2 * heartbeatInverval);
   while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request, timeoutInSec] {
     auto current = std::chrono::steady_clock::now();
@@ -230,6 +230,7 @@ int HeartbeatClient::init() {
 }
 
 int HeartbeatClient::initHeartbeatClient() {
+  // worker num & buff num
   client_ = std::make_shared<Client>(1, 32);
   if ((client_->init()) != 0) {
     return -1;
@@ -297,6 +298,11 @@ int HeartbeatClient::build_connection_with_exclusion(string excludedProxy) {
   return -1;
 }
 
+/**
+ * Segmentation fault will occur when client_->connect is called consecutively, e.g., client tries to find active
+ * proxy by connecting to two proxy servers one by one which are not launched. The segmentation  fault is caused
+ * by an HPNL function. Fixed by https://github.com/Intel-bigdata/HPNL/pull/92.
+ */
 int HeartbeatClient::build_connection(string proxy_addr, string heartbeat_port) {
   // reset to false to consider the possible re-connection to a new active proxy.
   connected_ = false;
@@ -309,7 +315,6 @@ int HeartbeatClient::build_connection(string proxy_addr, string heartbeat_port) 
   unique_lock<mutex> lk(con_mtx);
   // TODO: looks not a loop.
   while (!connected_) {
-    // TODO: sometimes segmentation fault occurs.
     if (con_v.wait_for(lk, std::chrono::seconds(3)) == std::cv_status::timeout) {
       break;
     }
