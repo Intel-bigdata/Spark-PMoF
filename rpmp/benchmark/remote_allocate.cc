@@ -47,6 +47,7 @@ int main() {
   std::vector<std::thread*> threads;
   int num = 0;
   for (int i = 0; i < 4; i++) {
+    // TODO: the below port is not proxy client service port.
     PmPoolClient *client = new PmPoolClient("172.168.0.40", "12346");
     client->begin_tx();
     client->init();

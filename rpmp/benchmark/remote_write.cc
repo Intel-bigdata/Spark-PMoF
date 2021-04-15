@@ -54,6 +54,7 @@ void func1(PmPoolClient* client) {
 
 int main() {
   std::vector<std::thread*> threads;
+  // TODO: the below port is not proxy client service port.
   PmPoolClient client("172.168.0.40", "12346");
   memset(str, '0', 1048576);
   client.init();

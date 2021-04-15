@@ -60,8 +60,7 @@ struct NodeInfo {
 
 class PmPoolClient {
  public:
-  PmPoolClient() = delete;
-  PmPoolClient(const string &remote_address, const string &remote_port);
+  PmPoolClient(const string &proxy_address, const string &proxy_port);
   ~PmPoolClient();
   int init();
 

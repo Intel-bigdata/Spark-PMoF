@@ -137,7 +137,9 @@ void NodeManager::printNodeStatus(){
   const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
   if (!reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &root,
                       &err)) {
-    std::cout << "error" << std::endl;
+#ifdef DEBUG
+    std::cout << "Error occurred in printing node status." << std::endl;
+#endif
   }
 
   Json::Value recordArray = root["data"];
@@ -264,14 +266,11 @@ void NodeManager::handle_recv_msg(std::shared_ptr<HeartbeatRequest> request)
   rrc.type = rc.type;
   rrc.success = 0;
   rrc.rid = rc.rid;
-  #ifdef DEBUG
+#ifdef DEBUG
   std::cout << "rid: " << to_string(rc.rid) << std::endl;
   std::cout << "host-hash: " << to_string(rc.host_ip_hash) << std::endl;
-  #endif
 
   map<uint64_t, string>::iterator it;
-
-  #ifdef DEBUG
   for (it = hashToNode_->begin(); it != hashToNode_->end(); it++)
   {
     std::cout << it->first  
@@ -279,7 +278,7 @@ void NodeManager::handle_recv_msg(std::shared_ptr<HeartbeatRequest> request)
               << it->second 
               << std::endl;
   }
-  #endif
+#endif
 
   if (hashToNode_->count(rc.host_ip_hash) > 0)
   {
@@ -301,14 +300,14 @@ void NodeManager::handle_recv_msg(std::shared_ptr<HeartbeatRequest> request)
   auto ck = chunkMgr_->get(rrc.con);
   #ifdef DEBUG
   std::cout << "ck->buffer" << ck->buffer << std::endl;
-  std::cout << "requestReply->size" << requestReply->size_ << std::endl;
+  std::cout << "requestReply->size: " << requestReply->size_ << std::endl;
   if (requestReply->data_ == nullptr)
   {
     std::cout << "data is null" << std::endl;
   }
   else
   {
-    std::cout << "requestReply->data" << requestReply->data_ << std::endl;
+    std::cout << "requestReply->data: " << requestReply->data_ << std::endl;
   }
   #endif
   memcpy(reinterpret_cast<char *>(ck->buffer), requestReply->data_, requestReply->size_);

@@ -53,7 +53,9 @@ class ReplicaShutdownCallback : public Callback {
   ~ReplicaShutdownCallback() override = default;
 
   void operator()(void* param_1, void* param_2) override {
-    cout << "replica service::ShutdownCallback::operator" << endl;
+#ifdef DEBUG
+    cout << "ReplicaService::ReplicaShutdownCallback::operator() is called." << endl;
+#endif
   }
 };
 
@@ -61,7 +63,9 @@ class ReplicaConnectCallback : public Callback {
  public:
   ReplicaConnectCallback() = default;
   void operator()(void* param_1, void* param_2) override {
-    cout << "replica service::ConnectCallback::operator" << endl;
+#ifdef DEBUG
+    cout << "ReplicaService::ReplicaConnectCallback::operator() is called." << endl;
+#endif
   }
 };
 

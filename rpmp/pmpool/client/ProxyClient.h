@@ -127,18 +127,30 @@ private:
 
 class ProxyClient : public std::enable_shared_from_this<ProxyClient> {
  public:
-  ProxyClient(const string& proxy_address, const string& proxy_port);
+  ProxyClient(const string &proxy_address, const string &proxy_port);
+  ProxyClient() = delete;
   ~ProxyClient();
-  int initProxyClient(std::shared_ptr<ProxyRequestHandler> requestHandler);
+  int initProxyClient();
   void send(const char* data, uint64_t size);
   void setConnection(Connection* connection);
+
+  int build_connection();
+  int build_connection(string proxy_addr, string proxy_port);
+  void onActiveProxyShutdown();
+  void set_active_proxy_shutdown_callback(Callback* activeProxyDisconnectedCallback);
+
+  void addTask(std::shared_ptr<ProxyRequest> request);
+  ProxyRequestReplyContext get(std::shared_ptr<ProxyRequest> request);
+  void addRequest(std::shared_ptr<ProxyRequest> request);
+
   void shutdown();
   void wait();
   void reset();
 
  private:
-  string proxy_address_;
-  string proxy_port_;
+  std::vector<string> proxy_addrs_;
+  std::string proxy_port_;
+  std::shared_ptr<ProxyRequestHandler> proxyRequestHandler_;
   std::shared_ptr<Client> client_;
   std::shared_ptr<ChunkMgr> chunkMgr_;
 
@@ -150,6 +162,21 @@ class ProxyClient : public std::enable_shared_from_this<ProxyClient> {
   std::mutex con_mtx;
   std::condition_variable con_v;
   bool connected_;
+
+  Callback* activeProxyDisconnectedCallback_;
+};
+
+/**
+ * A callback to take action when the built connection is shut down.
+ */
+class ActiveProxyDisconnectedCallback : public Callback {
+public:
+    explicit ActiveProxyDisconnectedCallback(std::shared_ptr<ProxyClient> proxyClient);
+    ~ActiveProxyDisconnectedCallback() override = default;
+    void operator()(void* param_1, void* param_2);
+
+private:
+    std::shared_ptr<ProxyClient> proxyClient_;
 };
 
 #endif //RPMP_PROXYCLIENT_H

@@ -137,9 +137,6 @@ void HeartbeatRecvCallback::operator()(void *param_1, void *param_2) {
   chunkMgr_->reclaim(ck, static_cast<Connection *>(ck->con));
 }
 
-/**
- * TODO: let RPMP server find new active proxy in shutdown callback.
- */
 void HeartbeatShutdownCallback::operator()(void* param_1, void* param_2) {
 }
 

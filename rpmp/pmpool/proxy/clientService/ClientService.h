@@ -53,17 +53,23 @@ class ProxyShutdownCallback:public Callback{
 public:
     ProxyShutdownCallback() = default;
     ~ProxyShutdownCallback() override = default;
-    void operator()(void* param_1, void* param_2) override{
-      cout<<"clientservice::ShutdownCallback::operator"<<endl;
+
+    void operator()(void *param_1, void *param_2) override {
+#ifdef DEBUG
+      cout << "Clientservice::ProxyShutdownCallback::operator() is called." << endl;
+#endif
     }
 };
 
 class ProxyConnectCallback : public Callback {
-  public:
-  ProxyConnectCallback() = default;
-  void operator()(void* param_1, void* param_2) override {
-    cout << "clientservice::ConnectCallback::operator" << endl;
-  }
+public:
+    ProxyConnectCallback() = default;
+
+    void operator()(void *param_1, void *param_2) override {
+#ifdef DEBUG
+      cout << "Clientservice::ProxyConnectCallback::operator() is called." << endl;
+#endif
+    }
 };
 
 class Worker : public ThreadWrapper {

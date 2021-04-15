@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
   std::shared_ptr<Config> config = std::make_shared<Config>();
   CHK_ERR("config init", config->init(argc, argv));
   auto client =
-      std::make_shared<PmPoolClient>(config->get_ip(), config->get_port());
+      std::make_shared<PmPoolClient>(config->get_proxy_addrs(), config->get_proxy_port());
   char temp[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
                  'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V',
                  'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f'};

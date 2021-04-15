@@ -1,3 +1,6 @@
+#include <boost/program_options.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
 
 #include "pmpool/client/ProxyClient.h"
 
@@ -71,7 +74,7 @@ ProxyRequestReplyContext ProxyRequestHandler::get(std::shared_ptr<ProxyRequest> 
   }
   auto res = ctx->get_rrc();
   if (ctx->op_failed) {
-    throw;
+    throw "Failed to send request to active proxy.";
   }
   inflight_erase(request);
   return res;
@@ -113,7 +116,8 @@ void ProxyClientConnectCallback::operator()(void *param_1, void *param_2) {
   proxyClient_->setConnection(connection);
 }
 
-ProxyClientRecvCallback::ProxyClientRecvCallback(std::shared_ptr<ChunkMgr> chunkMgr, std::shared_ptr<ProxyRequestHandler> requestHandler) 
+ProxyClientRecvCallback::ProxyClientRecvCallback(std::shared_ptr<ChunkMgr> chunkMgr,
+                                                 std::shared_ptr<ProxyRequestHandler> requestHandler)
 : chunkMgr_(chunkMgr), requestHandler_(requestHandler) {}
 
 void ProxyClientRecvCallback::operator()(void *param_1, void *param_2) {
@@ -127,12 +131,19 @@ void ProxyClientRecvCallback::operator()(void *param_1, void *param_2) {
   chunkMgr_->reclaim(ck, static_cast<Connection *>(ck->con));
 }
 
-ProxyClient::ProxyClient(const string &proxy_address, const string &proxy_port) 
-:proxy_address_(proxy_address), proxy_port_(proxy_port) {}
+/**
+ * In RPMP HA mode, proxy_address is a string containing multiple proxies with "," separated.
+ */
+ProxyClient::ProxyClient(const string &proxy_address, const string &proxy_port) {
+  vector<string> proxies;
+  boost::split(proxies, proxy_address, boost::is_any_of(","), boost::token_compress_on);
+  proxy_addrs_ = proxies;
+  proxy_port_ = proxy_port;
+}
 
 ProxyClient::~ProxyClient() {
 #ifdef DUBUG
-  std::cout << "NetworkClient destructed" << std::endl;
+  std::cout << "ProxyClient destructed" << std::endl;
 #endif
 }
 
@@ -151,7 +162,10 @@ void ProxyClient::send(const char *data, uint64_t size) {
   proxy_connection_->send(chunk);
 }
 
-int ProxyClient::initProxyClient(std::shared_ptr<ProxyRequestHandler> requestHandler) {
+int ProxyClient::initProxyClient() {
+  proxyRequestHandler_ = make_shared<ProxyRequestHandler>(shared_from_this());
+  proxyRequestHandler_->start();
+
   client_ = std::make_shared<Client>(1, 32);
   if ((client_->init()) != 0) {
     return -1;
@@ -166,7 +180,7 @@ int ProxyClient::initProxyClient(std::shared_ptr<ProxyRequestHandler> requestHan
   shutdownCallback = std::make_shared<ProxyClientShutdownCallback>();
   connectCallback =
       std::make_shared<ProxyClientConnectCallback>(shared_from_this());
-  recvCallback = std::make_shared<ProxyClientRecvCallback>(chunkMgr_, requestHandler);
+  recvCallback = std::make_shared<ProxyClientRecvCallback>(chunkMgr_, proxyRequestHandler_);
   sendCallback = std::make_shared<ProxyClientSendCallback>(chunkMgr_);
 
   client_->set_shutdown_callback(shutdownCallback.get());
@@ -175,25 +189,99 @@ int ProxyClient::initProxyClient(std::shared_ptr<ProxyRequestHandler> requestHan
   client_->set_send_callback(sendCallback.get());
 
   client_->start();
-  int res = client_->connect(proxy_address_.c_str(), proxy_port_.c_str());
-  unique_lock<mutex> lk(con_mtx);
-  auto start = std::chrono::steady_clock::now();
-  while (!con_v.wait_for(lk, 50ms, [start, this] {
-    auto current = std::chrono::steady_clock::now();
-    auto elapse = current - start;
-    if (elapse > 10s) {
-      fprintf(stderr, "Client connection spent %ld s, time out\n",
-              std::chrono::duration_cast<std::chrono::seconds>(elapse).count());
-      return true;
+
+  std::shared_ptr<ActiveProxyDisconnectedCallback> callbackPtr =
+      std::make_shared<ActiveProxyDisconnectedCallback>(shared_from_this());
+  set_active_proxy_shutdown_callback(callbackPtr.get());
+  return build_connection();
+}
+
+int ProxyClient::build_connection() {
+  const int MAX_LOOPS = 5;
+  int loop = 0;
+  while (loop++ < MAX_LOOPS) {
+    for (int i = 0; i < proxy_addrs_.size(); i++) {
+      cout << "Trying to connect to " << proxy_addrs_[i] << ":" << proxy_port_ << endl;
+      auto res = build_connection(proxy_addrs_[i], proxy_port_);
+      if (res == 0) {
+        return 0;
+      }
     }
-    return this->connected_;
-  })) {
+  }
+  cout << "Failed to connect to an active proxy!" << endl;
+  return -1;
+}
+
+int ProxyClient::build_connection(string proxy_addr, string proxy_port) {
+  // reset to false to consider the possible re-connection to a new active proxy.
+  connected_ = false;
+  // res can be 0 even though remote proxy is shut down.
+  int res = client_->connect(proxy_addr.c_str(), proxy_port.c_str());
+  if (res == -1) {
+    return -1;
+  }
+  // wait for ConnectedCallback to be executed.
+  unique_lock<mutex> lk(con_mtx);
+  // TODO: looks not a loop.
+  while (!connected_) {
+    // TODO: sometimes segmentation fault occurs.
+    if (con_v.wait_for(lk, std::chrono::seconds(3)) == std::cv_status::timeout) {
+      break;
+    }
   }
   if (!connected_) {
     return -1;
   }
-
+  cout << "Successfully connected to active proxy: " + proxy_addr << endl;
+  // Looks no need to keep this addr.
+//  activeProxyAddr_ = proxy_addr;
   return 0;
+}
+
+void ProxyClient::addTask(std::shared_ptr<ProxyRequest> request) {
+  proxyRequestHandler_->addTask(request);
+}
+
+/**
+ * Catch exception and build connection with new active proxy.
+ */
+ProxyRequestReplyContext ProxyClient::get(std::shared_ptr<ProxyRequest> request) {
+  try {
+    return proxyRequestHandler_->get(request);
+  } catch (char const* e) {
+    onActiveProxyShutdown();
+    if (connected_) {
+      // Ignore the exception case in below after new proxy connection is built.
+      // The possibility of this case is very low.
+      return proxyRequestHandler_->get(request);
+    }
+  }
+}
+
+void ProxyClient::addRequest(std::shared_ptr<ProxyRequest> request) {
+  return  proxyRequestHandler_->addRequest(request);
+}
+
+void ProxyClient::set_active_proxy_shutdown_callback(Callback* activeProxyDisconnectedCallback) {
+  activeProxyDisconnectedCallback_ = activeProxyDisconnectedCallback;
+}
+
+/**
+ * Actions to be token when active proxy is unreachable.
+ */
+void ProxyClient::onActiveProxyShutdown() {
+  connected_ = false;
+  if (proxy_connection_ != nullptr) {
+    proxy_connection_->shutdown();
+  }
+  if (activeProxyDisconnectedCallback_) {
+    activeProxyDisconnectedCallback_->operator()(nullptr, nullptr);
+  }
+  if (connected_) {
+    cout << "Connected to a new active proxy." << endl;
+  } else {
+    cout << "No active proxy is found." << endl;
+  }
 }
 
 void ProxyClient::shutdown() {
@@ -205,6 +293,7 @@ void ProxyClient::wait() {
 }
 
 void ProxyClient::reset(){
+  proxyRequestHandler_->reset();
   shutdownCallback.reset();
   connectCallback.reset();
   recvCallback.reset();
@@ -216,4 +305,16 @@ void ProxyClient::reset(){
     client_->shutdown();
     client_.reset();
   }
+}
+
+ActiveProxyDisconnectedCallback::ActiveProxyDisconnectedCallback(std::shared_ptr<ProxyClient> proxyClient) {
+  proxyClient_ = proxyClient;
+}
+
+/**
+ * Shutdown callback used to watch active proxy state. The current proxy should take action to
+ * launch active proxy service if predefined condition is met.
+ */
+void ActiveProxyDisconnectedCallback::operator()(void* param_1, void* param_2) {
+  proxyClient_->build_connection();
 }
