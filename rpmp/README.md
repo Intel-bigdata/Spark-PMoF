@@ -1,5 +1,7 @@
-# RPMP(Remote Persistent Memory Pool)
-RPMP was designed as a fully disaggregated shuffle solution for distributed compute system, leveraging state-of-art hardware technologies including persist memory and RDMA, but are not necessarily limited to a shuffle solution. It extends local PM(Persistent Memory) to remote PM and targets on a distributed persistent memory pool, providing easy-to-use interfaces, like the malloc and free in standard C library. 
+# Remote Persistent Memory Pool (RPMP)
+RPMP was designed as a fully disaggregated shuffle solution for distributed compute system, leveraging state-of-the-art hardware technologies, 
+including persist memory and RDMA, but are not necessarily limited to a shuffle solution. It extends local PM (Persistent Memory) to remote PM 
+and targets on a distributed persistent memory pool, providing easy-to-use interfaces, like `malloc` and `free` in standard C library. 
 
 ## Contents
 - [Prerequisite](#prerequisite) 
@@ -154,19 +156,21 @@ Set minimal replica and preferred replica.
 ## Launch RPMP cluster
 Change directory to {RPMP-HOME}/build/bin
 - Launch proxy
-  ```./proxyMain --current_proxy_addr {addr}```
+  ```./proxyMain --current_proxy_addr $addr```
 - Launch RPMP nodes according to config  
-  ```./main``
+  ```./main```
   
 Alternatively, you can leverage script to start/stop cluster services. To make stop script work as expected, 
 please note one node CANNOT plays two same roles, e.g., launch two proxy servers on one node.
 - Start cluster
-  ./start-rpmp.sh
+  ```./start-rpmp.sh```
 - Stop cluster
-  ./stop-rpmp.sh
+  ```./stop-rpmp.sh```
 
 ## Benchmark
-### Put and get`
+### Put and get
  - Launch put and get executor
- ```./put_and_get```
+ ```./put_and_get --address $addr --port $port```
    
+Here, `$addr` is proxy host address (see `rpmp.network.proxy.address`), and `$port` is client service port 
+(see `rpmp.proxy.client.service.port`), e.g., `./put_and_get --address 172.168.0.101,172.168.0.102 --port 12350`

@@ -6,7 +6,9 @@ ServiceConnectCallback::ServiceConnectCallback(std::shared_ptr<DataServerService
 }
 
 void ServiceConnectCallback::operator()(void *param_1, void *param_2) {
+#ifdef DEBUG
   cout << "ServiceConnectCallback" << endl;
+#endif
   auto connection = static_cast<Connection*>(param_1);
   service_->setConnection(connection);
 }
