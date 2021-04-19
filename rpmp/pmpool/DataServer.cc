@@ -73,6 +73,7 @@ void ConnectionShutdownCallback::operator()(void* param_1, void* param_2) {
   string activeProxyAddr = heartbeatClient_->getActiveProxyAddr();
   int ret = dataService_->build_connection(activeProxyAddr);
   if (ret == -1) {
+    std::cout << "Failed to register to " << activeProxyAddr << "due to connection issue.\n";
     return;
   }
   dataService_->registerDataServer();

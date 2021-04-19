@@ -112,11 +112,11 @@ void ClientService::handle_recv_msg(std::shared_ptr<ProxyRequest> request) {
   switch(rc.type) {
     case GET_HOSTS: {
       unordered_set<PhysicalNode, PhysicalNodeHash> nodes = proxyServer_->getNodes(rc.key);
-      #ifdef DEBUG
+#ifdef DEBUG
       for(auto node: nodes){
         cout<<"Get_HOSTS::"<<node.getIp()<<endl;
       }
-      #endif
+#endif
       rrc.type = rc.type;
       rrc.key = rc.key;
       rrc.success = 0;

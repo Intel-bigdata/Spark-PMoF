@@ -62,11 +62,15 @@ ProxyRequestReplyContext ProxyRequestHandler::get(std::shared_ptr<ProxyRequest> 
   while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request] {
     auto current = std::chrono::steady_clock::now();
     auto elapse = current - ctx->start;
+    // TODO: timeout set too long?
     if (elapse > 30s) {
       ctx->op_failed = true;
       fprintf(stderr, "Request [TYPE %ld] spent %ld s, time out\n",
               request->requestContext_.type,
               std::chrono::duration_cast<std::chrono::seconds>(elapse).count());
+      // TODO: throw exception from here?
+      // Throw the exception and ask for building connection with active proxy.
+      // throw "TIMEOUT occurred in sending request to active proxy.";
       return true;
     }
     return ctx->op_finished;

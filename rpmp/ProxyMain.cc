@@ -11,6 +11,7 @@ int main(int argc, char* argv[]){
     CHK_ERR("init config", config->init(argc, argv));
   }
   std::shared_ptr<Log> log = std::make_shared<Log>(config.get());
+  // TODO: this statement is applicable to active proxy.
   std::shared_ptr<Redis> redis = std::make_shared<Redis>(config, log);
   // Host ip will be passed from command line through a launch script.
   // It is consistent with user-specified address in the configuration.

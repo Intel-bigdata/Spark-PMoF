@@ -31,7 +31,7 @@ using std::unordered_map;
 using std::vector;
 
 /**
- * @brief Allocator proxy schedule faily to guarantee event to be assigned to
+ * @brief Allocator proxy schedule fairly to guarantee event to be assigned to
  * different allocators.
  *
  */

@@ -6,7 +6,9 @@ ServiceConnectCallback::ServiceConnectCallback(std::shared_ptr<DataServerService
 }
 
 void ServiceConnectCallback::operator()(void *param_1, void *param_2) {
+#ifdef DEBUG
   cout << "ServiceConnectCallback" << endl;
+#endif
   auto connection = static_cast<Connection*>(param_1);
   service_->setConnection(connection);
 }
@@ -150,7 +152,6 @@ int DataServerService::build_connection(std::string proxy_addr) {
     return -1;
   }
   log_->get_console_log()->info("Successfully connected to active proxy: " + proxy_addr);
-//  activeProxyAddr_ = proxy_addr;
   return 0;
 }
 
