@@ -125,6 +125,7 @@ public:
   void shutdown(Connection* conn);
   void wait();
   void reset();
+  // heartbeat in sec.
   int get_heartbeat_interval();
   void setExcludedProxy(string proxyAddr);
 

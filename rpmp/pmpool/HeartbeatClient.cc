@@ -32,10 +32,10 @@ void HeartbeatRequestHandler::addTask(std::shared_ptr<HeartbeatRequest> request)
 }
 
 int HeartbeatRequestHandler::entry() {
-  std::cout << "I'm working..\n";
+  int waitTimeInSec = heartbeatClient_->get_heartbeat_interval();
   std::shared_ptr<HeartbeatRequest> request;
   bool res = pendingRequestQueue_.wait_dequeue_timed(
-          request, std::chrono::milliseconds(1000));
+          request, std::chrono::seconds(waitTimeInSec));
   if (res) {
     handleRequest(request);
   }
@@ -204,7 +204,7 @@ int HeartbeatClient::heartbeat() {
     try {
       heartbeatRequestHandler_->get(heartbeatRequest);
     } catch (char const* e) {
-      log_->get_console_log()->info("Heartbeat exception: {0}", e);
+      log_->get_console_log()->warn("Heartbeat exception: {0}", e);
       // New active proxy may be connected. The loop will continue.
       onActiveProxyShutdown();
     }
