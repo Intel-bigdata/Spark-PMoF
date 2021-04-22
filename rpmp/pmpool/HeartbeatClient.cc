@@ -32,6 +32,7 @@ void HeartbeatRequestHandler::addTask(std::shared_ptr<HeartbeatRequest> request)
 }
 
 int HeartbeatRequestHandler::entry() {
+  std::cout << "I'm working..\n";
   std::shared_ptr<HeartbeatRequest> request;
   bool res = pendingRequestQueue_.wait_dequeue_timed(
           request, std::chrono::milliseconds(1000));
@@ -222,6 +223,7 @@ int HeartbeatClient::init() {
   heartbeatRequestHandler_ = make_shared<HeartbeatRequestHandler>(shared_from_this());
   auto res = initHeartbeatClient();
   if (res != -1) {
+    // TODO: stop this thread
     heartbeatRequestHandler_->start();
     std::thread t_heartbeat(&HeartbeatClient::heartbeat, shared_from_this());
     t_heartbeat.detach();

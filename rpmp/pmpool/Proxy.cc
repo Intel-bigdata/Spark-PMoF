@@ -187,6 +187,7 @@ void Proxy::removeReplica(uint64_t key) {
   replicaMap_.erase(key);
 }
 
+// TODO: get location from Metastore.
 std::unordered_set<PhysicalNode,PhysicalNodeHash> Proxy::getReplica(uint64_t key) {
   std::lock_guard<std::mutex> lk(replica_mtx);
   return replicaMap_[key];
