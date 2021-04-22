@@ -32,9 +32,10 @@ void HeartbeatRequestHandler::addTask(std::shared_ptr<HeartbeatRequest> request)
 }
 
 int HeartbeatRequestHandler::entry() {
+  int waitTimeInSec = heartbeatClient_->get_heartbeat_interval();
   std::shared_ptr<HeartbeatRequest> request;
   bool res = pendingRequestQueue_.wait_dequeue_timed(
-          request, std::chrono::milliseconds(1000));
+          request, std::chrono::seconds(waitTimeInSec));
   if (res) {
     handleRequest(request);
   }
@@ -203,7 +204,7 @@ int HeartbeatClient::heartbeat() {
     try {
       heartbeatRequestHandler_->get(heartbeatRequest);
     } catch (char const* e) {
-      log_->get_console_log()->info("Heartbeat exception: {0}", e);
+      log_->get_console_log()->warn("Heartbeat exception: {0}", e);
       // New active proxy may be connected. The loop will continue.
       onActiveProxyShutdown();
     }
@@ -222,6 +223,7 @@ int HeartbeatClient::init() {
   heartbeatRequestHandler_ = make_shared<HeartbeatRequestHandler>(shared_from_this());
   auto res = initHeartbeatClient();
   if (res != -1) {
+    // TODO: stop this thread
     heartbeatRequestHandler_->start();
     std::thread t_heartbeat(&HeartbeatClient::heartbeat, shared_from_this());
     t_heartbeat.detach();
@@ -378,7 +380,10 @@ void HeartbeatClient::reset(){
     client_->shutdown();
     client_.reset();
   }
+  // stop heartbeat thread
   isTerminated_ = true;
+  // stop heartbeat request handler thread
+  heartbeatRequestHandler_->stop();
 }
 
 int HeartbeatClient::get_heartbeat_interval() {
