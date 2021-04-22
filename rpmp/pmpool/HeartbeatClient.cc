@@ -380,7 +380,10 @@ void HeartbeatClient::reset(){
     client_->shutdown();
     client_.reset();
   }
+  // stop heartbeat thread
   isTerminated_ = true;
+  // stop heartbeat request handler thread
+  heartbeatRequestHandler_->stop();
 }
 
 int HeartbeatClient::get_heartbeat_interval() {
