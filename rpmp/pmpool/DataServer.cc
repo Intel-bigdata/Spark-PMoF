@@ -56,7 +56,7 @@ ConnectionShutdownCallback::ConnectionShutdownCallback(std::shared_ptr<Heartbeat
  * a new active proxy.
  */
 void ConnectionShutdownCallback::operator()(void* param_1, void* param_2) {
-  // Some time is needed by new active proxy setup.
+  // Some time is needed for new active proxy setup.
   const int waitTime = heartbeatClient_->get_heartbeat_timeout() + 1;
   sleep(waitTime);
   int res = heartbeatClient_->build_connection();
