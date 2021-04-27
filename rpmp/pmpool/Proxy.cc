@@ -66,21 +66,31 @@ bool Proxy::isActiveProxy(std::string currentHostAddr) {
   return false;
 }
 
-/// TODO: add fencing service to make sure only one proxy is active.
-/// TODO: terminate the launching if key service is not launched as expected.
+/** Terminate the launching if key service is not launched as expected.
+ *  TODO: add fencing service to make sure only one proxy is active.
+ */
 bool Proxy::launchActiveService() {
   log_->get_console_log()->info("Launch active proxy services..");
   redis_ = std::make_shared<Redis>(config_, log_);
+  if (!redis_->connect()) {
+    return false;
+  }
   nodeManager_ = std::make_shared<NodeManager>(config_, log_, redis_);
-  nodeManager_->init();
+  if (!nodeManager_->startService()) {
+    return false;
+  }
   loadBalanceFactor_ = config_->get_load_balance_factor();
   consistentHash_ = std::make_shared<ConsistentHash>();
   dataServerPort_ = config_->get_port();
   dataReplica_ = config_->get_data_replica();
   clientService_ = std::make_shared<ClientService>(config_, log_, shared_from_this(), redis_);
-  clientService_->startService();
+  if (!clientService_->startService()) {
+    return false;
+  }
   replicaService_ = std::make_shared<ReplicaService>(config_, log_, shared_from_this());
-  replicaService_->startService();
+  if (!replicaService_->startService()) {
+    return false;
+  }
   return true;
 }
 

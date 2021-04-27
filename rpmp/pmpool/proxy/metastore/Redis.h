@@ -12,7 +12,7 @@ class Config;
 class Redis: public std::enable_shared_from_this<Redis>{
 public:
   Redis(std::shared_ptr<Config> config, std::shared_ptr <Log> log_);
-  int connect();
+  bool connect();
   int connect(string ip, string port);
   string set(string key, string value);   
   string get(string key);
@@ -27,9 +27,11 @@ public:
   int exists(string key);
 
 private:
-  std::shared_ptr<MetastoreConnection> metastoreConnection_ = std::make_shared<MetastoreConnection>();
+  std::shared_ptr<MetastoreConnection> metastoreConnection_;
   std::shared_ptr<Config> config_;
   std::shared_ptr<Log> log_;
+  std::string address_;
+  std::string port_;
 };
 
 #endif

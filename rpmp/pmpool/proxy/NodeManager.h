@@ -94,13 +94,11 @@ private:
   BlockingConcurrentQueue<std::shared_ptr<HeartbeatRequest>> pendingRecvRequestQueue_;
 };
 
-class NodeManager :  public std::enable_shared_from_this<NodeManager> {
+class NodeManager : public std::enable_shared_from_this<NodeManager> {
 public:
   NodeManager() = delete;
   NodeManager(std::shared_ptr<Config> config, std::shared_ptr <Log> log, std::shared_ptr<Redis> redis);
   ~NodeManager();
-  void init();
-  int start();
   void wait();
   void printNodeStatus();
   uint64_t get_rkey();
@@ -108,7 +106,7 @@ public:
   void send(char *data, uint64_t size, Connection *con);
   void enqueue_recv_msg(std::shared_ptr<HeartbeatRequest> request);
   void handle_recv_msg(std::shared_ptr<HeartbeatRequest> request);
-  bool launchServer();
+  bool startService();
   
 
 private:

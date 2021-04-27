@@ -10,9 +10,19 @@
 Redis::Redis(std::shared_ptr<Config> config, std::shared_ptr<Log> log){
   config_ = config;
   log_ = log;
-  string ip = config_->get_metastore_redis_ip();
-  string port = config_->get_metastore_redis_port();
-  metastoreConnection_->connect(ip, port);
+  address_ = config_->get_metastore_redis_ip();
+  port_ = config_->get_metastore_redis_port();
+  metastoreConnection_ = std::make_shared<MetastoreConnection>();
+}
+
+bool Redis::connect() {
+  int res = metastoreConnection_->connect(address_, port_);
+  if (res == 0) {
+    log_->get_console_log()->info("Successfully connected to redis server {0}:{1}");
+    return true;
+  }
+  log_->get_console_log()->error("Failed to connect to redis server {0}:{1}", address_, port_);
+  return false;
 }
 
 string Redis::set(string key, string value){
