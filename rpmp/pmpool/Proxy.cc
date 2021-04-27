@@ -70,6 +70,7 @@ bool Proxy::isActiveProxy(string currentHostAddr) {
 }
 
 /// TODO: add fencing service to make sure only one proxy is active.
+/// TODO: terminate the launching if key service is not launched as expected.
 bool Proxy::launchActiveService() {
   log_->get_console_log()->info("Launch active proxy services..");
   nodeManager_ = std::make_shared<NodeManager>(config_, log_, redis_);

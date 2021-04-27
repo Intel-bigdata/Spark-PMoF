@@ -223,7 +223,6 @@ int HeartbeatClient::init() {
   heartbeatRequestHandler_ = make_shared<HeartbeatRequestHandler>(shared_from_this());
   auto res = initHeartbeatClient();
   if (res != -1) {
-    // TODO: stop this thread
     heartbeatRequestHandler_->start();
     std::thread t_heartbeat(&HeartbeatClient::heartbeat, shared_from_this());
     t_heartbeat.detach();
