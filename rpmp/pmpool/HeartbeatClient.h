@@ -20,8 +20,8 @@ class HeartbeatClient;
 class Config;
 class Log;
 
-/// TODO: remove or keep it in .cc file.
-using namespace std;
+using std::string;
+using std::vector;
 using std::make_shared;
 using moodycamel::BlockingConcurrentQueue;
 
@@ -116,10 +116,10 @@ public:
   void setConnection(Connection* connection);
   int initHeartbeatClient();
   int build_connection();
-  int build_connection_with_exclusion(string excludedProxy);
-  int build_connection(string proxy_addr, string heartbeat_port);
+  int build_connection_with_exclusion(std::string excludedProxy);
+  int build_connection(std::string proxy_addr, std::string heartbeat_port);
   void set_active_proxy_shutdown_callback(Callback* shutdownCallback);
-  string getActiveProxyAddr();
+  std::string getActiveProxyAddr();
   void onActiveProxyShutdown();
   void shutdown();
   void shutdown(Connection* conn);
@@ -129,7 +129,7 @@ public:
   int get_heartbeat_interval();
   // timeout in sec.
   int get_heartbeat_timeout();
-  void setExcludedProxy(string proxyAddr);
+  void setExcludedProxy(std::string proxyAddr);
 
 private:
   atomic<uint64_t> rid_ = {0};
@@ -158,7 +158,7 @@ private:
   bool isTerminated_;
 
   Callback* activeProxyShutdownCallback_;
-  string excludedProxy_;
+  std::string excludedProxy_;
 };
 
 #endif //SPARK_PMOF_HEARTBEAT_H
