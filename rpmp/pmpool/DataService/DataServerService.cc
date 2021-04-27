@@ -141,9 +141,7 @@ int DataServerService::build_connection(std::string proxy_addr) {
   }
   // wait for ConnectedCallback to be executed.
   std::unique_lock<std::mutex> lk(con_mtx);
-  // TODO: looks not a loop.
   while (!proxyConnected) {
-    // TODO: sometimes segmentation fault occurs.
     if (con_v.wait_for(lk, std::chrono::seconds(3)) == std::cv_status::timeout) {
       break;
     }

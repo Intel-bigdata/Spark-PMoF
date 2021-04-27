@@ -226,9 +226,7 @@ int ProxyClient::build_connection(string proxy_addr, string proxy_port) {
   }
   // wait for ConnectedCallback to be executed.
   unique_lock<mutex> lk(con_mtx);
-  // TODO: looks not a loop.
   while (!connected_) {
-    // TODO: sometimes segmentation fault occurs.
     if (con_v.wait_for(lk, std::chrono::seconds(3)) == std::cv_status::timeout) {
       break;
     }

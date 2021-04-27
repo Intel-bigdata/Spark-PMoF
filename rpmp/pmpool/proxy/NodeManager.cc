@@ -13,8 +13,9 @@
 #include "json/json.h"
 #include "pmpool/proxy/metastore/JsonUtil.h"
 
-
-using namespace std;
+using std::shared_ptr;
+using std::string;
+using std::vector;
 
 NodeManagerRecvCallback::NodeManagerRecvCallback(std::shared_ptr<NodeManager> nodeManager,
                                                  std::shared_ptr<ChunkMgr> chunkMgr)
@@ -81,7 +82,8 @@ int NodeManagerWorker::entry()
   return 0;
 }
 
-NodeManager::NodeManager(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Redis> redis) : config_(config), log_(log), redis_(redis)
+NodeManager::NodeManager(shared_ptr <Config> config, shared_ptr <Log> log, shared_ptr <Redis> redis) :
+    config_(config), log_(log), redis_(redis)
 {
   hashToNode_ = new map<uint64_t, string>();
   for (std::string node : config_->get_nodes())
@@ -363,19 +365,8 @@ int NodeManager::checkNode(){
   return 0;
 }
 
-
-
-void NodeManager::init()
+bool NodeManager::startService()
 {
-  std::thread t_nodeManager(&NodeManager::launchServer, shared_from_this());
-  t_nodeManager.detach();
-  std::thread t_nodeChecker(&NodeManager::checkNode, shared_from_this());
-  t_nodeChecker.detach();
-}
-
-bool NodeManager::launchServer()
-{
-
   int worker_number = config_->get_network_worker_num();
   int buffer_number = config_->get_network_buffer_num();
   int buffer_size = config_->get_network_buffer_size();
@@ -403,7 +394,13 @@ bool NodeManager::launchServer()
 
   server_->start();
   server_->listen(config_->get_current_proxy_addr().c_str(), config_->get_heartbeat_port().c_str());
+
+  std::thread t_nodeChecker(&NodeManager::checkNode, shared_from_this());
+  t_nodeChecker.detach();
   log_->get_console_log()->info("NodeManager server started at {0}:{1}", config_->get_current_proxy_addr(), config_->get_heartbeat_port());
-  server_->wait();
   return true;
+}
+
+void NodeManager::wait() {
+  server_->wait();
 }

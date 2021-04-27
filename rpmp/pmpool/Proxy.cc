@@ -14,10 +14,7 @@
 #include "pmpool/proxy/metastore/Redis.h"
 #include "json/json.h"
 
-/// TODO: remove or keep.
-using namespace std;
-
-Proxy::Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, string currentHostAddr) :
+Proxy::Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::string currentHostAddr) :
  config_(config), log_(log), currentHostAddr_(currentHostAddr) {}
 
 Proxy::~Proxy() {
@@ -34,7 +31,7 @@ bool Proxy::launchServer() {
     stopStandbyService();
     return launchActiveService();
   }
-  return 0;
+  return true;
 }
 
 /**
@@ -44,12 +41,12 @@ bool Proxy::launchServer() {
  * @param currentHostAddr   the host address of current proxy.
  * @return  true if the current proxy should be active.
  */
-bool Proxy::isActiveProxy(string currentHostAddr) {
+bool Proxy::isActiveProxy(std::string currentHostAddr) {
   // Directly launch proxy case.
   if (currentHostAddr.empty()) {
     return true;
   }
-  std::vector<string> proxies = config_->get_proxy_addrs();
+  std::vector<std::string> proxies = config_->get_proxy_addrs();
   // Only proxy node will trigger the launch. So if there is
   // only one proxy configured, the current node is active proxy.
   if (proxies.size() == 1) {
@@ -69,27 +66,37 @@ bool Proxy::isActiveProxy(string currentHostAddr) {
   return false;
 }
 
-/// TODO: add fencing service to make sure only one proxy is active.
-/// TODO: terminate the launching if key service is not launched as expected.
+/** Terminate the launching if key service is not launched as expected.
+ *  TODO: add fencing service to make sure only one proxy is active.
+ */
 bool Proxy::launchActiveService() {
   log_->get_console_log()->info("Launch active proxy services..");
   redis_ = std::make_shared<Redis>(config_, log_);
+  if (!redis_->connect()) {
+    return false;
+  }
   nodeManager_ = std::make_shared<NodeManager>(config_, log_, redis_);
-  nodeManager_->init();
+  if (!nodeManager_->startService()) {
+    return false;
+  }
   loadBalanceFactor_ = config_->get_load_balance_factor();
   consistentHash_ = std::make_shared<ConsistentHash>();
   dataServerPort_ = config_->get_port();
   dataReplica_ = config_->get_data_replica();
   clientService_ = std::make_shared<ClientService>(config_, log_, shared_from_this(), redis_);
-  clientService_->startService();
+  if (!clientService_->startService()) {
+    return false;
+  }
   replicaService_ = std::make_shared<ReplicaService>(config_, log_, shared_from_this());
-  replicaService_->startService();
+  if (!replicaService_->startService()) {
+    return false;
+  }
   return true;
 }
 
 bool Proxy::launchStandbyService() {
   log_->get_console_log()->info("Launch standby proxy services..");
-  vector<string> proxies = config_->get_proxy_addrs();
+  std::vector<std::string> proxies = config_->get_proxy_addrs();
   heartbeatClient_ = std::make_shared<HeartbeatClient>(config_, log_);
   // To avoid unnecessarily trying to connect to itself.
   heartbeatClient_->setExcludedProxy(currentHostAddr_);
@@ -108,9 +115,9 @@ bool Proxy::launchStandbyService() {
  * was active recently but it is dead now, the current proxy should become active.
  */
 bool Proxy::shouldBecomeActiveProxy() {
-  vector<string> proxies = config_->get_proxy_addrs();
-  string lastActiveProxy = getLastActiveProxy();
-  std::vector<string>::iterator iter;
+  std::vector<std::string> proxies = config_->get_proxy_addrs();
+  std::string lastActiveProxy = getLastActiveProxy();
+  std::vector<std::string>::iterator iter;
   iter = std::find(proxies.begin(), proxies.end(), lastActiveProxy);
   if (iter != proxies.end()) {
     /// TODO: in a loop style.
@@ -123,7 +130,7 @@ bool Proxy::shouldBecomeActiveProxy() {
 /**
  * Get last active proxy according to HeartbeatClient's successfully built connection previously.
  */
-string Proxy::getLastActiveProxy() {
+std::string Proxy::getLastActiveProxy() {
   log_->get_console_log()->info("Last active proxy addr: {0}", heartbeatClient_->getActiveProxyAddr());
   return heartbeatClient_->getActiveProxyAddr();
 }
@@ -143,7 +150,10 @@ ActiveProxyShutdownCallback::ActiveProxyShutdownCallback(std::shared_ptr<Proxy> 
 void ActiveProxyShutdownCallback::operator()(void* param_1, void* param_2) {
   if (proxy_->shouldBecomeActiveProxy()) {
     proxy_->stopStandbyService();
-    proxy_->launchActiveService();
+    if (!proxy_->launchActiveService()) {
+      std::cout << "Failed to launch active proxy services!\n";
+      return;
+    }
   } else {
     /// wait for time required by candidate proxy to detect the disconnection and to set up active proxy services.
     /// New active proxy needs some time to launch services.
@@ -155,7 +165,9 @@ void ActiveProxyShutdownCallback::operator()(void* param_1, void* param_2) {
     }
     /// No active proxy is running. The current proxy should become active.
     proxy_->stopStandbyService();
-    proxy_->launchActiveService();
+    if (!proxy_->launchActiveService()) {
+      std::cout << "Failed to launch active proxy services!\n";
+    }
   }
 }
 

@@ -15,7 +15,10 @@ int main(int argc, char* argv[]){
   // It is consistent with user-specified address in the configuration.
   std::string currentHostAddr = config->get_current_proxy_addr();
   std::shared_ptr<Proxy> proxyServer = std::make_shared<Proxy>(config, log, currentHostAddr);
-  proxyServer->launchServer();
+  if (!proxyServer->launchServer()) {
+    log->get_console_log()->error("Failed to launch proxy server!");
+    return -1;
+  }
   proxyServer->wait();
   return 0;
 }
