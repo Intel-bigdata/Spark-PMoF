@@ -6,6 +6,7 @@
 
 #include "json/json.h"
 
+// TODO: RPMP proxy process should not be terminated when cannot connect to Redis.
 Redis::Redis(std::shared_ptr<Config> config, std::shared_ptr<Log> log){
   config_ = config;
   log_ = log;

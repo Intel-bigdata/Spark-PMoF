@@ -127,6 +127,8 @@ public:
   void reset();
   // heartbeat in sec.
   int get_heartbeat_interval();
+  // timeout in sec.
+  int get_heartbeat_timeout();
   void setExcludedProxy(string proxyAddr);
 
 private:
@@ -138,6 +140,8 @@ private:
   std::shared_ptr<Config> config_;
   std::shared_ptr<Log> log_;
   int heartbeatInterval_;
+  // looks 5s for timeout is suitable. May need to be tuned for large scale cluster.
+  const int heartbeatTimeout_ = 5;
   std::shared_ptr<Client> client_;
   std::shared_ptr<ChunkMgr> chunkMgr_;
 
