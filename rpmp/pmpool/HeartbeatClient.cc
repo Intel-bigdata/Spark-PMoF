@@ -312,7 +312,6 @@ int HeartbeatClient::build_connection(string proxy_addr, string heartbeat_port) 
   }
   // wait for ConnectedCallback to be executed.
   unique_lock<mutex> lk(con_mtx);
-  // TODO: looks not a loop.
   while (!connected_) {
     if (con_v.wait_for(lk, std::chrono::seconds(3)) == std::cv_status::timeout) {
       break;

@@ -375,7 +375,6 @@ void NodeManager::init()
 
 bool NodeManager::launchServer()
 {
-
   int worker_number = config_->get_network_worker_num();
   int buffer_number = config_->get_network_buffer_num();
   int buffer_size = config_->get_network_buffer_size();
