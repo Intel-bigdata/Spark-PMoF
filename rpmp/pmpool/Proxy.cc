@@ -31,7 +31,7 @@ bool Proxy::launchServer() {
     stopStandbyService();
     return launchActiveService();
   }
-  return 0;
+  return true;
 }
 
 /**
@@ -150,7 +150,10 @@ ActiveProxyShutdownCallback::ActiveProxyShutdownCallback(std::shared_ptr<Proxy> 
 void ActiveProxyShutdownCallback::operator()(void* param_1, void* param_2) {
   if (proxy_->shouldBecomeActiveProxy()) {
     proxy_->stopStandbyService();
-    proxy_->launchActiveService();
+    if (!proxy_->launchActiveService()) {
+      std::cout << "Failed to launch active proxy services!\n";
+      return;
+    }
   } else {
     /// wait for time required by candidate proxy to detect the disconnection and to set up active proxy services.
     /// New active proxy needs some time to launch services.
@@ -162,7 +165,9 @@ void ActiveProxyShutdownCallback::operator()(void* param_1, void* param_2) {
     }
     /// No active proxy is running. The current proxy should become active.
     proxy_->stopStandbyService();
-    proxy_->launchActiveService();
+    if (!proxy_->launchActiveService()) {
+      std::cout << "Failed to launch active proxy services!\n";
+    }
   }
 }
 
