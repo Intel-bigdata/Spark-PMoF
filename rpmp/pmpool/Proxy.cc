@@ -145,7 +145,7 @@ void ActiveProxyShutdownCallback::operator()(void* param_1, void* param_2) {
     proxy_->stopStandbyService();
     proxy_->launchActiveService();
   } else {
-    /// wait for time required by candidate proxy to detect the disconnection and new active proxy services setup.
+    /// wait for time required by candidate proxy to detect the disconnection and to set up active proxy services.
     /// New active proxy needs some time to launch services.
     const int waitTime = proxy_->getHeartbeatClient()->get_heartbeat_timeout() + 1;
     sleep(waitTime);
