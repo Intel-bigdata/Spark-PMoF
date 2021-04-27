@@ -14,10 +14,7 @@
 #include "pmpool/proxy/metastore/Redis.h"
 #include "json/json.h"
 
-/// TODO: remove or keep.
-using namespace std;
-
-Proxy::Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, string currentHostAddr) :
+Proxy::Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::string currentHostAddr) :
  config_(config), log_(log), currentHostAddr_(currentHostAddr) {}
 
 Proxy::~Proxy() {
@@ -44,12 +41,12 @@ bool Proxy::launchServer() {
  * @param currentHostAddr   the host address of current proxy.
  * @return  true if the current proxy should be active.
  */
-bool Proxy::isActiveProxy(string currentHostAddr) {
+bool Proxy::isActiveProxy(std::string currentHostAddr) {
   // Directly launch proxy case.
   if (currentHostAddr.empty()) {
     return true;
   }
-  std::vector<string> proxies = config_->get_proxy_addrs();
+  std::vector<std::string> proxies = config_->get_proxy_addrs();
   // Only proxy node will trigger the launch. So if there is
   // only one proxy configured, the current node is active proxy.
   if (proxies.size() == 1) {
@@ -89,7 +86,7 @@ bool Proxy::launchActiveService() {
 
 bool Proxy::launchStandbyService() {
   log_->get_console_log()->info("Launch standby proxy services..");
-  vector<string> proxies = config_->get_proxy_addrs();
+  std::vector<std::string> proxies = config_->get_proxy_addrs();
   heartbeatClient_ = std::make_shared<HeartbeatClient>(config_, log_);
   // To avoid unnecessarily trying to connect to itself.
   heartbeatClient_->setExcludedProxy(currentHostAddr_);
@@ -108,9 +105,9 @@ bool Proxy::launchStandbyService() {
  * was active recently but it is dead now, the current proxy should become active.
  */
 bool Proxy::shouldBecomeActiveProxy() {
-  vector<string> proxies = config_->get_proxy_addrs();
-  string lastActiveProxy = getLastActiveProxy();
-  std::vector<string>::iterator iter;
+  std::vector<std::string> proxies = config_->get_proxy_addrs();
+  std::string lastActiveProxy = getLastActiveProxy();
+  std::vector<std::string>::iterator iter;
   iter = std::find(proxies.begin(), proxies.end(), lastActiveProxy);
   if (iter != proxies.end()) {
     /// TODO: in a loop style.
@@ -123,7 +120,7 @@ bool Proxy::shouldBecomeActiveProxy() {
 /**
  * Get last active proxy according to HeartbeatClient's successfully built connection previously.
  */
-string Proxy::getLastActiveProxy() {
+std::string Proxy::getLastActiveProxy() {
   log_->get_console_log()->info("Last active proxy addr: {0}", heartbeatClient_->getActiveProxyAddr());
   return heartbeatClient_->getActiveProxyAddr();
 }
