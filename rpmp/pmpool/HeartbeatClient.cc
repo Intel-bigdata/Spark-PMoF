@@ -64,9 +64,7 @@ void HeartbeatRequestHandler::inflight_erase(std::shared_ptr<HeartbeatRequest> r
 int HeartbeatRequestHandler::get(std::shared_ptr<HeartbeatRequest> request) {
   auto ctx = inflight_insert_or_get(request);
   unique_lock<mutex> lk(ctx->mtx_reply);
-  const int heartbeatInverval = heartbeatClient_->get_heartbeat_interval();
-  // timeout in sec depends on the configured heartbeat interval.
-  const std::chrono::seconds timeoutInSec(2 * heartbeatInverval);
+  const std::chrono::seconds timeoutInSec(heartbeatClient_->get_heartbeat_timeout());
   while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request, timeoutInSec] {
     auto current = std::chrono::steady_clock::now();
     auto elapse = current - ctx->start;
@@ -199,7 +197,7 @@ int HeartbeatClient::heartbeat() {
     hrc.host_ip_hash = host_ip_hash_;
 
     auto heartbeatRequest = std::make_shared<HeartbeatRequest>(hrc);
-    ///TODO: is it necessary to add task?
+    ///TODO: better to put addTask & get into a function, not limited to this pieces of code.
     heartbeatRequestHandler_->addTask(heartbeatRequest);
     try {
       heartbeatRequestHandler_->get(heartbeatRequest);
@@ -339,7 +337,6 @@ string HeartbeatClient::getActiveProxyAddr() {
 // For standby proxy & RPMP server use.
 void::HeartbeatClient::set_active_proxy_shutdown_callback(Callback* activeProxyShutdownCallback) {
   activeProxyShutdownCallback_ = activeProxyShutdownCallback;
-//  client_->set_shutdown_callback(shutdownCallback.get());
 }
 
 /**
@@ -389,8 +386,12 @@ int HeartbeatClient::get_heartbeat_interval() {
   return heartbeatInterval_;
 }
 
-// Directly letting standby proxy try to connect to itself can sometimes cause issues.
-// Also it is for efficiency consideration.
+int HeartbeatClient::get_heartbeat_timeout() {
+  return heartbeatTimeout_;
+}
+
+// Directly letting standby proxy try to connect to itself can sometimes cause
+// issues (may be fixed in HPNL PR #92). Also it is for efficiency consideration.
 void HeartbeatClient::setExcludedProxy(string proxyAddr) {
   excludedProxy_ = proxyAddr;
 }

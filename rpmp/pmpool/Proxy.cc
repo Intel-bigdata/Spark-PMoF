@@ -17,8 +17,8 @@
 /// TODO: remove or keep.
 using namespace std;
 
-Proxy::Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Redis> redis, string currentHostAddr) :
- config_(config), log_(log), redis_(redis), currentHostAddr_(currentHostAddr) {}
+Proxy::Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, string currentHostAddr) :
+ config_(config), log_(log), currentHostAddr_(currentHostAddr) {}
 
 Proxy::~Proxy() {
     // worker_->stop();
@@ -73,6 +73,7 @@ bool Proxy::isActiveProxy(string currentHostAddr) {
 /// TODO: terminate the launching if key service is not launched as expected.
 bool Proxy::launchActiveService() {
   log_->get_console_log()->info("Launch active proxy services..");
+  redis_ = std::make_shared<Redis>(config_, log_);
   nodeManager_ = std::make_shared<NodeManager>(config_, log_, redis_);
   nodeManager_->init();
   loadBalanceFactor_ = config_->get_load_balance_factor();
@@ -127,6 +128,10 @@ string Proxy::getLastActiveProxy() {
   return heartbeatClient_->getActiveProxyAddr();
 }
 
+std::shared_ptr<HeartbeatClient> Proxy::getHeartbeatClient() {
+  return heartbeatClient_;
+}
+
 ActiveProxyShutdownCallback::ActiveProxyShutdownCallback(std::shared_ptr<Proxy> proxy) {
   proxy_ = proxy;
 }
@@ -140,9 +145,10 @@ void ActiveProxyShutdownCallback::operator()(void* param_1, void* param_2) {
     proxy_->stopStandbyService();
     proxy_->launchActiveService();
   } else {
-    /// TODO: wait for 5s, can be optimized.
+    /// wait for time required by candidate proxy to detect the disconnection and new active proxy services setup.
     /// New active proxy needs some time to launch services.
-    sleep(5);
+    const int waitTime = proxy_->getHeartbeatClient()->get_heartbeat_timeout() + 1;
+    sleep(waitTime);
     int res = proxy_->build_connection_with_new_active_proxy();
     if (res == 0) {
       return;
@@ -198,11 +204,8 @@ void Proxy::notifyClient(uint64_t key) {
   clientService_->notifyClient(key);
 }
 
-/// TODO: for standby service, the below two services are not created.
 void Proxy::wait() {
   while (true) {
     sleep(10);
   }
-//  clientService_->wait();
-//  replicaService_->wait();
 }
