@@ -17,7 +17,7 @@ bool comp(char* str, char* str_read, uint64_t size) {
   auto res = memcmp(str, str_read, size);
   if (res != 0) {
     fprintf(stderr,
-            "strcmp is %d, read res is not aligned with wrote. readed "
+            "strcmp is %d, read res is not aligned with wrote. read "
             "content is \n",
             res);
     for (int i = 0; i < size; i++) {
@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
   std::string proxy_addrs = config->get_proxy_addrs();
   std::string proxy_port = config->get_proxy_port();
 
-  std::cout << "=================== Put and get ======================="
+  std::cout << "=================== Put and Read ======================="
             << std::endl;
   std::cout << "RPMP proxy address(s): " << proxy_addrs << std::endl;
   std::cout << "RPMP proxy port: " << proxy_port << std::endl;
