@@ -1,12 +1,3 @@
-/*
- * Filename: /mnt/spark-pmof/tool/rpmp/benchmark/allocate_perf.cc
- * Path: /mnt/spark-pmof/tool/rpmp/benchmark
- * Created Date: Friday, December 20th 2019, 8:29:23 am
- * Author: root
- * 
- * Copyright (c) 2019 Intel
- */
-
 #include <thread> // NOLINT
 #include <atomic>
 #include "pmpool/client/PmPoolClient.h"
