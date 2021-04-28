@@ -156,12 +156,16 @@ Set minimal replica and preferred replica.
 ## Launch RPMP cluster
 Change directory to {RPMP-HOME}/build/bin
 - Launch proxy
-  ```./proxyMain --current_proxy_addr $addr```
+  ```./proxy-server --current_proxy_addr $addr [--log $log_path]```
 - Launch RPMP nodes according to config  
-  ```./main```
+  ```./data-server [--log $log_path]```
+
+Please note if log path is not specified, /tmp/rpmp.log will be used.
   
 Alternatively, you can leverage script to start/stop cluster services. To make stop script work as expected, 
-please note one node CANNOT plays two same roles, e.g., launch two proxy servers on one node.
+please note one node CANNOT plays two same roles, e.g., launch two proxy servers on one node. RPMP proxy and 
+data server logs are recorded in $RPMP_HOME/log/proxy-server.log and $RPMP_HOME/log/data-server.log respectively.
+
 - Start cluster
   ```./start-rpmp.sh```
 - Stop cluster

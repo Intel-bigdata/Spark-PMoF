@@ -1,12 +1,3 @@
-/*
- * Filename: /mnt/spark-pmof/tool/rpmp/benchmark/allocate_perf.cc
- * Path: /mnt/spark-pmof/tool/rpmp/benchmark
- * Created Date: Friday, December 20th 2019, 8:29:23 am
- * Author: root
- *
- * Copyright (c) 2019 Intel
- */
-
 #include <string.h>
 #include <cstdlib>
 #include <thread>  // NOLINT
@@ -93,7 +84,7 @@ int main(int argc, char** argv) {
   std::string proxy_addrs = config->get_proxy_addrs();
   std::string proxy_port = config->get_proxy_port();
 
-  std::cout << "=================== Put and get ======================="
+  std::cout << "=================== Put and Get ======================="
     << std::endl;
   std::cout << "RPMP proxy address(s): " << proxy_addrs << std::endl;
   std::cout << "RPMP proxy port: " << proxy_port << std::endl;
