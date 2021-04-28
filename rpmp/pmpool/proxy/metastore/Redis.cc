@@ -18,7 +18,7 @@ Redis::Redis(std::shared_ptr<Config> config, std::shared_ptr<Log> log){
 bool Redis::connect() {
   int res = metastoreConnection_->connect(address_, port_);
   if (res == 0) {
-    log_->get_console_log()->info("Successfully connected to redis server {0}:{1}");
+    log_->get_console_log()->info("Successfully connected to redis server {0}:{1}", address_, port_);
     return true;
   }
   log_->get_console_log()->error("Failed to connect to redis server {0}:{1}", address_, port_);
