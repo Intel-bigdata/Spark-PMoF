@@ -99,7 +99,28 @@ void MessageSender::operator()(Connection* connection, ChunkMgr* chunkMgr)
     }
 }
 
-int main(int argc, char* argv[]){
+int main(int argc, char *argv[]) {
+  if (argc < 3) {
+    cout << "Please specify active proxy address and optionally specify client service port: "
+         << "--proxy_addr $addr [--port $port]\n";
+    return -1;
+  }
+  string proxy_addr;
+  // Default port is assigned.
+  string port = "12350";
+  for (int i = 1; i < argc; i++) {
+    string arg = argv[i];
+    if (arg == "--proxy_addr" && i < argc - 1) {
+      proxy_addr = argv[i + 1];
+    } else if (arg == "--port" && i < argc - 1) {
+      port = argv[i + 1];
+    }
+  }
+  if (proxy_addr == "") {
+    cout << "No active proxy address is given!\n";
+    return -1;
+  }
+
   auto client = new Client(1, 16);
   client->init();
 
@@ -119,8 +140,10 @@ int main(int argc, char* argv[]){
   client->set_shutdown_callback(shutdownCallback);
 
   client->start();
-  client->connect("172.168.0.209", "12348");
-  cout<<"Client::wait"<<endl;
+  cout << "Trying to connect to " << proxy_addr << ":" << port << endl;
+  // Active proxy address, proxy client service port.
+  client->connect(proxy_addr.c_str(), port.c_str());
+  cout << "Waiting for active proxy to respond.." << endl;
   client->wait();
 
   delete shutdownCallback;

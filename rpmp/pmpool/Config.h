@@ -54,7 +54,7 @@ class Config {
       return 0;
     }
 
-    /// This path depends on where user launches proxy or data server. For manually launch, user should go to
+    /// This path depends on where user launches proxy or data server. For manually launching, user should go to
     /// $RPMP_HOME/bin to start proxy or data server.
     int readFromFile(string file = "../config/rpmp.conf"){
       setDefault();
