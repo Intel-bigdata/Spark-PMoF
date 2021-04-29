@@ -77,7 +77,7 @@ int main(int argc, char** argv) {
 
   std::cout << "=================== Put and Read ======================="
             << std::endl;
-  std::cout << "RPMP proxy address(s): " << proxy_addrs << std::endl;
+  std::cout << "RPMP proxy address(es): " << proxy_addrs << std::endl;
   std::cout << "RPMP proxy port: " << proxy_port << std::endl;
   std::cout << "Total Num Requests is " << numReqs << std::endl;
   std::cout << "Total Num Threads is " << threads << std::endl;

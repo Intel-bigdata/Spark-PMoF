@@ -1,9 +1,4 @@
 /*
- * Filename: /mnt/spark-pmof/tool/rpmp/pmpool/Config.h
- * Path: /mnt/spark-pmof/tool/rpmp/pmpool
- * Created Date: Thursday, November 7th 2019, 3:48:52 pm
- * Author: root
- *
  * Copyright (c) 2019 Intel
  */
 
@@ -22,13 +17,6 @@
 
 using namespace boost::program_options;
 using namespace std;
-/*using boost::program_options::error;
-  using boost::program_options::options_description;
-  using boost::program_options::value;
-  using boost::program_options::variables_map;
-  using std::string;
-  using std::vector;*/
-
 
 #include <fstream>
 #include <sstream>
@@ -192,7 +180,7 @@ class Config {
       try {
         options_description desc{"Options"};
         desc.add_options()("help,h", "Help screen")(
-            "address,a", value<string>()->default_value("172.168.0.40"),
+            "address,a", value<string>()->default_value("0.0.0.0"),
             "set the rdma server address")(
               "port,p", value<string>()->default_value("12346"),
               "set the rdma server port")("network_buffer_size,nbs",
@@ -422,13 +410,13 @@ class Config {
     const string RPMP_PROXY_LOAD_BALANCE_FACTOR = "rpmp.proxy.load-balance-factor";
     const string RPMP_METASTORE_REDIS_IP = "rpmp.metastore.redis.ip";
     const string RPMP_METASTORE_REDIS_PORT = "rpmp.metastore.redis.port";
-    // TODO: remove meaningless default address
-    const string DEFAULT_RPMP_NODE_LIST = "172.168.0.209,172.168.0.40";
-    const string DEFAULT_RPMP_NETWORK_HEARTBEAT_INTERVAL = "5";
+
+    const string DEFAULT_RPMP_NODE_LIST = "0.0.0.0";
+    const string DEFAULT_RPMP_NETWORK_HEARTBEAT_INTERVAL = "3";
     const string DEFAULT_RPMP_NETWORK_HEARTBEAT_PORT = "12355";
-    const string DEFAULT_RPMP_NETWORK_PROXY_ADDRESS = "172.168.0.209";
+    const string DEFAULT_RPMP_NETWORK_PROXY_ADDRESS = "0.0.0.0";
     const string DEFAULT_RPMP_PROXY_CLIENT_SERVICE_PORT = "12350";
-    const string DEFAULT_RPMP_NETWORK_SERVER_ADDRESS = "172.168.0.209";
+    const string DEFAULT_RPMP_NETWORK_SERVER_ADDRESS = "0.0.0.0";
     const string DEFAULT_RPMP_NETWORK_SERVER_PORT = "12346";
     const string DEFAULT_RPMP_NETWORK_WORKER = "10";
     const string DEFAULT_RPMP_STORAGE_NAMESPACE_SIZE = "rpmp.storage.namespace.list";
@@ -442,7 +430,7 @@ class Config {
     const string DEFAULT_RPMP_DATA_MINREPLICA = "1";
     const string DEFAULT_RPMP_PROXY_REPLICA_SERVICE_PORT = "12340";
     const string DEFAULT_RPMP_PROXY_LOAD_BALANCE_FACTOR = "5";
-    const string DEFAULT_RPMP_METASTORE_REDIS_IP = "127.0.0.1";
+    const string DEFAULT_RPMP_METASTORE_REDIS_IP = "0.0.0.0";
     const string DEFAULT_RPMP_METASTORE_REDIS_PORT = "6379";
 };
 

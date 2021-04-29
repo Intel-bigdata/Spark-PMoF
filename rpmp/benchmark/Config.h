@@ -24,10 +24,9 @@ class Config {
   int init(int argc, char **argv) {
     try {
       options_description desc{"Options"};
-      // TODO: remove meaningless default address
       desc.add_options()("help,h", "Help screen")(
-          "address,a", value<string>()->default_value(""),
-          "Set RPMP proxy server address. Please combine all proxy addresses with comma separated "
+          "proxy_addr,a", value<string>()->default_value("0.0.0.0"),
+          "Set RPMP proxy server address(es). Please combine all proxy addresses with comma separated "
           "if HA mode is enabled.")(
           "port,p", value<string>()->default_value("12350"),
           "Set RPMP client service port of proxy server, consistent with the value set "
@@ -46,12 +45,12 @@ class Config {
         std::cout << desc << '\n';
         return -1;
       }
-      if (vm["address"].as<string>().empty()) {
-        std::cout << "Please specify RPMP proxy address(s)!\n";
+      if (vm["proxy_addr"].as<string>().empty()) {
+        std::cout << "Please specify RPMP proxy address(es)!\n";
         return -1;
       }
 
-      set_proxy_addrs(vm["address"].as<string>());
+      set_proxy_addrs(vm["proxy_addr"].as<string>());
       set_proxy_port(vm["port"].as<string>());
       set_log_path(vm["log"].as<string>());
       set_map_id(vm["map_id"].as<int>());
