@@ -123,10 +123,10 @@ Set proxy address and other proxy service's preference. You can deploy multiple 
 multiple proxy addresses, separated by comma, should be specified for `rpmp.network.proxy.address`.
 
 ```
-rpmp.network.proxy.address 172.168.0.40
+rpmp.network.proxy.address 0.0.0.0
 rpmp.proxy.client.service.port 12350
 rpmp.proxy.replica.service.port 12340
-rpmp.network.heartbeat-interval.sec 5
+rpmp.network.heartbeat-interval.sec 3
 rpmp.network.heartbeat.port 12355
 ```
 
@@ -174,7 +174,7 @@ data server logs are recorded in $RPMP_HOME/log/proxy-server.log and $RPMP_HOME/
 ## Benchmark
 ### Put and get
  - Launch put and get executor
- ```./put_and_get --address $addr --port $port```
+ ```./put_and_get --proxy_addr $addr --port $port```
    
 Here, `$addr` is proxy host address (see `rpmp.network.proxy.address`), and `$port` is client service port 
 (see `rpmp.proxy.client.service.port`), e.g., `./put_and_get --address 172.168.0.101,172.168.0.102 --port 12350`

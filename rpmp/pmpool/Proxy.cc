@@ -54,7 +54,7 @@ bool Proxy::isActiveProxy(std::string currentHostAddr) {
   }
   if (std::find(proxies.begin(), proxies.end(),
                 currentHostAddr) == proxies.end()) {
-    log_->get_file_log()->error("Incorrect proxy address is configured for current host!");
+    log_->get_console_log()->error("Incorrect proxy address is configured for current host!");
     return false;
   }
   // All proxy nodes share same config file. The first node
