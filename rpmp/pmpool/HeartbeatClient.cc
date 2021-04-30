@@ -371,7 +371,10 @@ void HeartbeatClient::reset(){
   recvCallback.reset();
   sendCallback.reset();
   if (heartbeat_connection_ != nullptr) {
-    heartbeat_connection_->shutdown();
+    // Consider case, if first candidate proxy is not set up, current proxy will shut down services before starting
+    // active services. In this case, heartbeat_connection_ is not nullptr (not know the reason), and calling the below
+    // code will cause segmentation fault.
+    // heartbeat_connection_->shutdown();
   }
   if (client_) {
     client_->shutdown();
