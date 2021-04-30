@@ -281,7 +281,7 @@ public:
         network_buffer_size_ = network_buffer_size;
         return;
       }
-      if (network_buffer_size != DEFAULT_RPMP_NETWORK_BUFFER_SIZE) {
+      if (network_buffer_size != stoi(DEFAULT_RPMP_NETWORK_BUFFER_SIZE)) {
         network_buffer_size_ = network_buffer_size;
       }
     }
@@ -292,7 +292,7 @@ public:
         network_buffer_num_ = network_buffer_num;
         return;
       }
-      if (network_buffer_num != DEFAULT_RPMP_NETWORK_BUFFER_NUMBER) {
+      if (network_buffer_num != stoi(DEFAULT_RPMP_NETWORK_BUFFER_NUMBER)) {
         network_buffer_num_ = network_buffer_num;
       }
     }
@@ -303,7 +303,7 @@ public:
         network_worker_num_ = network_worker_num;
         return;
       }
-      if (network_worker_num != DEFAULT_RPMP_NETWORK_WORKER) {
+      if (network_worker_num != stoi(DEFAULT_RPMP_NETWORK_WORKER)) {
         network_worker_num_ = network_worker_num;
       }
     }
