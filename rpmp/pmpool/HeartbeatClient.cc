@@ -15,7 +15,8 @@
 
 HeartbeatRequestHandler::HeartbeatRequestHandler(std::shared_ptr<HeartbeatClient> heartbeatClient)
         : heartbeatClient_(heartbeatClient) {
-  heartbeatTimeoutInSec_ = std::chrono::seconds(heartbeatClient_->get_heartbeat_timeout());
+  heartbeatInterval_ = heartbeatClient_->get_heartbeat_interval();
+  heartbeatTimeoutInSec_ = heartbeatClient_->get_heartbeat_timeout();
 }
 
 HeartbeatRequestHandler::~HeartbeatRequestHandler() {
@@ -33,7 +34,7 @@ void HeartbeatRequestHandler::addTask(std::shared_ptr<HeartbeatRequest> request)
 }
 
 int HeartbeatRequestHandler::entry() {
-  int waitTimeInSec = heartbeatClient_->get_heartbeat_interval();
+  int waitTimeInSec = heartbeatInterval_;
   std::shared_ptr<HeartbeatRequest> request;
   bool res = pendingRequestQueue_.wait_dequeue_timed(
           request, std::chrono::seconds(waitTimeInSec));
@@ -65,10 +66,11 @@ void HeartbeatRequestHandler::inflight_erase(std::shared_ptr<HeartbeatRequest> r
 int HeartbeatRequestHandler::get(std::shared_ptr<HeartbeatRequest> request) {
   auto ctx = inflight_insert_or_get(request);
   unique_lock<mutex> lk(ctx->mtx_reply);
-  while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request, heartbeatTimeoutInSec_] {
+  const std::chrono::seconds timeoutInSec(heartbeatTimeoutInSec_);
+  while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request, timeoutInSec] {
     auto current = std::chrono::steady_clock::now();
     auto elapse = current - ctx->start;
-    if (elapse > heartbeatTimeoutInSec_) {
+    if (elapse > timeoutInSec) {
       ctx->op_failed = true;
       fprintf(stderr, "Request [TYPE %ld] spent %ld s, time out\n",
               request->requestContext_.type,
