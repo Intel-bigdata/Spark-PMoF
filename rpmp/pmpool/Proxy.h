@@ -76,6 +76,7 @@ public:
 
 private:
     std::shared_ptr<Proxy> proxy_;
+    int heartbeatTimeoutInSec_;
 };
 
 #endif //RPMP_PROXY_H

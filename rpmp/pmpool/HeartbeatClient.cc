@@ -15,6 +15,8 @@
 
 HeartbeatRequestHandler::HeartbeatRequestHandler(std::shared_ptr<HeartbeatClient> heartbeatClient)
         : heartbeatClient_(heartbeatClient) {
+  heartbeatInterval_ = heartbeatClient_->get_heartbeat_interval();
+  heartbeatTimeoutInSec_ = heartbeatClient_->get_heartbeat_timeout();
 }
 
 HeartbeatRequestHandler::~HeartbeatRequestHandler() {
@@ -32,7 +34,7 @@ void HeartbeatRequestHandler::addTask(std::shared_ptr<HeartbeatRequest> request)
 }
 
 int HeartbeatRequestHandler::entry() {
-  int waitTimeInSec = heartbeatClient_->get_heartbeat_interval();
+  int waitTimeInSec = heartbeatInterval_;
   std::shared_ptr<HeartbeatRequest> request;
   bool res = pendingRequestQueue_.wait_dequeue_timed(
           request, std::chrono::seconds(waitTimeInSec));
@@ -64,7 +66,7 @@ void HeartbeatRequestHandler::inflight_erase(std::shared_ptr<HeartbeatRequest> r
 int HeartbeatRequestHandler::get(std::shared_ptr<HeartbeatRequest> request) {
   auto ctx = inflight_insert_or_get(request);
   unique_lock<mutex> lk(ctx->mtx_reply);
-  const std::chrono::seconds timeoutInSec(heartbeatClient_->get_heartbeat_timeout());
+  const std::chrono::seconds timeoutInSec(heartbeatTimeoutInSec_);
   while (!ctx->cv_reply.wait_for(lk, 5ms, [ctx, request, timeoutInSec] {
     auto current = std::chrono::steady_clock::now();
     auto elapse = current - ctx->start;
@@ -369,7 +371,10 @@ void HeartbeatClient::reset(){
   recvCallback.reset();
   sendCallback.reset();
   if (heartbeat_connection_ != nullptr) {
-    heartbeat_connection_->shutdown();
+    // Consider case, if first candidate proxy is not set up, current proxy will shut down services before starting
+    // active services. In this case, heartbeat_connection_ is not nullptr (not know the reason), and calling the below
+    // code will cause segmentation fault.
+    // heartbeat_connection_->shutdown();
   }
   if (client_) {
     client_->shutdown();
@@ -378,7 +383,7 @@ void HeartbeatClient::reset(){
   // stop heartbeat thread
   isTerminated_ = true;
   // stop heartbeat request handler thread
-  heartbeatRequestHandler_->stop();
+  heartbeatRequestHandler_->reset();
 }
 
 int HeartbeatClient::get_heartbeat_interval() {
