@@ -141,6 +141,7 @@ std::shared_ptr<HeartbeatClient> Proxy::getHeartbeatClient() {
 
 ActiveProxyShutdownCallback::ActiveProxyShutdownCallback(std::shared_ptr<Proxy> proxy) {
   proxy_ = proxy;
+  heartbeatTimeoutInSec_ = proxy_->getHeartbeatClient()->get_heartbeat_timeout();
 }
 
 /**
@@ -157,7 +158,7 @@ void ActiveProxyShutdownCallback::operator()(void* param_1, void* param_2) {
   } else {
     /// wait for time required by candidate proxy to detect the disconnection and to set up active proxy services.
     /// New active proxy needs some time to launch services.
-    const int waitTime = proxy_->getHeartbeatClient()->get_heartbeat_timeout() + 1;
+    const int waitTime = heartbeatTimeoutInSec_ + 1;
     sleep(waitTime);
     int res = proxy_->build_connection_with_new_active_proxy();
     if (res == 0) {
