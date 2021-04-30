@@ -10,7 +10,7 @@ int main(int argc, char* argv[]){
   if (argc > 1) {
     CHK_ERR("init config", config->init(argc, argv));
   }
-  std::shared_ptr<Log> log = std::make_shared<Log>(config.get());
+  std::shared_ptr<Log> log = std::make_shared<Log>(config->get_log_path(), config->get_log_level());
   // Host ip will be passed from command line through a launch script.
   // It is consistent with user-specified address in the configuration.
   std::string currentHostAddr = config->get_current_proxy_addr();

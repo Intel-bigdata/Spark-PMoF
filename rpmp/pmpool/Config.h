@@ -27,9 +27,9 @@ using namespace std;
  *
  */
 class Config {
-  public:
+private:
     map<std::string,std::string> configs;
-
+public:
     int setDefault(){
       configs.insert(pair<string,string>(RPMP_NODE_LIST, DEFAULT_RPMP_NODE_LIST));  
       configs.insert(pair<string,string>(RPMP_NETWORK_HEARTBEAT_INTERVAL, DEFAULT_RPMP_NETWORK_HEARTBEAT_INTERVAL));  
@@ -122,12 +122,6 @@ class Config {
         }        
         sizes_.push_back(stoull(sizes.substr(start,end)));
 
-        /** 
-        for (auto i = sizes_.begin(); i != sizes_.end(); i++){
-          cout << *i << endl;
-        }
-        **/
-
         string paths = configs.find(RPMP_STORAGE_NAMESPACE_LIST)->second;
         int start_path = 0;
         int end_path = paths.find(delimiter); 
@@ -137,12 +131,6 @@ class Config {
           end_path = paths.find(delimiter, start_path);
         }
         pool_paths_.push_back(paths.substr(start_path, end_path));
-        
-        /**
-        for (auto i = pool_paths_.begin(); i != pool_paths_.end(); i++){
-          cout << *i << endl;
-        }
-        **/
 
         if (pool_paths_.size() != sizes_.size()) {
           if (sizes_.size() < pool_paths_.size() && !sizes_.empty()) {
@@ -166,16 +154,14 @@ class Config {
           end_task = tasks.find(delimiter, start_task);
         }
         affinities_.push_back(stoi(tasks.substr(start_task, end_task)));
-
-        /**
-        for (auto i = affinities_.begin(); i != affinities_.end(); i++){
-          cout << *i << endl;
-        }
-        **/
       }
       return 0;
     }
 
+    /**
+     * Generally it is recommended that init function is called after readFromFile function
+     * to get not configured properties initialized with default value.
+     */
     int init(int argc, char **argv) {
       try {
         options_description desc{"Options"};
@@ -200,7 +186,7 @@ class Config {
                             "set rpmp log file path")("log_level,ll",
                               value<string>()->default_value("warn"),
                               "set log level")("current_proxy_addr,cpa",
-                                  value<string>()->default_value(""),
+                                  value<string>()->default_value("0.0.0.0"),
                                   "Set current proxy address, applicable to proxy node."
                                   );
 
@@ -214,7 +200,14 @@ class Config {
           std::cout << desc << '\n';
           throw;
         }
-        /// TODO: set when provided?
+        /// * If property is not set, set with command line value or default value.
+        /// * If property is set and command line value is not default value, set it.
+        /// * If property is set, but command line value is default value, do not set it.
+        /// * If property is not set in config file, no need to check above conditions, e.g., #set_affinities,
+        ///   #set_current_proxy_addr.
+        /// The consideration is if property is set with a not default value from config file in #readFromFile,
+        /// it should not be reset with a default value in #init. And #init can override property value set by
+        /// #readFromFile if it has not default value.
         set_ip(vm["address"].as<string>());
         set_port(vm["port"].as<string>());
         set_network_buffer_size(vm["network_buffer_size"].as<int>());
@@ -248,7 +241,7 @@ class Config {
           }
         }
         if (vm.count("task_set")) {
-          set_affinities_(vm["task_set"].as<vector<int>>());
+          set_affinities(vm["task_set"].as<vector<int>>());
         } else {
           affinities_.resize(pool_paths_.size(), -1);
         }
@@ -261,37 +254,85 @@ class Config {
     }
 
     string get_ip() { return ip_; }
-    void set_ip(string ip) { ip_ = ip; }
+    void set_ip(string ip) {
+      if (ip_ == "") {
+        ip_ = ip;
+        return;
+      }
+      if (ip != DEFAULT_RPMP_NETWORK_SERVER_ADDRESS) {
+        ip_ = ip;
+      }
+    }
 
     string get_port() { return port_; }
-    void set_port(string port) { port_ = port; }
+    void set_port(string port) {
+      if (port_ == "") {
+        port_ = port;
+        return;
+      }
+      if (port != DEFAULT_RPMP_NETWORK_SERVER_PORT) {
+        port_ = port;
+      }
+    }
 
     int get_network_buffer_size() { return network_buffer_size_; }
     void set_network_buffer_size(int network_buffer_size) {
-      network_buffer_size_ = network_buffer_size;
+      if (network_buffer_size_ == 0) {
+        network_buffer_size_ = network_buffer_size;
+        return;
+      }
+      if (network_buffer_size != DEFAULT_RPMP_NETWORK_BUFFER_SIZE) {
+        network_buffer_size_ = network_buffer_size;
+      }
     }
 
     int get_network_buffer_num() { return network_buffer_num_; }
     void set_network_buffer_num(int network_buffer_num) {
-      network_buffer_num_ = network_buffer_num;
+      if (network_buffer_num_ == 0) {
+        network_buffer_num_ = network_buffer_num;
+        return;
+      }
+      if (network_buffer_num != DEFAULT_RPMP_NETWORK_BUFFER_NUMBER) {
+        network_buffer_num_ = network_buffer_num;
+      }
     }
 
     int get_network_worker_num() { return network_worker_num_; }
     void set_network_worker_num(int network_worker_num) {
-      network_worker_num_ = network_worker_num;
+      if (network_worker_num_ == 0) {
+        network_worker_num_ = network_worker_num;
+        return;
+      }
+      if (network_worker_num != DEFAULT_RPMP_NETWORK_WORKER) {
+        network_worker_num_ = network_worker_num;
+      }
     }
 
     vector<string> &get_pool_paths() { return pool_paths_; }
     void set_pool_paths(const vector<string> &pool_paths) {
-      pool_paths_ = pool_paths;
+      if (pool_paths_.empty()) {
+        pool_paths_ = pool_paths;
+        return;
+      }
+      if (!pool_paths.empty()) {
+        pool_paths_ = pool_paths;
+      }
     }
 
     std::vector<uint64_t> get_pool_sizes() { return sizes_; }
-    void set_pool_sizes(vector<uint64_t> sizes) { sizes_ = sizes; }
+    void set_pool_sizes(vector<uint64_t> sizes) {
+      if (sizes_.empty()) {
+        sizes_ = sizes;
+        return;
+      }
+      if (!sizes.empty()) {
+        sizes_ = sizes;
+      }
+    }
 
     int get_pool_size() { return sizes_.size(); }
 
-    void set_affinities_(vector<int> affinities) {
+    void set_affinities(vector<int> affinities) {
       if (affinities.size() < pool_paths_.size()) {
         affinities_.resize(pool_paths_.size(), -1);
       } else {
@@ -305,10 +346,26 @@ class Config {
     std::vector<int> get_affinities_() { return affinities_; }
 
     string get_log_path() { return log_path_; }
-    void set_log_path(string log_path) { log_path_ = log_path; }
+    void set_log_path(string log_path) {
+      if (log_path_ == "") {
+        log_path_ = log_path;
+        return;
+      }
+      if (log_path != DEFAULT_RPMP_LOG_PATH) {
+        log_path_ = log_path;
+      }
+    }
 
     string get_log_level() { return log_level_; }
-    void set_log_level(string log_level) { log_level_ = log_level; }
+    void set_log_level(string log_level) {
+      if (log_level_ == "") {
+        log_level_ = log_level;
+        return;
+      }
+      if (log_level != DEFAULT_RPMP_LOG_LEVEL) {
+        log_level_ = log_level;
+      }
+    }
 
     void set_nodes(string configured_nodes) {
       vector<string> nodes;
