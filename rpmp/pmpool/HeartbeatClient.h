@@ -39,6 +39,7 @@ public:
 
 private:
   std::shared_ptr<HeartbeatClient> heartbeatClient_;
+  std::chrono::seconds heartbeatTimeoutInSec_;
   BlockingConcurrentQueue<std::shared_ptr<HeartbeatRequest>> pendingRequestQueue_;
   uint64_t total_num = 0;
   uint64_t begin = 0;
