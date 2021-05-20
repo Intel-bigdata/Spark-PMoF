@@ -1,12 +1,3 @@
-/*
- * Filename: /mnt/spark-pmof/tool/rpmp/benchmark/allocate_perf.cc
- * Path: /mnt/spark-pmof/tool/rpmp/benchmark
- * Created Date: Friday, December 20th 2019, 8:29:23 am
- * Author: root
- * 
- * Copyright (c) 2019 Intel
- */
-
 #include <thread> // NOLINT
 #include <atomic>
 #include "pmpool/client/PmPoolClient.h"
@@ -47,6 +38,7 @@ int main() {
   std::vector<std::thread*> threads;
   int num = 0;
   for (int i = 0; i < 4; i++) {
+    // TODO: the below port is not proxy client service port.
     PmPoolClient *client = new PmPoolClient("172.168.0.40", "12346");
     client->begin_tx();
     client->init();

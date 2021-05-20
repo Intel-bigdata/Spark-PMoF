@@ -1,12 +1,3 @@
-/*
- * Filename: /mnt/spark-pmof/tool/rpmp/benchmark/allocate_perf.cc
- * Path: /mnt/spark-pmof/tool/rpmp/benchmark
- * Created Date: Friday, December 20th 2019, 8:29:23 am
- * Author: root
- *
- * Copyright (c) 2019 Intel
- */
-
 #include <string.h>
 #include <cstdlib>
 #include <thread>  // NOLINT
@@ -26,7 +17,7 @@ bool comp(char* str, char* str_read, uint64_t size) {
   auto res = memcmp(str, str_read, size);
   if (res != 0) {
     fprintf(stderr,
-            "strcmp is %d, read res is not aligned with wrote. readed "
+            "strcmp is %d, read res is not aligned with wrote. read "
             "content is \n",
             res);
     for (int i = 0; i < size; i++) {
@@ -81,18 +72,19 @@ int main(int argc, char** argv) {
   int threads = config->get_num_threads();
   int map_id = config->get_map_id();
   numReqs = config->get_num_reqs();
-  std::string host = config->get_ip();
-  std::string port = config->get_port();
+  std::string proxy_addrs = config->get_proxy_addrs();
+  std::string proxy_port = config->get_proxy_port();
 
-  std::cout << "=================== Put and get ======================="
+  std::cout << "=================== Put and Read ======================="
             << std::endl;
-  std::cout << "RPMP server is " << host << ":" << port << std::endl;
+  std::cout << "RPMP proxy address(es): " << proxy_addrs << std::endl;
+  std::cout << "RPMP proxy port: " << proxy_port << std::endl;
   std::cout << "Total Num Requests is " << numReqs << std::endl;
   std::cout << "Total Num Threads is " << threads << std::endl;
   std::cout << "Block key pattern is "
             << "block_" << map_id << "_*" << std::endl;
 
-  auto client = std::make_shared<PmPoolClient>(host, port);
+  auto client = std::make_shared<PmPoolClient>(proxy_addrs, proxy_port);
   client->init();
   std::cout << "start put." << std::endl;
   int start = 0;

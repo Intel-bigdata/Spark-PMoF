@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "pmpool/proxy/clientService/ClientService.h"
+#include "pmpool/proxy/metastore/JsonUtil.h"
 
 using namespace std;
 
@@ -57,8 +58,8 @@ int Worker::entry() {
   return 0;
 }
 
-ClientService::ClientService(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Proxy> proxyServer) :
- config_(config), log_(log) ,proxyServer_(proxyServer){}
+ClientService::ClientService(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Proxy> proxyServer, std::shared_ptr<Redis> redis) :
+ config_(config), log_(log) ,proxyServer_(proxyServer), redis_(redis){}
 
 ClientService::~ClientService() {
   // for (auto worker : workers_) {
@@ -67,6 +68,36 @@ ClientService::~ClientService() {
   // }
   worker_->stop();
   worker_->join();
+}
+
+void ClientService::constructJobStatus(Json::Value record, uint64_t key){
+  Json::Value root;
+  Json::Value data;
+  data[0][NODE] = record[NODE];
+  data[0][STATUS] = record[STATUS];
+  root["data"] = data;
+  string json_str = rootToString(root);
+  #ifdef DEBUG
+  cout<<"ClientService::constructJobStatus::json_str:"<<json_str<<endl;
+  #endif
+  redis_->set(to_string(key), json_str);
+}
+
+/**
+ * Add data's location and status
+ **/
+void ClientService::addRecords(uint64_t key, unordered_set<PhysicalNode, PhysicalNodeHash> nodes){
+  Json::Value root;
+  Json::Value data;
+  int index = 0;
+  for(auto node: nodes){
+    data[index][NODE] = node.getIp();
+    data[index][STATUS] = PENDING;
+    index++;
+  }
+  root["data"] = data;
+  string json_str = rootToString(root);
+  redis_->set(to_string(key), json_str);
 }
 
 void ClientService::enqueue_recv_msg(std::shared_ptr<ProxyRequest> request) {
@@ -81,6 +112,11 @@ void ClientService::handle_recv_msg(std::shared_ptr<ProxyRequest> request) {
   switch(rc.type) {
     case GET_HOSTS: {
       unordered_set<PhysicalNode, PhysicalNodeHash> nodes = proxyServer_->getNodes(rc.key);
+#ifdef DEBUG
+      for(auto node: nodes){
+        cout<<"Get_HOSTS::"<<node.getIp()<<endl;
+      }
+#endif
       rrc.type = rc.type;
       rrc.key = rc.key;
       rrc.success = 0;
@@ -99,6 +135,7 @@ void ClientService::handle_recv_msg(std::shared_ptr<ProxyRequest> request) {
       prrcMap_[rc.key] = requestReply;
       lk.unlock();
       rrc.con->send(ck);
+      addRecords(rc.key, nodes);
       break;
     }
     case GET_REPLICA: {

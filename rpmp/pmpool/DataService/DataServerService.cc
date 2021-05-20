@@ -6,7 +6,9 @@ ServiceConnectCallback::ServiceConnectCallback(std::shared_ptr<DataServerService
 }
 
 void ServiceConnectCallback::operator()(void *param_1, void *param_2) {
+#ifdef DEBUG
   cout << "ServiceConnectCallback" << endl;
+#endif
   auto connection = static_cast<Connection*>(param_1);
   service_->setConnection(connection);
 }
@@ -81,7 +83,7 @@ bool DataServerService::init() {
     worker->start();
     workers_.push_back(std::move(worker));
   }
-  /// TODO: use the one passed from start script.
+  /// The address is passed from start script.
   host_ = config_->get_ip();
   port_ = config_->get_port();
   proxyClient_ = std::make_shared<Client>(1, 32);
@@ -139,9 +141,7 @@ int DataServerService::build_connection(std::string proxy_addr) {
   }
   // wait for ConnectedCallback to be executed.
   std::unique_lock<std::mutex> lk(con_mtx);
-  // TODO: looks not a loop.
   while (!proxyConnected) {
-    // TODO: sometimes segmentation fault occurs.
     if (con_v.wait_for(lk, std::chrono::seconds(3)) == std::cv_status::timeout) {
       break;
     }
@@ -150,7 +150,6 @@ int DataServerService::build_connection(std::string proxy_addr) {
     return -1;
   }
   log_->get_console_log()->info("Successfully connected to active proxy: " + proxy_addr);
-//  activeProxyAddr_ = proxy_addr;
   return 0;
 }
 

@@ -20,8 +20,8 @@ class HeartbeatClient;
 class Config;
 class Log;
 
-/// TODO: remove or keep it in .cc file.
-using namespace std;
+using std::string;
+using std::vector;
 using std::make_shared;
 using moodycamel::BlockingConcurrentQueue;
 
@@ -39,6 +39,8 @@ public:
 
 private:
   std::shared_ptr<HeartbeatClient> heartbeatClient_;
+  int heartbeatInterval_;
+  int heartbeatTimeoutInSec_;
   BlockingConcurrentQueue<std::shared_ptr<HeartbeatRequest>> pendingRequestQueue_;
   uint64_t total_num = 0;
   uint64_t begin = 0;
@@ -116,17 +118,20 @@ public:
   void setConnection(Connection* connection);
   int initHeartbeatClient();
   int build_connection();
-  int build_connection_with_exclusion(string excludedProxy);
-  int build_connection(string proxy_addr, string heartbeat_port);
+  int build_connection_with_exclusion(std::string excludedProxy);
+  int build_connection(std::string proxy_addr, std::string heartbeat_port);
   void set_active_proxy_shutdown_callback(Callback* shutdownCallback);
-  string getActiveProxyAddr();
+  std::string getActiveProxyAddr();
   void onActiveProxyShutdown();
   void shutdown();
   void shutdown(Connection* conn);
   void wait();
   void reset();
+  // heartbeat in sec.
   int get_heartbeat_interval();
-  void setExcludedProxy(string proxyAddr);
+  // timeout in sec.
+  int get_heartbeat_timeout();
+  void setExcludedProxy(std::string proxyAddr);
 
 private:
   atomic<uint64_t> rid_ = {0};
@@ -137,6 +142,8 @@ private:
   std::shared_ptr<Config> config_;
   std::shared_ptr<Log> log_;
   int heartbeatInterval_;
+  // looks 5s for timeout is suitable. May need to be tuned for large scale cluster.
+  const int heartbeatTimeout_ = 5;
   std::shared_ptr<Client> client_;
   std::shared_ptr<ChunkMgr> chunkMgr_;
 
@@ -153,7 +160,7 @@ private:
   bool isTerminated_;
 
   Callback* activeProxyShutdownCallback_;
-  string excludedProxy_;
+  std::string excludedProxy_;
 };
 
 #endif //SPARK_PMOF_HEARTBEAT_H

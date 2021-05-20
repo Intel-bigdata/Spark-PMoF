@@ -24,7 +24,7 @@ class Proxy;
 
 class Proxy : public std::enable_shared_from_this<Proxy>{
 public:
-    explicit Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Redis> redis, std::string currentHostAddr);
+    explicit Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::string currentHostAddr);
     ~Proxy();
     bool launchServer();
     bool isActiveProxy(string currentHostAddr);
@@ -32,6 +32,7 @@ public:
     bool launchStandbyService();
     bool shouldBecomeActiveProxy();
     std::string getLastActiveProxy();
+    std::shared_ptr<HeartbeatClient> getHeartbeatClient();
     int build_connection_with_new_active_proxy();
     void stopStandbyService();
     void wait();
@@ -75,6 +76,7 @@ public:
 
 private:
     std::shared_ptr<Proxy> proxy_;
+    int heartbeatTimeoutInSec_;
 };
 
 #endif //RPMP_PROXY_H

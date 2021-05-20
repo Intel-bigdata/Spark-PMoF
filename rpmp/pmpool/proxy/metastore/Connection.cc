@@ -9,7 +9,7 @@ int MetastoreConnection::connect(string ip, string port){
   context_ = shared_ptr<redisContext>(redisConnect(ip.c_str(), stoi(port)));
   if (context_->err == 0){
     setConnected(true);
-    return 1;
+    return 0;
   }
   setConnected(false);
   return -1;

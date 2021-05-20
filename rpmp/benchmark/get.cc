@@ -63,12 +63,13 @@ int main(int argc, char** argv) {
   int threads = config->get_num_threads();
   int map_id = config->get_map_id();
   int numReqs = config->get_num_reqs();
-  std::string host = config->get_ip();
-  std::string port = config->get_port();
+  std::string host = config->get_proxy_addrs();
+  std::string port = config->get_proxy_port();
 
   std::cout << "=================== Get ======================="
     << std::endl;
-  std::cout << "RPMP server is " << host << ":" << port << std::endl;
+  std::cout << "RPMP proxy address(es): " << host << std::endl;
+  std::cout << "RPMP proxy port: " << port << std::endl;
   std::cout << "Total Num Requests is " << numReqs << std::endl;
   std::cout << "Total Num Threads is " << threads << std::endl;
   std::cout << "Block key pattern is "

@@ -10,13 +10,15 @@ int main(int argc, char* argv[]){
   if (argc > 1) {
     CHK_ERR("init config", config->init(argc, argv));
   }
-  std::shared_ptr<Log> log = std::make_shared<Log>(config.get());
-  std::shared_ptr<Redis> redis = std::make_shared<Redis>(config, log);
+  std::shared_ptr<Log> log = std::make_shared<Log>(config->get_log_path(), config->get_log_level());
   // Host ip will be passed from command line through a launch script.
   // It is consistent with user-specified address in the configuration.
   std::string currentHostAddr = config->get_current_proxy_addr();
-  std::shared_ptr<Proxy> proxyServer = std::make_shared<Proxy>(config, log, redis, currentHostAddr);
-  proxyServer->launchServer();
+  std::shared_ptr<Proxy> proxyServer = std::make_shared<Proxy>(config, log, currentHostAddr);
+  if (!proxyServer->launchServer()) {
+    log->get_console_log()->error("Failed to launch proxy server!");
+    return -1;
+  }
   proxyServer->wait();
   return 0;
 }

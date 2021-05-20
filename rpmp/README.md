@@ -1,5 +1,7 @@
-# RPMP(Remote Persistent Memory Pool)
-RPMP was designed as a fully disaggregated shuffle solution for distributed compute system, leveraging state-of-art hardware technologies including persist memory and RDMA, but are not necessarily limited to a shuffle solution. It extends local PM(Persistent Memory) to remote PM and targets on a distributed persistent memory pool, providing easy-to-use interfaces, like the malloc and free in standard C library. 
+# Remote Persistent Memory Pool (RPMP)
+RPMP was designed as a fully disaggregated shuffle solution for distributed compute system, leveraging state-of-the-art hardware technologies, 
+including persist memory and RDMA, but are not necessarily limited to a shuffle solution. It extends local PM (Persistent Memory) to remote PM 
+and targets on a distributed persistent memory pool, providing easy-to-use interfaces, like `malloc` and `free` in standard C library. 
 
 ## Contents
 - [Prerequisite](#prerequisite) 
@@ -121,10 +123,10 @@ Set proxy address and other proxy service's preference. You can deploy multiple 
 multiple proxy addresses, separated by comma, should be specified for `rpmp.network.proxy.address`.
 
 ```
-rpmp.network.proxy.address 172.168.0.40
+rpmp.network.proxy.address 0.0.0.0
 rpmp.proxy.client.service.port 12350
 rpmp.proxy.replica.service.port 12340
-rpmp.network.heartbeat-interval.sec 5
+rpmp.network.heartbeat-interval.sec 3
 rpmp.network.heartbeat.port 12355
 ```
 
@@ -149,15 +151,30 @@ rpmp.data.replica 2
 rpmp.data.min.replica 2
 ```
 
-Set minimal replica and preferred replica. 
+Set minimal replica and preferred replica.
+
+## Launch RPMP cluster
+Change directory to {RPMP-HOME}/build/bin
+- Launch proxy
+  ```./proxy-server --current_proxy_addr $addr [--log $log_path]```
+- Launch RPMP nodes according to config  
+  ```./data-server [--log $log_path]```
+
+Please note if log path is not specified, /tmp/rpmp.log will be used.
+  
+Alternatively, you can leverage script to start/stop cluster services. To make stop script work as expected, 
+please note one node CANNOT plays two same roles, e.g., launch two proxy servers on one node. RPMP proxy and 
+data server logs are recorded in $RPMP_HOME/log/proxy-server.log and $RPMP_HOME/log/data-server.log respectively.
+
+- Start cluster
+  ```./start-rpmp.sh```
+- Stop cluster
+  ```./stop-rpmp.sh```
 
 ## Benchmark
 ### Put and get
-Change directory to {RPMP-HOME}/build/bin
- - Launch proxy 
- ```./proxyMain --current_proxy_addr {addr}```
- - Launch RPMP nodes according to config  
- ```./main```
  - Launch put and get executor
- ```./put_and_get```
-
+ ```./put_and_get --proxy_addr $addr --port $port```
+   
+Here, `$addr` is proxy host address (see `rpmp.network.proxy.address`), and `$port` is client service port 
+(see `rpmp.proxy.client.service.port`), e.g., `./put_and_get --address 172.168.0.101,172.168.0.102 --port 12350`

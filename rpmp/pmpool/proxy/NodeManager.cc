@@ -13,8 +13,9 @@
 #include "json/json.h"
 #include "pmpool/proxy/metastore/JsonUtil.h"
 
-
-using namespace std;
+using std::shared_ptr;
+using std::string;
+using std::vector;
 
 NodeManagerRecvCallback::NodeManagerRecvCallback(std::shared_ptr<NodeManager> nodeManager,
                                                  std::shared_ptr<ChunkMgr> chunkMgr)
@@ -81,11 +82,13 @@ int NodeManagerWorker::entry()
   return 0;
 }
 
-NodeManager::NodeManager(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Redis> redis) : config_(config), log_(log), redis_(redis)
+NodeManager::NodeManager(shared_ptr <Config> config, shared_ptr <Log> log, shared_ptr <Redis> redis) :
+    config_(config), log_(log), redis_(redis)
 {
   hashToNode_ = new map<uint64_t, string>();
   for (std::string node : config_->get_nodes())
   {
+    cout<<"NodeManager::node: "<<node<<endl;
     XXHash *hashFactory = new XXHash();
     uint64_t hashValue = hashFactory->hash(node);
     hashToNode_->insert(std::make_pair(hashValue, node));
@@ -122,7 +125,10 @@ int64_t NodeManager::getCurrentTime(){
   return ms.count();
 }
 
-
+/**
+ * For debug usage
+ * 
+ **/
 void NodeManager::printNodeStatus(){
   string rawJson = redis_->get(NODE_STATUS);
   const auto rawJsonLength = static_cast<int>(rawJson.length());
@@ -133,7 +139,9 @@ void NodeManager::printNodeStatus(){
   const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
   if (!reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &root,
                       &err)) {
-    std::cout << "error" << std::endl;
+#ifdef DEBUG
+    std::cout << "Error occurred in printing node status." << std::endl;
+#endif
   }
 
   Json::Value recordArray = root["data"];
@@ -147,6 +155,9 @@ void NodeManager::printNodeStatus(){
   }
 }
 
+/**
+ * Construct Node Status Table 
+ **/
 void NodeManager::constructNodeStatus(Json::Value record){
   Json::Value root;
   Json::Value data;
@@ -156,11 +167,15 @@ void NodeManager::constructNodeStatus(Json::Value record){
   root["data"] = data;
   string json_str = rootToString(root);
   #ifdef DEBUG
-  cout<<"json string is: "<<json_str<<endl;
+  cout<<"NodeManager::constructNodeStatus::json_str "<<json_str<<endl;
   #endif
   redis_->set(NODE_STATUS, json_str);
 }
 
+
+/**
+ * Add a new record if new host is connected or update existed host's status
+ **/
 void NodeManager::addOrUpdateRecord(Json::Value record){
   int exist = redis_->exists(NODE_STATUS);
   if (exist == 0){
@@ -179,7 +194,7 @@ void NodeManager::addOrUpdateRecord(Json::Value record){
   const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
   if (!reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &root,
                       &err)) {
-    std::cout << "error" << std::endl;
+    std::cout << "Error occurred in addOrUpdateRecord." << std::endl;
   }
 
   Json::Value recordArray = root["data"];
@@ -228,7 +243,7 @@ bool NodeManager::hostExists(string host){
   const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
   if (!reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &root,
                       &err)) {
-    std::cout << "error" << std::endl;
+    std::cout << "Error occurred in checking hostExists." << std::endl;
   }
 
   Json::Value recordArray = root["data"];
@@ -253,13 +268,11 @@ void NodeManager::handle_recv_msg(std::shared_ptr<HeartbeatRequest> request)
   rrc.type = rc.type;
   rrc.success = 0;
   rrc.rid = rc.rid;
-  #ifdef DEBUG
+#ifdef DEBUG
   std::cout << "rid: " << to_string(rc.rid) << std::endl;
   std::cout << "host-hash: " << to_string(rc.host_ip_hash) << std::endl;
-  #endif
 
   map<uint64_t, string>::iterator it;
-
   for (it = hashToNode_->begin(); it != hashToNode_->end(); it++)
   {
     std::cout << it->first  
@@ -267,6 +280,7 @@ void NodeManager::handle_recv_msg(std::shared_ptr<HeartbeatRequest> request)
               << it->second 
               << std::endl;
   }
+#endif
 
   if (hashToNode_->count(rc.host_ip_hash) > 0)
   {
@@ -288,14 +302,14 @@ void NodeManager::handle_recv_msg(std::shared_ptr<HeartbeatRequest> request)
   auto ck = chunkMgr_->get(rrc.con);
   #ifdef DEBUG
   std::cout << "ck->buffer" << ck->buffer << std::endl;
-  std::cout << "requestReply->size" << requestReply->size_ << std::endl;
+  std::cout << "requestReply->size: " << requestReply->size_ << std::endl;
   if (requestReply->data_ == nullptr)
   {
     std::cout << "data is null" << std::endl;
   }
   else
   {
-    std::cout << "requestReply->data" << requestReply->data_ << std::endl;
+    std::cout << "requestReply->data: " << requestReply->data_ << std::endl;
   }
   #endif
   memcpy(reinterpret_cast<char *>(ck->buffer), requestReply->data_, requestReply->size_);
@@ -328,7 +342,7 @@ int NodeManager::checkNode(){
     Json::CharReaderBuilder builder;
     const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
     if (!reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &root, &err)) {
-      std::cout << "error" << std::endl;
+      std::cout << "Error occurred in checking node." << std::endl;
     }
 
     Json::Value recordArray = root["data"];
@@ -351,19 +365,8 @@ int NodeManager::checkNode(){
   return 0;
 }
 
-
-
-void NodeManager::init()
+bool NodeManager::startService()
 {
-  std::thread t_nodeManager(&NodeManager::launchServer, shared_from_this());
-  t_nodeManager.detach();
-  std::thread t_nodeChecker(&NodeManager::checkNode, shared_from_this());
-  t_nodeChecker.detach();
-}
-
-bool NodeManager::launchServer()
-{
-
   int worker_number = config_->get_network_worker_num();
   int buffer_number = config_->get_network_buffer_num();
   int buffer_size = config_->get_network_buffer_size();
@@ -391,7 +394,13 @@ bool NodeManager::launchServer()
 
   server_->start();
   server_->listen(config_->get_current_proxy_addr().c_str(), config_->get_heartbeat_port().c_str());
+
+  std::thread t_nodeChecker(&NodeManager::checkNode, shared_from_this());
+  t_nodeChecker.detach();
   log_->get_console_log()->info("NodeManager server started at {0}:{1}", config_->get_current_proxy_addr(), config_->get_heartbeat_port());
-  server_->wait();
   return true;
+}
+
+void NodeManager::wait() {
+  server_->wait();
 }

@@ -1,9 +1,4 @@
 /*
- * Filename: /mnt/spark-pmof/tool/rpmp/pmpool/Config.h
- * Path: /mnt/spark-pmof/tool/rpmp/pmpool
- * Created Date: Thursday, November 7th 2019, 3:48:52 pm
- * Author: root
- *
  * Copyright (c) 2019 Intel
  */
 
@@ -22,13 +17,6 @@
 
 using namespace boost::program_options;
 using namespace std;
-/*using boost::program_options::error;
-  using boost::program_options::options_description;
-  using boost::program_options::value;
-  using boost::program_options::variables_map;
-  using std::string;
-  using std::vector;*/
-
 
 #include <fstream>
 #include <sstream>
@@ -39,9 +27,9 @@ using namespace std;
  *
  */
 class Config {
-  public:
+private:
     map<std::string,std::string> configs;
-
+public:
     int setDefault(){
       configs.insert(pair<string,string>(RPMP_NODE_LIST, DEFAULT_RPMP_NODE_LIST));  
       configs.insert(pair<string,string>(RPMP_NETWORK_HEARTBEAT_INTERVAL, DEFAULT_RPMP_NETWORK_HEARTBEAT_INTERVAL));  
@@ -66,8 +54,8 @@ class Config {
       return 0;
     }
 
-    /// TODO: This path depends on where user launches the program.
-    /// TODO: Should be fixed by using absolute path according to passed RPMP_HOME.
+    /// This path depends on where user launches proxy or data server. For manually launching, user should go to
+    /// $RPMP_HOME/bin to start proxy or data server.
     int readFromFile(string file = "../config/rpmp.conf"){
       setDefault();
       std::ifstream infile(file);
@@ -134,12 +122,6 @@ class Config {
         }        
         sizes_.push_back(stoull(sizes.substr(start,end)));
 
-        /** 
-        for (auto i = sizes_.begin(); i != sizes_.end(); i++){
-          cout << *i << endl;
-        }
-        **/
-
         string paths = configs.find(RPMP_STORAGE_NAMESPACE_LIST)->second;
         int start_path = 0;
         int end_path = paths.find(delimiter); 
@@ -149,12 +131,6 @@ class Config {
           end_path = paths.find(delimiter, start_path);
         }
         pool_paths_.push_back(paths.substr(start_path, end_path));
-        
-        /**
-        for (auto i = pool_paths_.begin(); i != pool_paths_.end(); i++){
-          cout << *i << endl;
-        }
-        **/
 
         if (pool_paths_.size() != sizes_.size()) {
           if (sizes_.size() < pool_paths_.size() && !sizes_.empty()) {
@@ -178,21 +154,19 @@ class Config {
           end_task = tasks.find(delimiter, start_task);
         }
         affinities_.push_back(stoi(tasks.substr(start_task, end_task)));
-
-        /**
-        for (auto i = affinities_.begin(); i != affinities_.end(); i++){
-          cout << *i << endl;
-        }
-        **/
       }
       return 0;
     }
 
+    /**
+     * Generally it is recommended that init function is called after readFromFile function
+     * to get not configured properties initialized with default value.
+     */
     int init(int argc, char **argv) {
       try {
         options_description desc{"Options"};
         desc.add_options()("help,h", "Help screen")(
-            "address,a", value<string>()->default_value("172.168.0.40"),
+            "address,a", value<string>()->default_value("0.0.0.0"),
             "set the rdma server address")(
               "port,p", value<string>()->default_value("12346"),
               "set the rdma server port")("network_buffer_size,nbs",
@@ -212,7 +186,7 @@ class Config {
                             "set rpmp log file path")("log_level,ll",
                               value<string>()->default_value("warn"),
                               "set log level")("current_proxy_addr,cpa",
-                                  value<string>()->default_value(""),
+                                  value<string>()->default_value("0.0.0.0"),
                                   "Set current proxy address, applicable to proxy node."
                                   );
 
@@ -226,7 +200,14 @@ class Config {
           std::cout << desc << '\n';
           throw;
         }
-        /// TODO: set when provided?
+        /// * If property is not set, set with command line value or default value.
+        /// * If property is set and command line value is not default value, set it.
+        /// * If property is set, but command line value is default value, do not set it.
+        /// * If property is not set in config file, no need to check above conditions, e.g., #set_affinities,
+        ///   #set_current_proxy_addr.
+        /// The consideration is if property is set with a not default value from config file in #readFromFile,
+        /// it should not be reset with a default value in #init. And #init can override property value set by
+        /// #readFromFile if it has not default value.
         set_ip(vm["address"].as<string>());
         set_port(vm["port"].as<string>());
         set_network_buffer_size(vm["network_buffer_size"].as<int>());
@@ -260,7 +241,7 @@ class Config {
           }
         }
         if (vm.count("task_set")) {
-          set_affinities_(vm["task_set"].as<vector<int>>());
+          set_affinities(vm["task_set"].as<vector<int>>());
         } else {
           affinities_.resize(pool_paths_.size(), -1);
         }
@@ -273,37 +254,85 @@ class Config {
     }
 
     string get_ip() { return ip_; }
-    void set_ip(string ip) { ip_ = ip; }
+    void set_ip(string ip) {
+      if (ip_ == "") {
+        ip_ = ip;
+        return;
+      }
+      if (ip != DEFAULT_RPMP_NETWORK_SERVER_ADDRESS) {
+        ip_ = ip;
+      }
+    }
 
     string get_port() { return port_; }
-    void set_port(string port) { port_ = port; }
+    void set_port(string port) {
+      if (port_ == "") {
+        port_ = port;
+        return;
+      }
+      if (port != DEFAULT_RPMP_NETWORK_SERVER_PORT) {
+        port_ = port;
+      }
+    }
 
     int get_network_buffer_size() { return network_buffer_size_; }
     void set_network_buffer_size(int network_buffer_size) {
-      network_buffer_size_ = network_buffer_size;
+      if (network_buffer_size_ == 0) {
+        network_buffer_size_ = network_buffer_size;
+        return;
+      }
+      if (network_buffer_size != stoi(DEFAULT_RPMP_NETWORK_BUFFER_SIZE)) {
+        network_buffer_size_ = network_buffer_size;
+      }
     }
 
     int get_network_buffer_num() { return network_buffer_num_; }
     void set_network_buffer_num(int network_buffer_num) {
-      network_buffer_num_ = network_buffer_num;
+      if (network_buffer_num_ == 0) {
+        network_buffer_num_ = network_buffer_num;
+        return;
+      }
+      if (network_buffer_num != stoi(DEFAULT_RPMP_NETWORK_BUFFER_NUMBER)) {
+        network_buffer_num_ = network_buffer_num;
+      }
     }
 
     int get_network_worker_num() { return network_worker_num_; }
     void set_network_worker_num(int network_worker_num) {
-      network_worker_num_ = network_worker_num;
+      if (network_worker_num_ == 0) {
+        network_worker_num_ = network_worker_num;
+        return;
+      }
+      if (network_worker_num != stoi(DEFAULT_RPMP_NETWORK_WORKER)) {
+        network_worker_num_ = network_worker_num;
+      }
     }
 
     vector<string> &get_pool_paths() { return pool_paths_; }
     void set_pool_paths(const vector<string> &pool_paths) {
-      pool_paths_ = pool_paths;
+      if (pool_paths_.empty()) {
+        pool_paths_ = pool_paths;
+        return;
+      }
+      if (!pool_paths.empty()) {
+        pool_paths_ = pool_paths;
+      }
     }
 
     std::vector<uint64_t> get_pool_sizes() { return sizes_; }
-    void set_pool_sizes(vector<uint64_t> sizes) { sizes_ = sizes; }
+    void set_pool_sizes(vector<uint64_t> sizes) {
+      if (sizes_.empty()) {
+        sizes_ = sizes;
+        return;
+      }
+      if (!sizes.empty()) {
+        sizes_ = sizes;
+      }
+    }
 
     int get_pool_size() { return sizes_.size(); }
 
-    void set_affinities_(vector<int> affinities) {
+    void set_affinities(vector<int> affinities) {
       if (affinities.size() < pool_paths_.size()) {
         affinities_.resize(pool_paths_.size(), -1);
       } else {
@@ -317,32 +346,43 @@ class Config {
     std::vector<int> get_affinities_() { return affinities_; }
 
     string get_log_path() { return log_path_; }
-    void set_log_path(string log_path) { log_path_ = log_path; }
+    void set_log_path(string log_path) {
+      if (log_path_ == "") {
+        log_path_ = log_path;
+        return;
+      }
+      if (log_path != DEFAULT_RPMP_LOG_PATH) {
+        log_path_ = log_path;
+      }
+    }
 
     string get_log_level() { return log_level_; }
-    void set_log_level(string log_level) { log_level_ = log_level; }
+    void set_log_level(string log_level) {
+      if (log_level_ == "") {
+        log_level_ = log_level;
+        return;
+      }
+      if (log_level != DEFAULT_RPMP_LOG_LEVEL) {
+        log_level_ = log_level;
+      }
+    }
 
     void set_nodes(string configured_nodes) {
       vector<string> nodes;
       boost::split(nodes, configured_nodes, boost::is_any_of(","), boost::token_compress_on);
       nodes_ = nodes;
     }
-    vector<string> get_nodes() {return nodes_;}
 
-    void set_client_service_port(string port) {proxy_client_service_port_ = port;}
-    string get_client_service_port() {return proxy_client_service_port_;}
+    vector <string> get_nodes() { return nodes_; }
 
-    // TODO: need to be removed.
-    void set_proxy_ip(string ip) {proxy_ip_ = ip;}
-    void set_proxy_addrs(string proxy_ips) {
+    void set_client_service_port(string port) { proxy_client_service_port_ = port; }
+
+    string get_client_service_port() { return proxy_client_service_port_; }
+
+    void set_proxy_addrs(string proxy_addrs) {
       vector<string> proxies;
-      boost::split(proxies, proxy_ips, boost::is_any_of(","), boost::token_compress_on);
+      boost::split(proxies, proxy_addrs, boost::is_any_of(","), boost::token_compress_on);
       proxy_addrs_ = proxies;
-    }
-    // TODO: need to be removed. Still keep it for compatibility consideration.
-    string get_proxy_ip() {
-      // return proxy_ip_;
-      return proxy_addrs_[0];
     }
     vector<string> get_proxy_addrs() {
       return proxy_addrs_;
@@ -394,8 +434,6 @@ class Config {
     vector<string> nodes_;
     int heatbeat_interval_;
     string proxy_client_service_port_;
-    // TODO: need to be removed.
-    string proxy_ip_;
     // Applicable to proxy node.
     string current_proxy_addr_;
     vector<string> proxy_addrs_;
@@ -408,48 +446,49 @@ class Config {
     string redis_ip_;
     string redis_port_;
 
-const string RPMP_NODE_LIST = "rpmp.node.list";
-const string RPMP_NETWORK_HEARTBEAT_INTERVAL = "rpmp.network.heartbeat-interval.sec";
-const string RPMP_NETWORK_HEARTBEAT_PORT = "rpmp.network.heartbeat.port";
-const string RPMP_NETWORK_PROXY_ADDRESS = "rpmp.network.proxy.address";
-const string RPMP_PROXY_CLIENT_SERVICE_PORT = "rpmp.proxy.client.service.port";
-const string RPMP_NETWORK_SERVER_ADDRESS = "rpmp.network.server.address";
-const string RPMP_NETWORK_SERVER_PORT = "rpmp.network.server.port";
-const string RPMP_NETWORK_WORKER = "rpmp.network.worker";
-const string RPMP_STORAGE_NAMESPACE_SIZE = "rpmp.storage.namespace.size";
-const string RPMP_STORAGE_NAMESPACE_LIST = "rpmp.storage.namespace.list";
-const string RPMP_TASK_LIST = "rpmp.task.set";
-const string RPMP_NETWORK_BUFFER_NUMBER = "rpmp.network.buffer.number";
-const string RPMP_NETWORK_BUFFER_SIZE = "rpmp.network.buffer.size";
-const string RPMP_LOG_LEVEL = "rpmp.log.level";
-const string RPMP_LOG_PATH = "rpmp.log.path";
-const string RPMP_DATA_REPLICA = "rpmp.data.replica";
-const string RPMP_DATA_MINREPLICA = "rpmp.data.min.replica";
-const string RPMP_PROXY_REPLICA_SERVICE_PORT = "rpmp.proxy.replica.service.port";
-const string RPMP_PROXY_LOAD_BALANCE_FACTOR = "rpmp.proxy.load-balance-factor";
-const string RPMP_METASTORE_REDIS_IP = "rpmp.metastore.redis.ip";
-const string RPMP_METASTORE_REDIS_PORT = "rpmp.metastore.redis.port";
-const string DEFAULT_RPMP_NODE_LIST = "172.168.0.209,172.168.0.40";
-const string DEFAULT_RPMP_NETWORK_HEARTBEAT_INTERVAL = "5";
-const string DEFAULT_RPMP_NETWORK_HEARTBEAT_PORT = "12355";
-const string DEFAULT_RPMP_NETWORK_PROXY_ADDRESS = "172.168.0.209";
-const string DEFAULT_RPMP_PROXY_CLIENT_SERVICE_PORT = "12348";
-const string DEFAULT_RPMP_NETWORK_SERVER_ADDRESS = "172.168.0.209";
-const string DEFAULT_RPMP_NETWORK_SERVER_PORT = "12346";
-const string DEFAULT_RPMP_NETWORK_WORKER = "10";
-const string DEFAULT_RPMP_STORAGE_NAMESPACE_SIZE = "rpmp.storage.namespace.list";
-const string DEFAULT_RPMP_STORAGE_NAMESPACE_LIST = "/dev/dax0.0,/dev/dax0.1,/dev/dax1.0,/dev/dax1.1";
-const string DEFAULT_RPMP_TASK_LIST = "2,38,20,56";
-const string DEFAULT_RPMP_NETWORK_BUFFER_NUMBER = "16";
-const string DEFAULT_RPMP_NETWORK_BUFFER_SIZE = "65536";
-const string DEFAULT_RPMP_LOG_LEVEL = "warn";
-const string DEFAULT_RPMP_LOG_PATH = "/tmp/rpmp.log";
-const string DEFAULT_RPMP_DATA_REPLICA = "3";
-const string DEFAULT_RPMP_DATA_MINREPLICA = "1";
-const string DEFAULT_RPMP_PROXY_REPLICA_SERVICE_PORT = "12340";
-const string DEFAULT_RPMP_PROXY_LOAD_BALANCE_FACTOR = "5";
-const string DEFAULT_RPMP_METASTORE_REDIS_IP = "127.0.0.1";
-const string DEFAULT_RPMP_METASTORE_REDIS_PORT = "6379";
+    const string RPMP_NODE_LIST = "rpmp.node.list";
+    const string RPMP_NETWORK_HEARTBEAT_INTERVAL = "rpmp.network.heartbeat-interval.sec";
+    const string RPMP_NETWORK_HEARTBEAT_PORT = "rpmp.network.heartbeat.port";
+    const string RPMP_NETWORK_PROXY_ADDRESS = "rpmp.network.proxy.address";
+    const string RPMP_PROXY_CLIENT_SERVICE_PORT = "rpmp.proxy.client.service.port";
+    const string RPMP_NETWORK_SERVER_ADDRESS = "rpmp.network.server.address";
+    const string RPMP_NETWORK_SERVER_PORT = "rpmp.network.server.port";
+    const string RPMP_NETWORK_WORKER = "rpmp.network.worker";
+    const string RPMP_STORAGE_NAMESPACE_SIZE = "rpmp.storage.namespace.size";
+    const string RPMP_STORAGE_NAMESPACE_LIST = "rpmp.storage.namespace.list";
+    const string RPMP_TASK_LIST = "rpmp.task.set";
+    const string RPMP_NETWORK_BUFFER_NUMBER = "rpmp.network.buffer.number";
+    const string RPMP_NETWORK_BUFFER_SIZE = "rpmp.network.buffer.size";
+    const string RPMP_LOG_LEVEL = "rpmp.log.level";
+    const string RPMP_LOG_PATH = "rpmp.log.path";
+    const string RPMP_DATA_REPLICA = "rpmp.data.replica";
+    const string RPMP_DATA_MINREPLICA = "rpmp.data.min.replica";
+    const string RPMP_PROXY_REPLICA_SERVICE_PORT = "rpmp.proxy.replica.service.port";
+    const string RPMP_PROXY_LOAD_BALANCE_FACTOR = "rpmp.proxy.load-balance-factor";
+    const string RPMP_METASTORE_REDIS_IP = "rpmp.metastore.redis.ip";
+    const string RPMP_METASTORE_REDIS_PORT = "rpmp.metastore.redis.port";
+
+    const string DEFAULT_RPMP_NODE_LIST = "0.0.0.0";
+    const string DEFAULT_RPMP_NETWORK_HEARTBEAT_INTERVAL = "3";
+    const string DEFAULT_RPMP_NETWORK_HEARTBEAT_PORT = "12355";
+    const string DEFAULT_RPMP_NETWORK_PROXY_ADDRESS = "0.0.0.0";
+    const string DEFAULT_RPMP_PROXY_CLIENT_SERVICE_PORT = "12350";
+    const string DEFAULT_RPMP_NETWORK_SERVER_ADDRESS = "0.0.0.0";
+    const string DEFAULT_RPMP_NETWORK_SERVER_PORT = "12346";
+    const string DEFAULT_RPMP_NETWORK_WORKER = "10";
+    const string DEFAULT_RPMP_STORAGE_NAMESPACE_SIZE = "rpmp.storage.namespace.list";
+    const string DEFAULT_RPMP_STORAGE_NAMESPACE_LIST = "/dev/dax0.0,/dev/dax0.1,/dev/dax1.0,/dev/dax1.1";
+    const string DEFAULT_RPMP_TASK_LIST = "2,38,20,56";
+    const string DEFAULT_RPMP_NETWORK_BUFFER_NUMBER = "16";
+    const string DEFAULT_RPMP_NETWORK_BUFFER_SIZE = "65536";
+    const string DEFAULT_RPMP_LOG_LEVEL = "warn";
+    const string DEFAULT_RPMP_LOG_PATH = "/tmp/rpmp.log";
+    const string DEFAULT_RPMP_DATA_REPLICA = "3";
+    const string DEFAULT_RPMP_DATA_MINREPLICA = "1";
+    const string DEFAULT_RPMP_PROXY_REPLICA_SERVICE_PORT = "12340";
+    const string DEFAULT_RPMP_PROXY_LOAD_BALANCE_FACTOR = "5";
+    const string DEFAULT_RPMP_METASTORE_REDIS_IP = "0.0.0.0";
+    const string DEFAULT_RPMP_METASTORE_REDIS_PORT = "6379";
 };
 
 #endif  // PMPOOL_CONFIG_H_

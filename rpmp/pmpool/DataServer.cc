@@ -56,9 +56,9 @@ ConnectionShutdownCallback::ConnectionShutdownCallback(std::shared_ptr<Heartbeat
  * a new active proxy.
  */
 void ConnectionShutdownCallback::operator()(void* param_1, void* param_2) {
-  /// TODO: wait for 5s, can be optimized.
-  /// New active proxy needs some time to launch services.
-  sleep(5);
+  // Some time is needed for new active proxy setup.
+  const int waitTime = heartbeatClient_->get_heartbeat_timeout() + 1;
+  sleep(waitTime);
   int res = heartbeatClient_->build_connection();
   int attempts = 0;
   while (res != 0 && attempts < 10) {
@@ -73,6 +73,7 @@ void ConnectionShutdownCallback::operator()(void* param_1, void* param_2) {
   string activeProxyAddr = heartbeatClient_->getActiveProxyAddr();
   int ret = dataService_->build_connection(activeProxyAddr);
   if (ret == -1) {
+    std::cout << "Failed to register to " << activeProxyAddr << "due to connection issue.\n";
     return;
   }
   dataService_->registerDataServer();

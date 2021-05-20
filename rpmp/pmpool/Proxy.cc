@@ -14,11 +14,8 @@
 #include "pmpool/proxy/metastore/Redis.h"
 #include "json/json.h"
 
-/// TODO: remove or keep.
-using namespace std;
-
-Proxy::Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Redis> redis, string currentHostAddr) :
- config_(config), log_(log), redis_(redis), currentHostAddr_(currentHostAddr) {}
+Proxy::Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::string currentHostAddr) :
+ config_(config), log_(log), currentHostAddr_(currentHostAddr) {}
 
 Proxy::~Proxy() {
     // worker_->stop();
@@ -34,7 +31,7 @@ bool Proxy::launchServer() {
     stopStandbyService();
     return launchActiveService();
   }
-  return 0;
+  return true;
 }
 
 /**
@@ -44,12 +41,12 @@ bool Proxy::launchServer() {
  * @param currentHostAddr   the host address of current proxy.
  * @return  true if the current proxy should be active.
  */
-bool Proxy::isActiveProxy(string currentHostAddr) {
+bool Proxy::isActiveProxy(std::string currentHostAddr) {
   // Directly launch proxy case.
   if (currentHostAddr.empty()) {
     return true;
   }
-  std::vector<string> proxies = config_->get_proxy_addrs();
+  std::vector<std::string> proxies = config_->get_proxy_addrs();
   // Only proxy node will trigger the launch. So if there is
   // only one proxy configured, the current node is active proxy.
   if (proxies.size() == 1) {
@@ -57,7 +54,7 @@ bool Proxy::isActiveProxy(string currentHostAddr) {
   }
   if (std::find(proxies.begin(), proxies.end(),
                 currentHostAddr) == proxies.end()) {
-    log_->get_file_log()->error("Incorrect proxy address is configured for current host!");
+    log_->get_console_log()->error("Incorrect proxy address is configured for current host!");
     return false;
   }
   // All proxy nodes share same config file. The first node
@@ -69,25 +66,37 @@ bool Proxy::isActiveProxy(string currentHostAddr) {
   return false;
 }
 
-/// TODO: add fencing service to make sure only one proxy is active.
+/** Terminate the launching if key service is not launched as expected.
+ *  TODO: add fencing service to make sure only one proxy is active.
+ */
 bool Proxy::launchActiveService() {
   log_->get_console_log()->info("Launch active proxy services..");
+  redis_ = std::make_shared<Redis>(config_, log_);
+  if (!redis_->connect()) {
+    return false;
+  }
   nodeManager_ = std::make_shared<NodeManager>(config_, log_, redis_);
-  nodeManager_->init();
+  if (!nodeManager_->startService()) {
+    return false;
+  }
   loadBalanceFactor_ = config_->get_load_balance_factor();
   consistentHash_ = std::make_shared<ConsistentHash>();
   dataServerPort_ = config_->get_port();
   dataReplica_ = config_->get_data_replica();
-  clientService_ = std::make_shared<ClientService>(config_, log_, shared_from_this());
-  clientService_->startService();
+  clientService_ = std::make_shared<ClientService>(config_, log_, shared_from_this(), redis_);
+  if (!clientService_->startService()) {
+    return false;
+  }
   replicaService_ = std::make_shared<ReplicaService>(config_, log_, shared_from_this());
-  replicaService_->startService();
+  if (!replicaService_->startService()) {
+    return false;
+  }
   return true;
 }
 
 bool Proxy::launchStandbyService() {
   log_->get_console_log()->info("Launch standby proxy services..");
-  vector<string> proxies = config_->get_proxy_addrs();
+  std::vector<std::string> proxies = config_->get_proxy_addrs();
   heartbeatClient_ = std::make_shared<HeartbeatClient>(config_, log_);
   // To avoid unnecessarily trying to connect to itself.
   heartbeatClient_->setExcludedProxy(currentHostAddr_);
@@ -106,9 +115,9 @@ bool Proxy::launchStandbyService() {
  * was active recently but it is dead now, the current proxy should become active.
  */
 bool Proxy::shouldBecomeActiveProxy() {
-  vector<string> proxies = config_->get_proxy_addrs();
-  string lastActiveProxy = getLastActiveProxy();
-  std::vector<string>::iterator iter;
+  std::vector<std::string> proxies = config_->get_proxy_addrs();
+  std::string lastActiveProxy = getLastActiveProxy();
+  std::vector<std::string>::iterator iter;
   iter = std::find(proxies.begin(), proxies.end(), lastActiveProxy);
   if (iter != proxies.end()) {
     /// TODO: in a loop style.
@@ -121,13 +130,18 @@ bool Proxy::shouldBecomeActiveProxy() {
 /**
  * Get last active proxy according to HeartbeatClient's successfully built connection previously.
  */
-string Proxy::getLastActiveProxy() {
+std::string Proxy::getLastActiveProxy() {
   log_->get_console_log()->info("Last active proxy addr: {0}", heartbeatClient_->getActiveProxyAddr());
   return heartbeatClient_->getActiveProxyAddr();
 }
 
+std::shared_ptr<HeartbeatClient> Proxy::getHeartbeatClient() {
+  return heartbeatClient_;
+}
+
 ActiveProxyShutdownCallback::ActiveProxyShutdownCallback(std::shared_ptr<Proxy> proxy) {
   proxy_ = proxy;
+  heartbeatTimeoutInSec_ = proxy_->getHeartbeatClient()->get_heartbeat_timeout();
 }
 
 /**
@@ -137,18 +151,24 @@ ActiveProxyShutdownCallback::ActiveProxyShutdownCallback(std::shared_ptr<Proxy> 
 void ActiveProxyShutdownCallback::operator()(void* param_1, void* param_2) {
   if (proxy_->shouldBecomeActiveProxy()) {
     proxy_->stopStandbyService();
-    proxy_->launchActiveService();
+    if (!proxy_->launchActiveService()) {
+      std::cout << "Failed to launch active proxy services!\n";
+      return;
+    }
   } else {
-    /// TODO: wait for 5s, can be optimized.
+    /// wait for time required by candidate proxy to detect the disconnection and to set up active proxy services.
     /// New active proxy needs some time to launch services.
-    sleep(5);
+    const int waitTime = heartbeatTimeoutInSec_ + 1;
+    sleep(waitTime);
     int res = proxy_->build_connection_with_new_active_proxy();
     if (res == 0) {
       return;
     }
     /// No active proxy is running. The current proxy should become active.
     proxy_->stopStandbyService();
-    proxy_->launchActiveService();
+    if (!proxy_->launchActiveService()) {
+      std::cout << "Failed to launch active proxy services!\n";
+    }
   }
 }
 
@@ -159,10 +179,6 @@ int Proxy::build_connection_with_new_active_proxy() {
   return heartbeatClient_-> build_connection_with_exclusion(currentHostAddr_);
 }
 
-/**
- * TODO: needs to avoid cyclic calling.
- * ActiveProxyShutdownCallback -> stopStandbyService -> ActiveProxyShutdownCallback.
- */
 void Proxy::stopStandbyService() {
   log_->get_console_log()->info("Shutting down standby services..");
   heartbeatClient_->reset();
@@ -191,6 +207,7 @@ void Proxy::removeReplica(uint64_t key) {
   replicaMap_.erase(key);
 }
 
+// TODO: get location from Metastore.
 std::unordered_set<PhysicalNode,PhysicalNodeHash> Proxy::getReplica(uint64_t key) {
   std::lock_guard<std::mutex> lk(replica_mtx);
   return replicaMap_[key];
@@ -200,11 +217,8 @@ void Proxy::notifyClient(uint64_t key) {
   clientService_->notifyClient(key);
 }
 
-/// TODO: for standby service, the below two services are not created.
 void Proxy::wait() {
   while (true) {
     sleep(10);
   }
-//  clientService_->wait();
-//  replicaService_->wait();
 }

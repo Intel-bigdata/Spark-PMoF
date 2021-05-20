@@ -1,9 +1,4 @@
 /*
- * Filename: /mnt/spark-pmof/tool/rpmp/main.cc
- * Path: /mnt/spark-pmof/tool/rpmp
- * Created Date: Thursday, November 7th 2019, 3:48:52 pm
- * Author: root
- *
  * Copyright (c) 2019 Intel
  */
 
@@ -15,10 +10,7 @@
 #include "pmpool/Log.h"
 
 /**
- * @brief program entry of RPMP server
- * @param argc 
- * @param argv 
- * @return int 
+ * @brief program entry of RPMP data server
  */
 int ServerMain(int argc, char **argv) {
   /// initialize Config class
@@ -28,7 +20,7 @@ int ServerMain(int argc, char **argv) {
     CHK_ERR("config init", config->init(argc, argv));
   }
   /// initialize Log class
-  std::shared_ptr<Log> log = std::make_shared<Log>(config.get());
+  std::shared_ptr<Log> log = std::make_shared<Log>(config->get_log_path(), config->get_log_level());
 
   /// initialize DataServer class
   std::shared_ptr<DataServer> dataServer =
