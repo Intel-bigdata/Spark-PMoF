@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "ReplicaService.h"
+#include "pmpool/proxy/metastore/JsonUtil.h"
 
 using namespace std;
 
@@ -47,8 +48,8 @@ int ReplicaWorker::entry() {
   return 0;
 }
 
-ReplicaService::ReplicaService(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Proxy> proxyServer) :
- config_(config), log_(log), proxyServer_(proxyServer) {}
+ReplicaService::ReplicaService(std::shared_ptr<Config> config, std::shared_ptr<RLog> log, std::shared_ptr<Proxy> proxyServer, std::shared_ptr<Rocks> rocks) :
+ config_(config), log_(log), proxyServer_(proxyServer), rocks_(rocks) {}
 
 ReplicaService::~ReplicaService() {
   worker_->stop();
@@ -81,6 +82,7 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
       break;
     }
     case REPLICATE: {
+      //The message received means the data has been put to node, change status from pending to valid
       uint32_t replicaNum = dataReplica_ < proxyServer_->getNodeNum() ? dataReplica_ : proxyServer_->getNodeNum();
       uint32_t minReplica = replicaNum < minReplica_ ? replicaNum : minReplica_;
       if (getReplica(rc.key).size() != 0) {

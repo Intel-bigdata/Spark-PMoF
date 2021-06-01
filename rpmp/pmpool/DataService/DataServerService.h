@@ -20,7 +20,7 @@
 #include "pmpool/queue/blockingconcurrentqueue.h"
 #include "pmpool/queue/concurrentqueue.h"
 #include "pmpool/Config.h"
-#include "pmpool/Log.h"
+#include "pmpool/RLog.h"
 #include "pmpool/proxy/replicaService/ReplicaEvent.h"
 #include "pmpool/Protocol.h"
 
@@ -85,7 +85,7 @@ private:
 class DataServerService : public std::enable_shared_from_this<DataServerService> {
 public:
  explicit DataServerService(std::shared_ptr<Config> config,
-                            std::shared_ptr<Log> log,
+                            std::shared_ptr<RLog> log,
                             std::shared_ptr<Protocol> protocol);
  ~DataServerService();
  bool init();  // connect to proxy server
@@ -112,7 +112,7 @@ private:
  std::shared_ptr<ServiceRecvCallback> recvCallback;
  std::shared_ptr<ServiceSendCallback> sendCallback;
  std::shared_ptr<Config> config_;
- std::shared_ptr<Log> log_;
+ std::shared_ptr<RLog> log_;
  std::shared_ptr<Protocol> protocol_;
 
  std::shared_ptr<Client> proxyClient_;
@@ -170,7 +170,7 @@ class DataServiceRequestHandler : public ThreadWrapper {
       if (elapse > 10s) {
         ctx->op_failed = true;
         fprintf(
-            stderr, "Request [TYPE %ld] spent %ld s, time out\n",
+            stderr, "DataServerService::Request [TYPE %ld] spent %ld s, time out\n",
             request->requestContext_.type,
             std::chrono::duration_cast<std::chrono::seconds>(elapse).count());
         return true;

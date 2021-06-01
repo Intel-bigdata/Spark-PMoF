@@ -1,5 +1,5 @@
 #include <iostream>
-#include "../../Config.h"
+#include "../../../Config.h"
 
 #include "Redis.h"
 #include "hiredis.h"
@@ -7,7 +7,7 @@
 #include "json/json.h"
 
 // TODO: RPMP proxy process should not be terminated at runtime when cannot connect to Redis for query, etc.
-Redis::Redis(std::shared_ptr<Config> config, std::shared_ptr<Log> log){
+Redis::Redis(std::shared_ptr<Config> config, std::shared_ptr<RLog> log){
   config_ = config;
   log_ = log;
   address_ = config_->get_metastore_redis_ip();

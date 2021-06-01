@@ -65,7 +65,7 @@ ProxyRequestReplyContext ProxyRequestHandler::get(std::shared_ptr<ProxyRequest> 
     // TODO: timeout set too long?
     if (elapse > 30s) {
       ctx->op_failed = true;
-      fprintf(stderr, "Request [TYPE %ld] spent %ld s, time out\n",
+      fprintf(stderr, "ProxyClient::Request [TYPE %ld] spent %ld s, time out\n",
               request->requestContext_.type,
               std::chrono::duration_cast<std::chrono::seconds>(elapse).count());
       // TODO: throw exception from here?

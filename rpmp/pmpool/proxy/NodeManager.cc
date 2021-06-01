@@ -82,8 +82,8 @@ int NodeManagerWorker::entry()
   return 0;
 }
 
-NodeManager::NodeManager(shared_ptr <Config> config, shared_ptr <Log> log, shared_ptr <Redis> redis) :
-    config_(config), log_(log), redis_(redis)
+NodeManager::NodeManager(shared_ptr <Config> config, shared_ptr <RLog> log, shared_ptr <Rocks> rocks) :
+    config_(config), log_(log), rocks_(rocks)
 {
   hashToNode_ = new map<uint64_t, string>();
   for (std::string node : config_->get_nodes())
@@ -130,7 +130,7 @@ int64_t NodeManager::getCurrentTime(){
  * 
  **/
 void NodeManager::printNodeStatus(){
-  string rawJson = redis_->get(NODE_STATUS);
+  string rawJson = rocks_->get(NODE_STATUS);
   const auto rawJsonLength = static_cast<int>(rawJson.length());
   JSONCPP_STRING err;
   Json::Value root;
@@ -169,7 +169,7 @@ void NodeManager::constructNodeStatus(Json::Value record){
   #ifdef DEBUG
   cout<<"NodeManager::constructNodeStatus::json_str "<<json_str<<endl;
   #endif
-  redis_->set(NODE_STATUS, json_str);
+  rocks_->set(NODE_STATUS, json_str);
 }
 
 
@@ -177,12 +177,12 @@ void NodeManager::constructNodeStatus(Json::Value record){
  * Add a new record if new host is connected or update existed host's status
  **/
 void NodeManager::addOrUpdateRecord(Json::Value record){
-  int exist = redis_->exists(NODE_STATUS);
+  int exist = rocks_->exists(NODE_STATUS);
   if (exist == 0){
     constructNodeStatus(record);
   }
 
-  string rawJson = redis_->get(NODE_STATUS);
+  string rawJson = rocks_->get(NODE_STATUS);
   #ifdef DEBUG
   cout<<rawJson<<endl;
   #endif
@@ -216,7 +216,7 @@ void NodeManager::addOrUpdateRecord(Json::Value record){
     new_data[size][TIME] = record[TIME];
     new_data[size][STATUS] = record[STATUS];
     new_root["data"] = new_data;
-    redis_->set(NODE_STATUS, rootToString(new_root));
+    rocks_->set(NODE_STATUS, rootToString(new_root));
     return;
   } 
 
@@ -229,12 +229,12 @@ void NodeManager::addOrUpdateRecord(Json::Value record){
   }
 
   root["data"] = recordArray;
-  redis_->set(NODE_STATUS, rootToString(root));
+  rocks_->set(NODE_STATUS, rootToString(root));
   
 }
 
 bool NodeManager::hostExists(string host){
-  string rawJson = redis_->get(NODE_STATUS);
+  string rawJson = rocks_->get(NODE_STATUS);
   const auto rawJsonLength = static_cast<int>(rawJson.length());
   JSONCPP_STRING err;
   Json::Value root;
@@ -330,11 +330,11 @@ int NodeManager::checkNode(){
   int gap = 2;
   while(true){
     sleep(heartbeatInterval * gap);
-    int exist = redis_->exists(NODE_STATUS);
+    int exist = rocks_->exists(NODE_STATUS);
     if (exist == 0){
       continue;
     }
-    string rawJson = redis_->get(NODE_STATUS);
+    string rawJson = rocks_->get(NODE_STATUS);
     const auto rawJsonLength = static_cast<int>(rawJson.length());
     JSONCPP_STRING err;
     Json::Value root;

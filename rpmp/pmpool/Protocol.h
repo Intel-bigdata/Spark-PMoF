@@ -23,7 +23,7 @@ class AllocatorProxy;
 class Protocol;
 class NetworkServer;
 class Config;
-class Log;
+class RLog;
 class DataServerService;
 
 using moodycamel::BlockingConcurrentQueue;
@@ -147,7 +147,7 @@ class FinalizeWorker : public ThreadWrapper {
 class Protocol : public std::enable_shared_from_this<Protocol> {
  public:
   Protocol() = delete;
-  Protocol(std::shared_ptr<Config> config, std::shared_ptr<Log> log,
+  Protocol(std::shared_ptr<Config> config, std::shared_ptr<RLog> log,
            std::shared_ptr<NetworkServer> server,
            std::shared_ptr<AllocatorProxy> allocatorProxy);
   ~Protocol();
@@ -171,7 +171,7 @@ class Protocol : public std::enable_shared_from_this<Protocol> {
 
  public:
   std::shared_ptr<Config> config_;
-  std::shared_ptr<Log> log_;
+  std::shared_ptr<RLog> log_;
   uint64_t num_requests_ = 0;
 
  private:

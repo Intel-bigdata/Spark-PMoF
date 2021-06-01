@@ -55,7 +55,7 @@ void ReplicateWorker::addTask(std::shared_ptr<ReplicaRequestReply> rr) {
 }
 
 DataServerService::DataServerService(std::shared_ptr<Config> config,
-                                     std::shared_ptr<Log> log, 
+                                     std::shared_ptr<RLog> log, 
                                      std::shared_ptr<Protocol> protocol)
     : config_(config), log_(log), protocol_(protocol) {}
 

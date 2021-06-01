@@ -18,7 +18,7 @@ class Connection;
 class ChunkMgr;
 class HeartbeatClient;
 class Config;
-class Log;
+class RLog;
 
 using std::string;
 using std::vector;
@@ -109,7 +109,7 @@ private:
 
 class HeartbeatClient: public std::enable_shared_from_this<HeartbeatClient>{
 public:
-  HeartbeatClient(std::shared_ptr<Config> config, std::shared_ptr<Log> log);
+  HeartbeatClient(std::shared_ptr<Config> config, std::shared_ptr<RLog> log);
   ~HeartbeatClient();
   int init();
   int heartbeat();
@@ -140,7 +140,7 @@ private:
 
   std::shared_ptr<HeartbeatRequestHandler> heartbeatRequestHandler_;
   std::shared_ptr<Config> config_;
-  std::shared_ptr<Log> log_;
+  std::shared_ptr<RLog> log_;
   int heartbeatInterval_;
   // looks 5s for timeout is suitable. May need to be tuned for large scale cluster.
   const int heartbeatTimeout_ = 5;
