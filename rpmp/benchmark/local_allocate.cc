@@ -17,7 +17,7 @@
 
 #include "../pmpool/AllocatorProxy.h"
 #include "../pmpool/Config.h"
-#include "../pmpool/Log.h"
+#include "../pmpool/RLog.h"
 #include "gtest/gtest.h"
 
 uint64_t timestamp_now() {
@@ -46,7 +46,7 @@ void func(std::shared_ptr<AllocatorProxy> proxy, int index) {
 int main() {
   std::shared_ptr<Config> config = std::make_shared<Config>();
   config->init(0, nullptr);
-  std::shared_ptr<Log> log = std::make_shared<Log>(config->get_log_path(), config->get_log_level());
+  std::shared_ptr<RLog> log = std::make_shared<RLog>(config->get_log_path(), config->get_log_level());
   auto allocatorProxy = std::make_shared<AllocatorProxy>(config, log, nullptr);
   allocatorProxy->init();
   std::vector<std::thread *> threads;

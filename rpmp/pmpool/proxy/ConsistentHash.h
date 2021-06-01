@@ -25,10 +25,10 @@ class ConsistentHash {
       }
 
       map<uint64_t, VirtualNode>::iterator itr;
+      int counter = 0;
       for (itr = ring.begin(); itr != ring.end(); ++itr){
-        cout << '\t' << itr->first << '\t' << itr->second.getKey() << '\n';
+        counter++;
       }
-
     };
 
     void removeNode(PhysicalNode physicalNode){

@@ -72,7 +72,7 @@ int HeartbeatRequestHandler::get(std::shared_ptr<HeartbeatRequest> request) {
     auto elapse = current - ctx->start;
     if (elapse > timeoutInSec) {
       ctx->op_failed = true;
-      fprintf(stderr, "Request [TYPE %ld] spent %ld s, time out\n",
+      fprintf(stderr, "HeartbeatClient::Request [TYPE %ld] spent %ld s, time out\n",
               request->requestContext_.type,
               std::chrono::duration_cast<std::chrono::seconds>(elapse).count());
       return true;
@@ -154,7 +154,7 @@ std::string exec(const char* cmd) {
   return result;
 }
 
-HeartbeatClient::HeartbeatClient(std::shared_ptr<Config> config, std::shared_ptr<Log> log)
+HeartbeatClient::HeartbeatClient(std::shared_ptr<Config> config, std::shared_ptr<RLog> log)
         : config_(config), log_(log) {
   heartbeatInterval_ = config->get_heartbeat_interval();
   XXHash *hashFactory = new XXHash();

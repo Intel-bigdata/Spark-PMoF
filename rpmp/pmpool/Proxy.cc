@@ -11,10 +11,10 @@
 #include "Proxy.h"
 
 #include "hiredis/hiredis.h"
-#include "pmpool/proxy/metastore/Redis.h"
+#include "pmpool/proxy/metastore/redis/Redis.h"
 #include "json/json.h"
 
-Proxy::Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::string currentHostAddr) :
+Proxy::Proxy(std::shared_ptr<Config> config, std::shared_ptr<RLog> log, std::string currentHostAddr) :
  config_(config), log_(log), currentHostAddr_(currentHostAddr) {}
 
 Proxy::~Proxy() {
@@ -71,11 +71,11 @@ bool Proxy::isActiveProxy(std::string currentHostAddr) {
  */
 bool Proxy::launchActiveService() {
   log_->get_console_log()->info("Launch active proxy services..");
-  redis_ = std::make_shared<Redis>(config_, log_);
-  if (!redis_->connect()) {
+  rocks_ = std::make_shared<Rocks>(config_, log_);
+  if (!rocks_->connect("/tmp/rocksdb_simple_example")) {
     return false;
   }
-  nodeManager_ = std::make_shared<NodeManager>(config_, log_, redis_);
+  nodeManager_ = std::make_shared<NodeManager>(config_, log_, rocks_);
   if (!nodeManager_->startService()) {
     return false;
   }
@@ -83,11 +83,11 @@ bool Proxy::launchActiveService() {
   consistentHash_ = std::make_shared<ConsistentHash>();
   dataServerPort_ = config_->get_port();
   dataReplica_ = config_->get_data_replica();
-  clientService_ = std::make_shared<ClientService>(config_, log_, shared_from_this(), redis_);
+  clientService_ = std::make_shared<ClientService>(config_, log_, shared_from_this(), rocks_);
   if (!clientService_->startService()) {
     return false;
   }
-  replicaService_ = std::make_shared<ReplicaService>(config_, log_, shared_from_this());
+  replicaService_ = std::make_shared<ReplicaService>(config_, log_, shared_from_this(), rocks_);
   if (!replicaService_->startService()) {
     return false;
   }

@@ -23,7 +23,7 @@ class CircularBuffer;
 class Config;
 class RequestReply;
 class RequestReplyContext;
-class Log;
+class RLog;
 
 /**
  * @brief RPMP network service is based on HPNL, which is a completely
@@ -34,7 +34,7 @@ class NetworkServer : public RmaBufferRegister,
                       public std::enable_shared_from_this<NetworkServer> {
  public:
   NetworkServer() = delete;
-  NetworkServer(std::shared_ptr<Config> config, std::shared_ptr<Log> log_);
+  NetworkServer(std::shared_ptr<Config> config, std::shared_ptr<RLog> log_);
   ~NetworkServer();
   int init();
   int start();
@@ -78,7 +78,7 @@ class NetworkServer : public RmaBufferRegister,
 
  private:
   std::shared_ptr<Config> config_;
-  std::shared_ptr<Log> log_;
+  std::shared_ptr<RLog> log_;
   std::shared_ptr<Server> server_;
   std::shared_ptr<ChunkMgr> chunkMgr_;
   std::shared_ptr<CircularBuffer> circularBuffer_;

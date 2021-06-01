@@ -5,11 +5,11 @@
 #include "pmpool/Config.h"
 #include "pmpool/Digest.h"
 #include "pmpool/HeartbeatClient.h"
-#include "pmpool/Log.h"
+#include "pmpool/RLog.h"
 #include "pmpool/NetworkServer.h"
 #include "pmpool/Protocol.h"
 
-DataServer::DataServer(std::shared_ptr<Config> config, std::shared_ptr<Log> log)
+DataServer::DataServer(std::shared_ptr<Config> config, std::shared_ptr<RLog> log)
     : config_(config), log_(log) {}
 
 int DataServer::init() {

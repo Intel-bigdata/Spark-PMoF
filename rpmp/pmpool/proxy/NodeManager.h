@@ -12,13 +12,14 @@
 #include "pmpool/queue/blockingconcurrentqueue.h"
 #include "pmpool/queue/concurrentqueue.h"
 #include "pmpool/Config.h"
-#include "pmpool/Log.h"
+#include "pmpool/RLog.h"
 #include "pmpool/proxy/NodeManager.h"
 
 #include "pmpool/proxy/XXHash.h"
 #include "pmpool/proxy/IHash.h"
 
-#include "pmpool/proxy/metastore/Redis.h"
+#include "pmpool/proxy/metastore/redis/Redis.h"
+#include "pmpool/proxy/metastore/rocksdb/Rocks.h"
 #include "json/json.h"
 
 #include <chrono>
@@ -97,7 +98,7 @@ private:
 class NodeManager : public std::enable_shared_from_this<NodeManager> {
 public:
   NodeManager() = delete;
-  NodeManager(std::shared_ptr<Config> config, std::shared_ptr <Log> log, std::shared_ptr<Redis> redis);
+  NodeManager(std::shared_ptr<Config> config, std::shared_ptr <RLog> log, std::shared_ptr<Rocks> rocks);
   ~NodeManager();
   void wait();
   void printNodeStatus();
@@ -121,8 +122,8 @@ private:
   std::map<uint64_t, string> *hashToNode_;
   std::shared_ptr <NodeManagerWorker> worker_;
   std::shared_ptr <Config> config_;
-  std::shared_ptr <Log> log_;
-  std::shared_ptr <Redis> redis_;
+  std::shared_ptr <RLog> log_;
+  std::shared_ptr <Rocks> rocks_;
   std::shared_ptr <Server> server_;
   std::shared_ptr <ChunkMgr> chunkMgr_;
   std::shared_ptr <NodeManagerRecvCallback> recvCallback_;
