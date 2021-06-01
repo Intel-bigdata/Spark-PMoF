@@ -87,6 +87,9 @@ void ClientService::constructJobStatus(Json::Value record, uint64_t key){
  * Add data's location and status
  **/
 void ClientService::addRecords(uint64_t key, unordered_set<PhysicalNode, PhysicalNodeHash> nodes){
+  #ifdef DEBUG
+  cout<<"ClientService::addRecords::key: "<<key<<endl;
+  #endif
   Json::Value root;
   Json::Value data;
   int index = 0;
