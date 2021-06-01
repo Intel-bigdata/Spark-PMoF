@@ -110,6 +110,7 @@ class ReplicaService : public std::enable_shared_from_this<ReplicaService> {
   void addReplica(uint64_t key, PhysicalNode node);
   std::unordered_set<PhysicalNode, PhysicalNodeHash> getReplica(uint64_t key);
   void removeReplica(uint64_t key);
+  void addRecords(uint64_t key, unordered_set<PhysicalNode, PhysicalNodeHash> nodes);
   void updateRecord(uint64_t key, PhysicalNode node);
   std::shared_ptr<ReplicaWorker> worker_;
   std::shared_ptr<ChunkMgr> chunkMgr_;
