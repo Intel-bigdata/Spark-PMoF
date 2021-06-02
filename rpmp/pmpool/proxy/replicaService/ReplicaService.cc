@@ -154,6 +154,7 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
       uint32_t replicaNum = dataReplica_ < proxyServer_->getNodeNum() ? dataReplica_ : proxyServer_->getNodeNum();
       uint32_t minReplica = replicaNum < minReplica_ ? replicaNum : minReplica_;
       addReplica(rc.key, rc.node);
+      updateRecord(rc.key, rc.node);
       if (getReplica(rc.key).size() == minReplica) {
         proxyServer_->notifyClient(rc.key);
       }
