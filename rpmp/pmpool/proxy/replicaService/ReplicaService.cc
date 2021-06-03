@@ -101,23 +101,6 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
   ReplicaRequestContext rc = request->get_rc();
   auto rrc = ReplicaRequestReplyContext();
   switch(rc.type) {
-    case REGISTER: {
-      PhysicalNode physicalNode = {rc.node.getIp(), rc.node.getPort()};
-      proxyServer_->addNode(physicalNode);
-      rrc.type = rc.type;
-      rrc.success = 0;
-      rrc.rid = rc.rid;
-      rrc.con = rc.con;
-      dataServerConnections_.insert(pair<std::string, Connection*>(physicalNode.getKey(), rc.con));
-      std::shared_ptr<ReplicaRequestReply> requestReply = std::make_shared<ReplicaRequestReply>(rrc);
-      requestReply->encode();
-      auto ck = chunkMgr_->get(rrc.con);
-      memcpy(reinterpret_cast<char*>(ck->buffer), requestReply->data_,
-             requestReply->size_);
-      ck->size = requestReply->size_;
-      rrc.con->send(ck);
-      break;
-    }
     case REPLICATE: {
       //The message received means the data has been put to node, change status from pending to valid
       uint32_t replicaNum = dataReplica_ < proxyServer_->getNodeNum() ? dataReplica_ : proxyServer_->getNodeNum();

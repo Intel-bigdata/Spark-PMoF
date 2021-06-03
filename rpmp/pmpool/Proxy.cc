@@ -14,6 +14,8 @@
 #include "pmpool/proxy/metastore/redis/Redis.h"
 #include "json/json.h"
 
+#include "pmpool/proxy/NodeManager.h"
+
 Proxy::Proxy(std::shared_ptr<Config> config, std::shared_ptr<RLog> log, std::string currentHostAddr) :
  config_(config), log_(log), currentHostAddr_(currentHostAddr) {}
 
@@ -54,6 +56,7 @@ bool Proxy::isActiveProxy(std::string currentHostAddr) {
   }
   if (std::find(proxies.begin(), proxies.end(),
                 currentHostAddr) == proxies.end()) {
+#include "pmpool/proxy/NodeManager.h"
     log_->get_console_log()->error("Incorrect proxy address is configured for current host!");
     return false;
   }
@@ -75,8 +78,8 @@ bool Proxy::launchActiveService() {
   if (!rocks_->connect("/tmp/rocksdb_simple_example")) {
     return false;
   }
-  nodeManager_ = std::make_shared<NodeManager>(config_, log_, rocks_);
-  if (!nodeManager_->startService()) {
+  std::shared_ptr<NodeManager> nodeManager = std::make_shared<NodeManager>(config_, log_, shared_from_this(), rocks_);
+  if (!nodeManager->startService()) {
     return false;
   }
   loadBalanceFactor_ = config_->get_load_balance_factor();

@@ -181,6 +181,7 @@ void HeartbeatClient::setConnection(Connection *connection) {
 
 int HeartbeatClient::heartbeat() {
   int heartbeatInterval = config_->get_heartbeat_interval();
+  int port = stoi(config_->get_port());
   while (true) {
     sleep(heartbeatInterval);
     if (isTerminated_) {
@@ -197,7 +198,8 @@ int HeartbeatClient::heartbeat() {
     hrc.type = HEARTBEAT;
     hrc.rid = rid_++;
     hrc.host_ip_hash = host_ip_hash_;
-
+    hrc.port = port;
+    
     auto heartbeatRequest = std::make_shared<HeartbeatRequest>(hrc);
     ///TODO: better to put addTask & get into a function, not limited to this pieces of code.
     heartbeatRequestHandler_->addTask(heartbeatRequest);
