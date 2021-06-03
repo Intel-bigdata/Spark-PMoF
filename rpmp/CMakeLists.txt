@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.11)
 project(rpmof)
 
 set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-std=c++14 -g -pthread -fPIC")
+set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-std=c++14 -g -pthread -fPIC -ldl -lz")
 
 # Generate compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -48,11 +48,13 @@ file(COPY bin/stop-rpmp.sh DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
 add_executable(data-server main.cc)
 add_executable(chashtest test/chash_test.cc)
+add_executable(rocksdbtest test/rocksdb_test.cc)
 add_executable(proxy-server ProxyMain.cc)
 add_executable(client Client.cc)
-target_link_libraries(chashtest pmpool spdlog hiredis jsoncpp)
-target_link_libraries(data-server pmpool spdlog hiredis jsoncpp)
-target_link_libraries(proxy-server pmpool spdlog hiredis jsoncpp)
-target_link_libraries(client pmpool spdlog hiredis jsoncpp)
+target_link_libraries(chashtest pmpool spdlog hiredis jsoncpp rocksdb)
+target_link_libraries(data-server pmpool spdlog hiredis jsoncpp rocksdb)
+target_link_libraries(proxy-server pmpool spdlog hiredis jsoncpp rocksdb)
+target_link_libraries(client pmpool spdlog hiredis jsoncpp rocksdb)
+target_link_libraries(rocksdbtest spdlog hiredis jsoncpp rocksdb)
 
 file(COPY ${PROJECT_SOURCE_DIR}/config DESTINATION .)

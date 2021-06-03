@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "ReplicaService.h"
+#include "pmpool/proxy/metastore/JsonUtil.h"
 
 using namespace std;
 
@@ -47,8 +48,8 @@ int ReplicaWorker::entry() {
   return 0;
 }
 
-ReplicaService::ReplicaService(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Proxy> proxyServer) :
- config_(config), log_(log), proxyServer_(proxyServer) {}
+ReplicaService::ReplicaService(std::shared_ptr<Config> config, std::shared_ptr<RLog> log, std::shared_ptr<Proxy> proxyServer, std::shared_ptr<Rocks> rocks) :
+ config_(config), log_(log), proxyServer_(proxyServer), rocks_(rocks) {}
 
 ReplicaService::~ReplicaService() {
   worker_->stop();
@@ -57,6 +58,43 @@ ReplicaService::~ReplicaService() {
 
 void ReplicaService::enqueue_recv_msg(std::shared_ptr<ReplicaRequest> request) {
   worker_->addTask(request);
+}
+
+/**
+ * Update data status once it's been put to the node successfully
+ **/
+void ReplicaService::updateRecord(uint64_t key, PhysicalNode node){
+  string rawJson = rocks_->get(to_string(key));
+  #ifdef DEBUG
+  cout<<rawJson<<endl;
+  #endif
+  const auto rawJsonLength = static_cast<int>(rawJson.length());
+  JSONCPP_STRING err;
+  Json::Value root;
+  
+  Json::CharReaderBuilder builder;
+  const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+  if (!reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &root,
+                      &err)) {
+    std::cout << "Error occurred in UpdateRecord." << std::endl;
+  }
+
+  Json::Value recordArray = root["data"];
+  Json::ArrayIndex size = recordArray.size(); 
+  Json::Value data;
+  
+  for(Json::ArrayIndex i = 0; i < size; i++){
+    data[i][NODE] = recordArray[i][NODE];
+    if(data[i][NODE] == node.getIp()){
+      data[i][STATUS] = VALID;
+    }else{
+      data[i][STATUS] = recordArray[i][STATUS];
+    }
+  }
+
+  root["data"] = data;
+  string json_str = rootToString(root);
+  rocks_->set(to_string(key), json_str);
 }
 
 void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
@@ -81,12 +119,14 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
       break;
     }
     case REPLICATE: {
+      //The message received means the data has been put to node, change status from pending to valid
       uint32_t replicaNum = dataReplica_ < proxyServer_->getNodeNum() ? dataReplica_ : proxyServer_->getNodeNum();
       uint32_t minReplica = replicaNum < minReplica_ ? replicaNum : minReplica_;
       if (getReplica(rc.key).size() != 0) {
         removeReplica(rc.key);
       }
       addReplica(rc.key, rc.node);
+      updateRecord(rc.key, rc.node);
       unordered_set<PhysicalNode, PhysicalNodeHash> nodes = proxyServer_->getNodes(rc.key);
       if (nodes.count(rc.node)) {
         nodes.erase(rc.node);

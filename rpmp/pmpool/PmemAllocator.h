@@ -22,7 +22,7 @@
 
 #include "pmpool/Allocator.h"
 #include "pmpool/DataServer.h"
-#include "pmpool/Log.h"
+#include "pmpool/RLog.h"
 #include "pmpool/NetworkServer.h"
 
 using std::shared_ptr;
@@ -68,7 +68,7 @@ enum types { BLOCK_ENTRY_TYPE, DATA_TYPE, MAX_TYPE };
 class PmemObjAllocator : public Allocator {
  public:
   PmemObjAllocator() = delete;
-  explicit PmemObjAllocator(std::shared_ptr<Log> log,
+  explicit PmemObjAllocator(std::shared_ptr<RLog> log,
                             std::shared_ptr<DiskInfo> diskInfos,
                             std::shared_ptr<NetworkServer> server, int wid)
       : log_(log), diskInfo_(diskInfos), server_(server), wid_(wid) {}
@@ -382,7 +382,7 @@ class PmemObjAllocator : public Allocator {
   }
 
  private:
-  std::shared_ptr<Log> log_;
+  std::shared_ptr<RLog> log_;
   std::shared_ptr<DiskInfo> diskInfo_;
   std::shared_ptr<NetworkServer> server_;
   int wid_;
