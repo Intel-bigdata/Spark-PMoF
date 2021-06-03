@@ -92,8 +92,6 @@ public:
  int build_connection();
  int build_connection(std::string proxy_addr);
  void setConnection(Connection* connection);
- // register RPMP node to proxy
- void registerDataServer();
  void send(const char* data, uint64_t size);
  void addTask(std::shared_ptr<ReplicaRequest> request);
  void enqueue_recv_msg(std::shared_ptr<ReplicaRequestReply> repy);

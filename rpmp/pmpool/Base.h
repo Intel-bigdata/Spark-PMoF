@@ -63,6 +63,7 @@ struct HeartbeatRequestMsg {
   uint32_t type;
   uint64_t rid;
   uint64_t host_ip_hash;
+  uint64_t port;
 };
 
 struct HeartbeatRequestReplyMsg {

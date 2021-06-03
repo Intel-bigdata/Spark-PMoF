@@ -31,7 +31,7 @@ void HeartbeatRequest::encode() {
   requestMsg->type = requestContext_.type;
   requestMsg->rid = requestContext_.rid;
   requestMsg->host_ip_hash = requestContext_.host_ip_hash;
-
+  requestMsg->port = requestContext_.port;
 }
 
 void HeartbeatRequest::decode() {
@@ -40,6 +40,7 @@ void HeartbeatRequest::decode() {
   requestContext_.type = (HeartbeatOpType)requestMsg->type;
   requestContext_.rid = requestMsg->rid;
   requestContext_.host_ip_hash = requestMsg->host_ip_hash;
+  requestContext_.port = requestMsg->port;
 }
 
 HeartbeatRequestReply::HeartbeatRequestReply(HeartbeatRequestReplyContext &requestReplyContext)

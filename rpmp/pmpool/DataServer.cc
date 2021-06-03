@@ -76,5 +76,4 @@ void ConnectionShutdownCallback::operator()(void* param_1, void* param_2) {
     std::cout << "Failed to register to " << activeProxyAddr << "due to connection issue.\n";
     return;
   }
-  dataService_->registerDataServer();
 }

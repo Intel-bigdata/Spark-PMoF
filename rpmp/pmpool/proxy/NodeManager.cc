@@ -82,8 +82,8 @@ int NodeManagerWorker::entry()
   return 0;
 }
 
-NodeManager::NodeManager(shared_ptr <Config> config, shared_ptr <RLog> log, shared_ptr <Rocks> rocks) :
-    config_(config), log_(log), rocks_(rocks)
+NodeManager::NodeManager(shared_ptr <Config> config, shared_ptr <RLog> log, shared_ptr <Proxy> proxy, shared_ptr <Rocks> rocks) :
+    config_(config), log_(log), proxy_(proxy), rocks_(rocks)
 {
   hashToNode_ = new map<uint64_t, string>();
   for (std::string node : config_->get_nodes())
@@ -215,14 +215,17 @@ void NodeManager::addOrUpdateRecord(Json::Value record){
     new_data[size][HOST] = record[HOST];
     new_data[size][TIME] = record[TIME];
     new_data[size][STATUS] = record[STATUS];
+    nodeConnect(record[HOST].asString(), record[PORT].asString());
     new_root["data"] = new_data;
     rocks_->set(NODE_STATUS, rootToString(new_root));
     return;
-  } 
-
+  }
    
   for (Json::ArrayIndex i = 0; i < size; i++){
     if (recordArray[i][HOST].asString() == record[HOST].asString()){
+      if(record[STATUS].asString() == LIVE && recordArray[i][STATUS].asString() == DEAD){
+        nodeConnect(record[HOST].asString(), record[PORT].asString());
+      }
       recordArray[i][TIME] = record[TIME];
       recordArray[i][STATUS] = record[STATUS];
     }
@@ -293,7 +296,7 @@ void NodeManager::handle_recv_msg(std::shared_ptr<HeartbeatRequest> request)
     record[HOST] = host;
     record[TIME] = to_string(getCurrentTime());
     record[STATUS] = LIVE;
-
+    record[PORT] = rc.port;
     addOrUpdateRecord(record);
   }
   rrc.con = rc.con;
@@ -321,8 +324,9 @@ void NodeManager::nodeDead(string node){
   cout<<"dead node: "<<node<<endl;
 }
 
-void NodeManager::nodeConnect(string node){
-  cout<<"connect node: "<<node<<endl;
+void NodeManager::nodeConnect(string node, string port){
+  PhysicalNode physicalNode = {node, port};
+  proxy_->addNode(physicalNode);
 }
 
 int NodeManager::checkNode(){
