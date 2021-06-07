@@ -48,8 +48,8 @@ int ReplicaWorker::entry() {
   return 0;
 }
 
-ReplicaService::ReplicaService(std::shared_ptr<Config> config, std::shared_ptr<RLog> log, std::shared_ptr<Proxy> proxyServer, std::shared_ptr<Rocks> rocks) :
- config_(config), log_(log), proxyServer_(proxyServer), rocks_(rocks) {}
+ReplicaService::ReplicaService(std::shared_ptr<Config> config, std::shared_ptr<RLog> log, std::shared_ptr<Proxy> proxyServer, std::shared_ptr<MetastoreFacade> metastore) :
+ config_(config), log_(log), proxyServer_(proxyServer), metastore_(metastore) {}
 
 ReplicaService::~ReplicaService() {
   worker_->stop();
@@ -64,7 +64,7 @@ void ReplicaService::enqueue_recv_msg(std::shared_ptr<ReplicaRequest> request) {
  * Update data status once it's been put to the node successfully
  **/
 void ReplicaService::updateRecord(uint64_t key, PhysicalNode node){
-  string rawJson = rocks_->get(to_string(key));
+  string rawJson = metastore_->get(to_string(key));
   #ifdef DEBUG
   cout<<rawJson<<endl;
   #endif
@@ -94,7 +94,7 @@ void ReplicaService::updateRecord(uint64_t key, PhysicalNode node){
 
   root["data"] = data;
   string json_str = rootToString(root);
-  rocks_->set(to_string(key), json_str);
+  metastore_->set(to_string(key), json_str);
 }
 
 void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
