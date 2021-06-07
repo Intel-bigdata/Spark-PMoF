@@ -58,8 +58,8 @@ int Worker::entry() {
   return 0;
 }
 
-ClientService::ClientService(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::shared_ptr<Proxy> proxyServer, std::shared_ptr<Redis> redis) :
- config_(config), log_(log) ,proxyServer_(proxyServer), redis_(redis){}
+ClientService::ClientService(std::shared_ptr<Config> config, std::shared_ptr<RLog> log, std::shared_ptr<Proxy> proxyServer, std::shared_ptr<Rocks> rocks) :
+ config_(config), log_(log) ,proxyServer_(proxyServer), rocks_(rocks){}
 
 ClientService::~ClientService() {
   // for (auto worker : workers_) {
@@ -80,13 +80,16 @@ void ClientService::constructJobStatus(Json::Value record, uint64_t key){
   #ifdef DEBUG
   cout<<"ClientService::constructJobStatus::json_str:"<<json_str<<endl;
   #endif
-  redis_->set(to_string(key), json_str);
+  rocks_->set(to_string(key), json_str);
 }
 
 /**
  * Add data's location and status
  **/
 void ClientService::addRecords(uint64_t key, unordered_set<PhysicalNode, PhysicalNodeHash> nodes){
+  #ifdef DEBUG
+  cout<<"ClientService::addRecords::key: "<<key<<endl;
+  #endif
   Json::Value root;
   Json::Value data;
   int index = 0;
@@ -97,7 +100,7 @@ void ClientService::addRecords(uint64_t key, unordered_set<PhysicalNode, Physica
   }
   root["data"] = data;
   string json_str = rootToString(root);
-  redis_->set(to_string(key), json_str);
+  rocks_->set(to_string(key), json_str);
 }
 
 void ClientService::enqueue_recv_msg(std::shared_ptr<ProxyRequest> request) {

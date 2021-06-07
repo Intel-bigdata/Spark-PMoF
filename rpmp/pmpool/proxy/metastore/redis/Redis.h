@@ -4,14 +4,14 @@
 #include <memory>
 
 #include "pmpool/Config.h"
-#include "pmpool/Log.h"
+#include "pmpool/RLog.h"
 #include "Connection.h"
 
 class Config;
 
 class Redis: public std::enable_shared_from_this<Redis>{
 public:
-  Redis(std::shared_ptr<Config> config, std::shared_ptr <Log> log_);
+  Redis(std::shared_ptr<Config> config, std::shared_ptr <RLog> log_);
   bool connect();
   int connect(string ip, string port);
   string set(string key, string value);   
@@ -29,7 +29,7 @@ public:
 private:
   std::shared_ptr<MetastoreConnection> metastoreConnection_;
   std::shared_ptr<Config> config_;
-  std::shared_ptr<Log> log_;
+  std::shared_ptr<RLog> log_;
   std::string address_;
   std::string port_;
 };

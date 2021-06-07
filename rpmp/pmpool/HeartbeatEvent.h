@@ -64,6 +64,7 @@ struct HeartbeatRequestContext {
   HeartbeatOpType type;
   uint64_t rid = 0;
   uint64_t host_ip_hash;
+  uint64_t port;
   Connection* con;
 };
 

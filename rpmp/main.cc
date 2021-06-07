@@ -7,7 +7,7 @@
 #include "pmpool/Config.h"
 #include "pmpool/DataServer.h"
 #include "pmpool/Base.h"
-#include "pmpool/Log.h"
+#include "pmpool/RLog.h"
 
 /**
  * @brief program entry of RPMP data server
@@ -20,7 +20,7 @@ int ServerMain(int argc, char **argv) {
     CHK_ERR("config init", config->init(argc, argv));
   }
   /// initialize Log class
-  std::shared_ptr<Log> log = std::make_shared<Log>(config->get_log_path(), config->get_log_level());
+  std::shared_ptr<RLog> log = std::make_shared<RLog>(config->get_log_path(), config->get_log_level());
 
   /// initialize DataServer class
   std::shared_ptr<DataServer> dataServer =

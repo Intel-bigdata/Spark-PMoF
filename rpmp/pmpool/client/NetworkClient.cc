@@ -91,7 +91,7 @@ uint64_t RequestHandler::wait(std::shared_ptr<Request> request) {
     if (elapse > 10s) {  // tried 10s and found 8 process * 8 threads request
                          // will still go timeout, need to fix
       ctx->op_failed = true;
-      fprintf(stderr, "Request [TYPE %ld][Key %ld] spent %ld s, time out\n",
+      fprintf(stderr, "NetworkClient::wait::Request [TYPE %ld][Key %ld] spent %ld s, time out\n",
               request->requestContext_.type, request->requestContext_.key,
               std::chrono::duration_cast<std::chrono::seconds>(elapse).count());
       return true;
@@ -116,7 +116,7 @@ RequestReplyContext RequestHandler::get(std::shared_ptr<Request> request) {
     if (elapse > 10s) {  // tried 10s and found 8 process * 8 threads request
                          // will still go timeout, need to fix
       ctx->op_failed = true;
-      fprintf(stderr, "Request [TYPE %ld] spent %ld s, time out\n",
+      fprintf(stderr, "NetworkClient::get::Request [TYPE %ld] spent %ld s, time out\n",
               request->requestContext_.type,
               std::chrono::duration_cast<std::chrono::seconds>(elapse).count());
       return true;

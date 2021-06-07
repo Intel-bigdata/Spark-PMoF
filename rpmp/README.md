@@ -177,4 +177,4 @@ data server logs are recorded in $RPMP_HOME/log/proxy-server.log and $RPMP_HOME/
  ```./put_and_get --proxy_addr $addr --port $port```
    
 Here, `$addr` is proxy host address (see `rpmp.network.proxy.address`), and `$port` is client service port 
-(see `rpmp.proxy.client.service.port`), e.g., `./put_and_get --address 172.168.0.101,172.168.0.102 --port 12350`
+(see `rpmp.proxy.client.service.port`), e.g., `./put_and_get --proxy_addr 172.168.0.101,172.168.0.102 --port 12350`

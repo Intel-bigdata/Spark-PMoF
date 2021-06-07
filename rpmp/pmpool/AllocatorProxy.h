@@ -21,7 +21,7 @@
 #include "Base.h"
 #include "Config.h"
 #include "DataServer.h"
-#include "Log.h"
+#include "RLog.h"
 #include "PmemAllocator.h"
 
 using std::atomic;
@@ -38,7 +38,7 @@ using std::vector;
 class AllocatorProxy {
  public:
   AllocatorProxy() = delete;
-  AllocatorProxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log,
+  AllocatorProxy(std::shared_ptr<Config> config, std::shared_ptr<RLog> log,
                  std::shared_ptr<NetworkServer> networkServer)
       : config_(config), log_(log) {
     vector<string> paths = config_->get_pool_paths();
@@ -141,7 +141,7 @@ class AllocatorProxy {
 
  private:
   std::shared_ptr<Config> config_;
-  std::shared_ptr<Log> log_;
+  std::shared_ptr<RLog> log_;
   vector<std::shared_ptr<Allocator>> allocators_;
   vector<std::shared_ptr<DiskInfo>> diskInfos_;
   atomic<uint64_t> buffer_id_{0};

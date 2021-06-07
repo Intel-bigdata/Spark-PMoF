@@ -12,11 +12,11 @@
 #include "pmpool/queue/blockingconcurrentqueue.h"
 #include "pmpool/queue/concurrentqueue.h"
 #include "pmpool/Config.h"
-#include "pmpool/Log.h"
+#include "pmpool/RLog.h"
 #include "pmpool/proxy/clientService/ClientService.h"
 #include "pmpool/proxy/replicaService/ReplicaService.h"
-#include "pmpool/proxy/NodeManager.h"
-#include "pmpool/proxy/metastore/Redis.h"
+#include "pmpool/proxy/metastore/redis/Redis.h"
+#include "pmpool/proxy/metastore/rocksdb/Rocks.h"
 
 using moodycamel::BlockingConcurrentQueue;
 
@@ -24,7 +24,7 @@ class Proxy;
 
 class Proxy : public std::enable_shared_from_this<Proxy>{
 public:
-    explicit Proxy(std::shared_ptr<Config> config, std::shared_ptr<Log> log, std::string currentHostAddr);
+    explicit Proxy(std::shared_ptr<Config> config, std::shared_ptr<RLog> log, std::string currentHostAddr);
     ~Proxy();
     bool launchServer();
     bool isActiveProxy(string currentHostAddr);
@@ -46,12 +46,11 @@ public:
     void removeReplica(uint64_t key);
     void notifyClient(uint64_t key);
     private:
-    std::shared_ptr<NodeManager> nodeManager_;
     std::shared_ptr<ChunkMgr> chunkMgr_;
     std::shared_ptr<Config> config_;
     std::string currentHostAddr_;
-    std::shared_ptr<Log> log_;
-    std::shared_ptr<Redis> redis_;
+    std::shared_ptr<RLog> log_;
+    std::shared_ptr<Rocks> rocks_;
     std::shared_ptr<ConsistentHash> consistentHash_;
     uint32_t loadBalanceFactor_;
     std::shared_ptr<Server> server_;
