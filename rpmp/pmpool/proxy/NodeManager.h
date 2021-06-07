@@ -14,14 +14,11 @@
 #include "pmpool/Config.h"
 #include "pmpool/RLog.h"
 #include "pmpool/Proxy.h"
-
 #include "pmpool/proxy/XXHash.h"
 #include "pmpool/proxy/IHash.h"
+#include "pmpool/proxy/metastore/MetastoreFacade.h"
 
-#include "pmpool/proxy/metastore/redis/Redis.h"
-#include "pmpool/proxy/metastore/rocksdb/Rocks.h"
 #include "json/json.h"
-
 #include <chrono>
 
 using moodycamel::BlockingConcurrentQueue;
@@ -99,7 +96,7 @@ private:
 class NodeManager : public std::enable_shared_from_this<NodeManager> {
 public:
   NodeManager() = delete;
-  NodeManager(std::shared_ptr<Config> config, std::shared_ptr <RLog> log, std::shared_ptr<Proxy> proxyServer, std::shared_ptr<Rocks> rocks);
+  NodeManager(std::shared_ptr<Config> config, std::shared_ptr <RLog> log, std::shared_ptr<Proxy> proxyServer, std::shared_ptr<MetastoreFacade> metastore);
   ~NodeManager();
   void wait();
   void printNodeStatus();
@@ -125,7 +122,7 @@ private:
   std::shared_ptr <NodeManagerWorker> worker_;
   std::shared_ptr <Config> config_;
   std::shared_ptr <RLog> log_;
-  std::shared_ptr <Rocks> rocks_;
+  std::shared_ptr <MetastoreFacade> metastore_;
   std::shared_ptr <Server> server_;
   std::shared_ptr <ChunkMgr> chunkMgr_;
   std::shared_ptr <NodeManagerRecvCallback> recvCallback_;
