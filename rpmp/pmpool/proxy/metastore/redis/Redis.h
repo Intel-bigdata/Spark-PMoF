@@ -13,7 +13,6 @@ class Redis: public std::enable_shared_from_this<Redis>{
 public:
   Redis(std::shared_ptr<Config> config, std::shared_ptr <RLog> log_);
   bool connect();
-  int connect(string ip, string port);
   string set(string key, string value);   
   string get(string key);
   int hset(string key, map<string, string> *subkeyToSubvalue);

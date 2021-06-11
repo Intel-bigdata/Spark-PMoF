@@ -82,8 +82,8 @@ int NodeManagerWorker::entry()
   return 0;
 }
 
-NodeManager::NodeManager(shared_ptr <Config> config, shared_ptr <RLog> log, shared_ptr <Rocks> rocks) :
-    config_(config), log_(log), rocks_(rocks)
+NodeManager::NodeManager(shared_ptr <Config> config, shared_ptr <RLog> log, shared_ptr <Proxy> proxy, shared_ptr <MetastoreFacade> metastore) :
+    config_(config), log_(log), proxy_(proxy), metastore_(metastore)
 {
   hashToNode_ = new map<uint64_t, string>();
   for (std::string node : config_->get_nodes())
@@ -130,7 +130,7 @@ int64_t NodeManager::getCurrentTime(){
  * 
  **/
 void NodeManager::printNodeStatus(){
-  string rawJson = rocks_->get(NODE_STATUS);
+  string rawJson = metastore_->get(NODE_STATUS);
   const auto rawJsonLength = static_cast<int>(rawJson.length());
   JSONCPP_STRING err;
   Json::Value root;
@@ -169,7 +169,7 @@ void NodeManager::constructNodeStatus(Json::Value record){
   #ifdef DEBUG
   cout<<"NodeManager::constructNodeStatus::json_str "<<json_str<<endl;
   #endif
-  rocks_->set(NODE_STATUS, json_str);
+  metastore_->set(NODE_STATUS, json_str);
 }
 
 
@@ -177,12 +177,12 @@ void NodeManager::constructNodeStatus(Json::Value record){
  * Add a new record if new host is connected or update existed host's status
  **/
 void NodeManager::addOrUpdateRecord(Json::Value record){
-  int exist = rocks_->exists(NODE_STATUS);
+  int exist = metastore_->exists(NODE_STATUS);
   if (exist == 0){
     constructNodeStatus(record);
   }
 
-  string rawJson = rocks_->get(NODE_STATUS);
+  string rawJson = metastore_->get(NODE_STATUS);
   #ifdef DEBUG
   cout<<rawJson<<endl;
   #endif
@@ -215,26 +215,29 @@ void NodeManager::addOrUpdateRecord(Json::Value record){
     new_data[size][HOST] = record[HOST];
     new_data[size][TIME] = record[TIME];
     new_data[size][STATUS] = record[STATUS];
+    nodeConnect(record[HOST].asString(), record[PORT].asString());
     new_root["data"] = new_data;
-    rocks_->set(NODE_STATUS, rootToString(new_root));
+    metastore_->set(NODE_STATUS, rootToString(new_root));
     return;
-  } 
-
+  }
    
   for (Json::ArrayIndex i = 0; i < size; i++){
     if (recordArray[i][HOST].asString() == record[HOST].asString()){
+      if(record[STATUS].asString() == LIVE && recordArray[i][STATUS].asString() == DEAD){
+        nodeConnect(record[HOST].asString(), record[PORT].asString());
+      }
       recordArray[i][TIME] = record[TIME];
       recordArray[i][STATUS] = record[STATUS];
     }
   }
 
   root["data"] = recordArray;
-  rocks_->set(NODE_STATUS, rootToString(root));
+  metastore_->set(NODE_STATUS, rootToString(root));
   
 }
 
 bool NodeManager::hostExists(string host){
-  string rawJson = rocks_->get(NODE_STATUS);
+  string rawJson = metastore_->get(NODE_STATUS);
   const auto rawJsonLength = static_cast<int>(rawJson.length());
   JSONCPP_STRING err;
   Json::Value root;
@@ -293,7 +296,7 @@ void NodeManager::handle_recv_msg(std::shared_ptr<HeartbeatRequest> request)
     record[HOST] = host;
     record[TIME] = to_string(getCurrentTime());
     record[STATUS] = LIVE;
-
+    record[PORT] = rc.port;
     addOrUpdateRecord(record);
   }
   rrc.con = rc.con;
@@ -321,8 +324,9 @@ void NodeManager::nodeDead(string node){
   cout<<"dead node: "<<node<<endl;
 }
 
-void NodeManager::nodeConnect(string node){
-  cout<<"connect node: "<<node<<endl;
+void NodeManager::nodeConnect(string node, string port){
+  PhysicalNode physicalNode = {node, port};
+  proxy_->addNode(physicalNode);
 }
 
 int NodeManager::checkNode(){
@@ -330,11 +334,11 @@ int NodeManager::checkNode(){
   int gap = 2;
   while(true){
     sleep(heartbeatInterval * gap);
-    int exist = rocks_->exists(NODE_STATUS);
+    int exist = metastore_->exists(NODE_STATUS);
     if (exist == 0){
       continue;
     }
-    string rawJson = rocks_->get(NODE_STATUS);
+    string rawJson = metastore_->get(NODE_STATUS);
     const auto rawJsonLength = static_cast<int>(rawJson.length());
     JSONCPP_STRING err;
     Json::Value root;

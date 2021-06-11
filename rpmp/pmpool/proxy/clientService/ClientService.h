@@ -18,8 +18,7 @@
 #include "pmpool/Config.h"
 #include "pmpool/RLog.h"
 #include "pmpool/Proxy.h"
-#include "pmpool/proxy/metastore/redis/Redis.h"
-#include "pmpool/proxy/metastore/rocksdb/Rocks.h"
+#include "pmpool/proxy/metastore/MetastoreFacade.h"
 #include "json/json.h"
 
 using moodycamel::BlockingConcurrentQueue;
@@ -87,7 +86,7 @@ class Worker : public ThreadWrapper {
 
 class ClientService : public std::enable_shared_from_this<ClientService>{
 public:
-    explicit ClientService(std::shared_ptr<Config> config, std::shared_ptr<RLog> log, std::shared_ptr<Proxy> proxyServer, std::shared_ptr<Rocks> rocks);
+    explicit ClientService(std::shared_ptr<Config> config, std::shared_ptr<RLog> log, std::shared_ptr<Proxy> proxyServer, std::shared_ptr<MetastoreFacade> metastore);
     ~ClientService();
     bool startService();
     void wait();
@@ -127,7 +126,7 @@ public:
     std::unordered_map<uint64_t, std::shared_ptr<ProxyRequestReply>> prrcMap_;
     std::mutex prrcMtx;
     std::shared_ptr<Proxy> proxyServer_;
-    std::shared_ptr <Rocks> rocks_;
+    std::shared_ptr<MetastoreFacade> metastore_;
     int count = 0;
 
 };

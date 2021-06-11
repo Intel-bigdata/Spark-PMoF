@@ -18,9 +18,8 @@
 #include "pmpool/queue/blockingconcurrentqueue.h"
 #include "pmpool/queue/concurrentqueue.h"
 #include "pmpool/Proxy.h"
+#include "pmpool/proxy/metastore/MetastoreFacade.h"
 
-#include "pmpool/proxy/metastore/redis/Redis.h"
-#include "pmpool/proxy/metastore/rocksdb/Rocks.h"
 #include "json/json.h"
 
 const string JOB_STATUS = "JOB_STATUS";
@@ -99,7 +98,7 @@ class ReplicaService : public std::enable_shared_from_this<ReplicaService> {
   explicit ReplicaService(std::shared_ptr<Config> config,
                           std::shared_ptr<RLog> log,
                           std::shared_ptr<Proxy> proxyServer,
-                          std::shared_ptr<Rocks> rocks);
+                          std::shared_ptr<MetastoreFacade> metastore);
   ~ReplicaService();
   bool startService();
   void enqueue_recv_msg(std::shared_ptr<ReplicaRequest> msg);
@@ -117,7 +116,7 @@ class ReplicaService : public std::enable_shared_from_this<ReplicaService> {
   std::shared_ptr<Config> config_;
   std::shared_ptr<RLog> log_;
   std::shared_ptr<Server> server_;
-  std::shared_ptr<Rocks> rocks_;
+  std::shared_ptr<MetastoreFacade> metastore_;
   std::shared_ptr<ReplicaRecvCallback> recvCallback_;
   std::shared_ptr<ReplicaSendCallback> sendCallback_;
   std::shared_ptr<ReplicaConnectCallback> connectCallback_;

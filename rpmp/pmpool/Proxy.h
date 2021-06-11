@@ -15,9 +15,7 @@
 #include "pmpool/RLog.h"
 #include "pmpool/proxy/clientService/ClientService.h"
 #include "pmpool/proxy/replicaService/ReplicaService.h"
-#include "pmpool/proxy/NodeManager.h"
-#include "pmpool/proxy/metastore/redis/Redis.h"
-#include "pmpool/proxy/metastore/rocksdb/Rocks.h"
+#include "pmpool/proxy/metastore/MetastoreFacade.h"
 
 using moodycamel::BlockingConcurrentQueue;
 
@@ -47,12 +45,11 @@ public:
     void removeReplica(uint64_t key);
     void notifyClient(uint64_t key);
     private:
-    std::shared_ptr<NodeManager> nodeManager_;
     std::shared_ptr<ChunkMgr> chunkMgr_;
     std::shared_ptr<Config> config_;
     std::string currentHostAddr_;
     std::shared_ptr<RLog> log_;
-    std::shared_ptr<Rocks> rocks_;
+    std::shared_ptr<MetastoreFacade> metastore_;
     std::shared_ptr<ConsistentHash> consistentHash_;
     uint32_t loadBalanceFactor_;
     std::shared_ptr<Server> server_;

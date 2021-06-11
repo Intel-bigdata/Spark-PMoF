@@ -13,15 +13,12 @@
 #include "pmpool/queue/concurrentqueue.h"
 #include "pmpool/Config.h"
 #include "pmpool/RLog.h"
-#include "pmpool/proxy/NodeManager.h"
-
+#include "pmpool/Proxy.h"
 #include "pmpool/proxy/XXHash.h"
 #include "pmpool/proxy/IHash.h"
+#include "pmpool/proxy/metastore/MetastoreFacade.h"
 
-#include "pmpool/proxy/metastore/redis/Redis.h"
-#include "pmpool/proxy/metastore/rocksdb/Rocks.h"
 #include "json/json.h"
-
 #include <chrono>
 
 using moodycamel::BlockingConcurrentQueue;
@@ -32,6 +29,7 @@ struct NodeStatus{
 };
 
 class NodeManager;
+class Proxy;
 
 class NodeManagerRecvCallback : public Callback {
 public:
@@ -98,7 +96,7 @@ private:
 class NodeManager : public std::enable_shared_from_this<NodeManager> {
 public:
   NodeManager() = delete;
-  NodeManager(std::shared_ptr<Config> config, std::shared_ptr <RLog> log, std::shared_ptr<Rocks> rocks);
+  NodeManager(std::shared_ptr<Config> config, std::shared_ptr <RLog> log, std::shared_ptr<Proxy> proxyServer, std::shared_ptr<MetastoreFacade> metastore);
   ~NodeManager();
   void wait();
   void printNodeStatus();
@@ -114,6 +112,7 @@ private:
   const string NODE_STATUS = "NODE_STATUS";
   const string HOST = "HOST";
   const string TIME = "TIME";
+  const string PORT = "PORT";
   const string STATUS = "STATUS";
   const string LIVE = "LIVE";
   const string DEAD = "DEAD";
@@ -123,15 +122,16 @@ private:
   std::shared_ptr <NodeManagerWorker> worker_;
   std::shared_ptr <Config> config_;
   std::shared_ptr <RLog> log_;
-  std::shared_ptr <Rocks> rocks_;
+  std::shared_ptr <MetastoreFacade> metastore_;
   std::shared_ptr <Server> server_;
   std::shared_ptr <ChunkMgr> chunkMgr_;
   std::shared_ptr <NodeManagerRecvCallback> recvCallback_;
   std::shared_ptr <NodeManagerSendCallback> sendCallback_;
   std::shared_ptr <NodeManagerConnectCallback> connectCallback_;
   std::shared_ptr <NodeManagerShutdownCallback> shutdownCallback_;
+  std::shared_ptr <Proxy> proxy_;
   void nodeDead(string host);
-  void nodeConnect(string host);
+  void nodeConnect(string host, string port);
   int checkNode();
   bool hostExists(string host);
   void addOrUpdateRecord(Json::Value record);

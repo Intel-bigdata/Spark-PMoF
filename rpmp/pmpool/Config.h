@@ -109,6 +109,8 @@ public:
         set_metastore_redis_ip(configs.find(RPMP_METASTORE_REDIS_IP)->second);
         set_metastore_redis_port(configs.find(RPMP_METASTORE_REDIS_PORT)->second); 
 
+        set_metastore_type(configs.find(RPMP_METASTORE_TYPE)->second);
+
         set_log_path(configs.find(RPMP_LOG_PATH)->second);
         set_log_level(configs.find(RPMP_LOG_LEVEL)->second);
         string sizes = configs.find(RPMP_STORAGE_NAMESPACE_SIZE)->second;
@@ -419,7 +421,9 @@ public:
     void set_metastore_redis_port(string redis_port){redis_port_ = redis_port;};
     string get_metastore_redis_port(){return redis_port_;};
 
-
+    void set_metastore_type(string metastore_type){metastore_type_ = metastore_type;};
+    string get_metastore_type(){return metastore_type_;};
+    
   private:
     string ip_;
     string port_;
@@ -445,6 +449,7 @@ public:
     string heartbeat_port_;
     string redis_ip_;
     string redis_port_;
+    string metastore_type_;
 
     const string RPMP_NODE_LIST = "rpmp.node.list";
     const string RPMP_NETWORK_HEARTBEAT_INTERVAL = "rpmp.network.heartbeat-interval.sec";
@@ -467,6 +472,7 @@ public:
     const string RPMP_PROXY_LOAD_BALANCE_FACTOR = "rpmp.proxy.load-balance-factor";
     const string RPMP_METASTORE_REDIS_IP = "rpmp.metastore.redis.ip";
     const string RPMP_METASTORE_REDIS_PORT = "rpmp.metastore.redis.port";
+    const string RPMP_METASTORE_TYPE = "rpmp.metastore.type";
 
     const string DEFAULT_RPMP_NODE_LIST = "0.0.0.0";
     const string DEFAULT_RPMP_NETWORK_HEARTBEAT_INTERVAL = "3";
@@ -489,6 +495,7 @@ public:
     const string DEFAULT_RPMP_PROXY_LOAD_BALANCE_FACTOR = "5";
     const string DEFAULT_RPMP_METASTORE_REDIS_IP = "0.0.0.0";
     const string DEFAULT_RPMP_METASTORE_REDIS_PORT = "6379";
+    const string DEFAULT_RPMP_METASTORE_TYPE = "ROCKS";
 };
 
 #endif  // PMPOOL_CONFIG_H_
