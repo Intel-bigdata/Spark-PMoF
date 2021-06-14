@@ -100,6 +100,17 @@ export PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig/:$PKG_CONFIG_PATH
 echo “export PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig/:$PKG_CONFIG_PATH” > /etc/profile.d/pmdk.sh
 ```
 
+Redis-plus-plus:
+```
+git clone https://github.com/sewenew/redis-plus-plus.git
+cd redis-plus-plus
+mkdir build
+cd build
+cmake ..
+make
+make install
+```
+
 
 ### Build for C/C++
 ```
