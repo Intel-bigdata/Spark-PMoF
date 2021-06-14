@@ -72,7 +72,7 @@ int HeartbeatRequestHandler::get(std::shared_ptr<HeartbeatRequest> request) {
     auto elapse = current - ctx->start;
     if (elapse > timeoutInSec) {
       ctx->op_failed = true;
-      fprintf(stderr, "Request [TYPE %ld] spent %ld s, time out\n",
+      fprintf(stderr, "HeartbeatClient::Request [TYPE %ld] spent %ld s, time out\n",
               request->requestContext_.type,
               std::chrono::duration_cast<std::chrono::seconds>(elapse).count());
       return true;
@@ -154,7 +154,7 @@ std::string exec(const char* cmd) {
   return result;
 }
 
-HeartbeatClient::HeartbeatClient(std::shared_ptr<Config> config, std::shared_ptr<Log> log)
+HeartbeatClient::HeartbeatClient(std::shared_ptr<Config> config, std::shared_ptr<RLog> log)
         : config_(config), log_(log) {
   heartbeatInterval_ = config->get_heartbeat_interval();
   XXHash *hashFactory = new XXHash();
@@ -181,6 +181,7 @@ void HeartbeatClient::setConnection(Connection *connection) {
 
 int HeartbeatClient::heartbeat() {
   int heartbeatInterval = config_->get_heartbeat_interval();
+  int port = stoi(config_->get_port());
   while (true) {
     sleep(heartbeatInterval);
     if (isTerminated_) {
@@ -197,7 +198,8 @@ int HeartbeatClient::heartbeat() {
     hrc.type = HEARTBEAT;
     hrc.rid = rid_++;
     hrc.host_ip_hash = host_ip_hash_;
-
+    hrc.port = port;
+    
     auto heartbeatRequest = std::make_shared<HeartbeatRequest>(hrc);
     ///TODO: better to put addTask & get into a function, not limited to this pieces of code.
     heartbeatRequestHandler_->addTask(heartbeatRequest);

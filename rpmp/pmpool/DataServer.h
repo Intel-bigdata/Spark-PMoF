@@ -21,7 +21,7 @@ class Digest;
 class DataList;
 class AllocatorProxy;
 class NetworkServer;
-class Log;
+class RLog;
 class HeartbeatClient;
 
 /**
@@ -33,13 +33,13 @@ class HeartbeatClient;
 class DataServer {
  public:
   DataServer() = delete;
-  explicit DataServer(std::shared_ptr<Config> config, std::shared_ptr<Log> log);
+  explicit DataServer(std::shared_ptr<Config> config, std::shared_ptr<RLog> log);
   int init();
   void wait();
 
  private:
   std::shared_ptr<Config> config_;
-  std::shared_ptr<Log> log_;
+  std::shared_ptr<RLog> log_;
   std::shared_ptr<NetworkServer> networkServer_;
   std::shared_ptr<AllocatorProxy> allocatorProxy_;
   std::shared_ptr<Protocol> protocol_;

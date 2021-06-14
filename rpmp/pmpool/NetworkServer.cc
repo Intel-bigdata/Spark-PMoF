@@ -12,11 +12,11 @@
 #include "pmpool/Base.h"
 #include "pmpool/Config.h"
 #include "pmpool/Event.h"
-#include "pmpool/Log.h"
+#include "pmpool/RLog.h"
 #include "pmpool/buffer/CircularBuffer.h"
 
 NetworkServer::NetworkServer(std::shared_ptr<Config> config,
-                             std::shared_ptr<Log> log)
+                             std::shared_ptr<RLog> log)
     : config_(config), log_(log) {
   time = 0;
 }

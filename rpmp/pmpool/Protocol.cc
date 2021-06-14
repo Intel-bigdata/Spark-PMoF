@@ -6,7 +6,7 @@
 #include "pmpool/Config.h"
 #include "pmpool/Digest.h"
 #include "pmpool/Event.h"
-#include "pmpool/Log.h"
+#include "pmpool/RLog.h"
 #include "pmpool/NetworkServer.h"
 #include "pmpool/DataService/DataServerService.h"
 
@@ -141,7 +141,7 @@ void FinalizeWorker::addTask(std::shared_ptr<RequestReply> requestReply) {
   pendingRequestReplyQueue_.enqueue(requestReply);
 }
 
-Protocol::Protocol(std::shared_ptr<Config> config, std::shared_ptr<Log> log,
+Protocol::Protocol(std::shared_ptr<Config> config, std::shared_ptr<RLog> log,
                    std::shared_ptr<NetworkServer> server,
                    std::shared_ptr<AllocatorProxy> allocatorProxy)
     : config_(config),
