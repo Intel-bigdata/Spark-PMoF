@@ -3,7 +3,7 @@
 
 #include "MetastoreFacade.h"
 #include "rocksdb/Rocks.h"
-#include "redis/RRedis.h"
+#include "redis/Redis.h"
 #include "json/json.h"
 
 MetastoreFacade::MetastoreFacade(std::shared_ptr<Config> config, std::shared_ptr<RLog> log, string type){
@@ -43,4 +43,13 @@ string MetastoreFacade::get(string key){
 
 int MetastoreFacade::exists(string key){
   return connection_->exists(key);
+}
+
+std::unordered_set<std::string> MetastoreFacade::scanAll(){
+  return connection_->scanAll();
+}
+
+
+std::unordered_set<std::string> MetastoreFacade::scan(std::string pattern){
+  return connection_->scan(pattern);
 }
