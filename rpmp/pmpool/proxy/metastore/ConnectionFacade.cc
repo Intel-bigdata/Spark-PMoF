@@ -8,7 +8,7 @@
 #include "rocksdb/slice.h"
 #include "rocksdb/options.h"
 
-#include "redis/RRedis.h"
+#include "redis/Redis.h"
 
 using namespace std;
 using namespace ROCKSDB_NAMESPACE;
@@ -44,11 +44,7 @@ string ConnectionFacade::put(string key, string value){
     Status s = db_->Put(WriteOptions(), key, value);
     return s.ToString();
   }else{
-    /**
-    string cmd = "set " + key + " " + value;
-    return send_str(cmd);
-    **/
-    return rredis_->set(key, value);
+    return redis_->set(key, value);
   }
 }
 
@@ -58,11 +54,7 @@ string ConnectionFacade::get(string key){
     Status s = db_->Get(ReadOptions(), key, &value);
     return value;
   }else{
-    /**
-    string cmd = "get " + key;
-    return send_str(cmd);
-    **/
-    return rredis_->get(key);
+    return redis_->get(key);
   }
 }
 
@@ -75,47 +67,31 @@ int ConnectionFacade::exists(string key){
     }
     return 0;
   }else{
-    /**
-    string cmd = "exists " + key;
-    return send_int(cmd);
-    **/
-    return rredis_->exists(key);
+    return redis_->exists(key);
+  }
+}
+
+std::unordered_set<std::string> ConnectionFacade::scanAll(){
+  if(type_ == ROCKS){
+    //Do nothing
+  }else{
+    return redis_->scanAll();
+  }
+}
+
+std::unordered_set<std::string> ConnectionFacade::scan(std::string pattern){
+  if(type_ == ROCKS){
+    //Do nothing
+  }else{
+    return redis_->scan(pattern);
   }
 }
 
 //Redis
 int ConnectionFacade::connect(){
-  /**
-  context_ = shared_ptr<redisContext>(redisConnect(ip.c_str(), stoi(port)));
-  if (context_->err == 0){
-    setConnected(true);
-    return 0;
-  }
-  setConnected(false);
-  **/
-  rredis_ = make_shared<RRedis>(config_, log_);
-  rredis_ -> connect();
+  redis_ = make_shared<Redis>(config_, log_);
+  redis_ -> connect();
   setConnected(true);
-  return 0;
-}
-
-string ConnectionFacade::send_str(string cmd){
-  /**
-  redisReply *reply = (redisReply*)redisCommand(context_.get(), cmd.c_str());
-  string response = reply->str;
-  freeReplyObject(reply);
-  return response;
-  **/
-  return "";
-}
-
-int ConnectionFacade::send_int(string cmd){
-  /**
-  redisReply *reply = (redisReply*)redisCommand(context_.get(), cmd.c_str());
-  int response = reply->integer;
-  freeReplyObject(reply);
-  return response;
-  **/
   return 0;
 }
 

@@ -6,18 +6,23 @@
 #include "pmpool/RLog.h"
 
 #include <sw/redis++/redis++.h>
+#include <unordered_set>
 
 class Config;
 
-class RRedis: public std::enable_shared_from_this<RRedis>{
+class Redis: public std::enable_shared_from_this<Redis>{
 public:
-  RRedis(std::shared_ptr<Config> config, std::shared_ptr <RLog> log_);
+  Redis(std::shared_ptr<Config> config, std::shared_ptr <RLog> log_);
   bool connect();
   string set(string key, string value);   
   string get(string key);
-  int exists(string key);
+  bool exists(string key);
+  std::unordered_set<std::string> scanAll();
+  std::unordered_set<std::string> scan(std::string pattern);
+  
 
 private:
+  bool first = true;
   std::shared_ptr<Config> config_;
   std::shared_ptr<RLog> log_;
   std::string address_;

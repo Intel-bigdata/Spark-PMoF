@@ -21,6 +21,8 @@ public:
   string set(string key, string value);   
   string get(string key);
   int exists(string key);
+  std::unordered_set<std::string> scanAll();
+  std::unordered_set<std::string> scan(string pattern);
 private:
   std::shared_ptr<ConnectionFacade> connection_;
   std::shared_ptr<Config> config_;

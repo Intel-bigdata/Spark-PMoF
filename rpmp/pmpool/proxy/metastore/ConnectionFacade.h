@@ -7,7 +7,7 @@
 #include "rocksdb/db.h"
 #include "rocksdb/slice.h"
 #include "rocksdb/options.h"
-#include "redis/RRedis.h"
+#include "redis/Redis.h"
 
 #include "pmpool/Config.h"
 #include "pmpool/RLog.h"
@@ -23,15 +23,16 @@ class ConnectionFacade: public std::enable_shared_from_this<ConnectionFacade>{
 public:
   // RocksDB
   ConnectionFacade(std::shared_ptr<Config> config, std::shared_ptr<RLog> log, string type);
-  int connect(string DBPath);
-  bool isConnected();
+  // Redis 
+  int connect();
+  // Common
   string put(string key, string value);
   string get(string key);
   int exists(string key);
-  // Redis 
-  int connect();
-  string send_str(string cmd);
-  int send_int(string cmd);
+  std::unordered_set<std::string> scan(string pattern);
+  std::unordered_set<std::string> scanAll();
+  int connect(string DBPath);
+  bool isConnected();
 
 private:
   std::shared_ptr<Config> config_;
@@ -44,7 +45,7 @@ private:
   // RocksDB
   DB *db_;
   // Redis
-  shared_ptr<RRedis> rredis_;
+  shared_ptr<Redis> redis_;
 };
 
 #endif

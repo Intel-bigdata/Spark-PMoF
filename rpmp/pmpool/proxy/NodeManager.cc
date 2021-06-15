@@ -330,6 +330,10 @@ void NodeManager::nodeConnect(string node, string port){
 }
 
 int NodeManager::checkNode(){
+  /**
+   * For debug usage
+   * metastore_->scan("[0-9]*");
+   **/
   int heartbeatInterval = config_->get_heartbeat_interval();
   int gap = 2;
   while(true){
