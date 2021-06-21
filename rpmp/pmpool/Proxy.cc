@@ -92,6 +92,8 @@ bool Proxy::launchActiveService() {
   if (!replicaService_->startService()) {
     return false;
   }
+  tracker_ = std::make_shared<Tracker>(config_, log_, shared_from_this(), metastore_);
+  tracker_->getUnfinishedTask();
   return true;
 }
 

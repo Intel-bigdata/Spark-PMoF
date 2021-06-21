@@ -30,6 +30,11 @@ void ReplicaSendCallback::operator()(void* param_1, void* param_2) {
   chunkMgr_->reclaim(chunk, connection);
 }
 
+void ReplicaConnectCallback::operator()(void *param_1, void *param_2){
+  auto connection = static_cast<Connection*>(param_1);
+  cout<<"connected in ReplicaService"<<endl;
+}
+
 ReplicaWorker::ReplicaWorker(std::shared_ptr<ReplicaService> service) : service_(service) {}
 
 void ReplicaWorker::addTask(std::shared_ptr<ReplicaRequest> request) {
@@ -101,6 +106,22 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
   ReplicaRequestContext rc = request->get_rc();
   auto rrc = ReplicaRequestReplyContext();
   switch(rc.type) {
+    case REGISTER: {
+      cout<<"Connection of "<<rc.node.getIp()<<" added"<<endl;
+      node2Connection.insert(pair<std::string, Connection*>(rc.node.getIp(), rc.con));
+      rrc.type = rc.type;
+      rrc.success = 0;
+      rrc.rid = rc.rid;
+      rrc.con = rc.con;
+      std::shared_ptr<ReplicaRequestReply> requestReply = std::make_shared<ReplicaRequestReply>(rrc);
+      requestReply->encode();
+      auto ck = chunkMgr_->get(rrc.con);
+      memcpy(reinterpret_cast<char*>(ck->buffer), requestReply->data_,
+             requestReply->size_);
+      ck->size = requestReply->size_;
+      rrc.con->send(ck);
+      break;
+    }
     case REPLICATE: {
       //The message received means the data has been put to node, change status from pending to valid
       uint32_t replicaNum = dataReplica_ < proxyServer_->getNodeNum() ? dataReplica_ : proxyServer_->getNodeNum();

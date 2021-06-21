@@ -26,7 +26,7 @@ class ReplicaService;
 class DataServiceRequestHandler;
 class DataServerService;
 
-enum ReplicaOpType : uint32_t { REPLICATE, REPLICA_REPLY };
+enum ReplicaOpType : uint32_t { REGISTER, REPLICATE, REPLICA_REPLY };
 
 struct ReplicaRequestMsg {
   template <class Archive>

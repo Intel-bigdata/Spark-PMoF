@@ -27,7 +27,11 @@ void ServiceRecvCallback::operator()(void *param_1, void *param_2) {
       reinterpret_cast<Connection *>(ck->con));
   requestReply->decode();
   auto rrc = requestReply->get_rrc();
-  service_->enqueue_recv_msg(requestReply);
+  if (rrc.type == REGISTER) {
+    requestHandler_->notify(requestReply);
+  } else {
+    service_->enqueue_recv_msg(requestReply);
+  } 
   chunkMgr_->reclaim(ck, static_cast<Connection *>(ck->con));
 }
 
@@ -104,6 +108,7 @@ bool DataServerService::init() {
   proxyClient_->set_send_callback(sendCallback.get());
 
   proxyClient_->start();
+  registerDataServer();
   int res = build_connection();
   if (res == -1) {
     log_->get_console_log()->info("Failed to register data server!");
@@ -154,6 +159,10 @@ void DataServerService::setConnection(Connection *con) {
   proxyConnected = true;
   con_v.notify_all();
   lk.unlock();
+}
+
+void DataServerService::handle_replica_msg(std::shared_ptr<ReplicaRequest> request){
+
 }
 
 void DataServerService::handle_replica_msg(std::shared_ptr<ReplicaRequestReply> reply) {
@@ -221,5 +230,22 @@ std::shared_ptr<DataChannel> DataServerService::getChannel(string node, string p
     channel->requestHandler->start();
     channels.insert(make_pair(node+port, channel));
     return channel;
+  }
+}
+
+void DataServerService::registerDataServer() {
+  while (true) {
+    ReplicaRequestContext rc = {};
+    rc.type = REGISTER;
+    rc.rid = rid_++;
+    rc.node = {host_, port_};
+    auto request = std::make_shared<ReplicaRequest>(rc);
+    requestHandler_->addTask(request);
+    try {
+      auto rrc = requestHandler_->get(request);
+      break;
+    } catch (const char *ex) {
+      std::cout << "Failed to register data server, try again" << std::endl;
+    }
   }
 }

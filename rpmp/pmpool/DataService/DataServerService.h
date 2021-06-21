@@ -94,8 +94,10 @@ public:
  void setConnection(Connection* connection);
  void send(const char* data, uint64_t size);
  void addTask(std::shared_ptr<ReplicaRequest> request);
+ void registerDataServer();
  void enqueue_recv_msg(std::shared_ptr<ReplicaRequestReply> repy);
  void handle_replica_msg(std::shared_ptr<ReplicaRequestReply> msg);
+ void handle_replica_msg(std::shared_ptr<ReplicaRequest> request);
  // get RPMP channel
  std::shared_ptr<DataChannel> getChannel(string node, string port);
 private:
