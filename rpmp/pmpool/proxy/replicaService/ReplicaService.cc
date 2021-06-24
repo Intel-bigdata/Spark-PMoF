@@ -68,7 +68,7 @@ void ReplicaService::enqueue_recv_msg(std::shared_ptr<ReplicaRequest> request) {
 /**
  * Update data status once it's been put to the node successfully
  **/
-void ReplicaService::updateRecord(uint64_t key, PhysicalNode node){
+void ReplicaService::updateRecord(uint64_t key, PhysicalNode node, uint64_t size){
   string rawJson = metastore_->get(to_string(key));
   #ifdef DEBUG
   cout<<rawJson<<endl;
@@ -85,13 +85,14 @@ void ReplicaService::updateRecord(uint64_t key, PhysicalNode node){
   }
 
   Json::Value recordArray = root["data"];
-  Json::ArrayIndex size = recordArray.size(); 
+  Json::ArrayIndex length = recordArray.size(); 
   Json::Value data;
   
-  for(Json::ArrayIndex i = 0; i < size; i++){
+  for(Json::ArrayIndex i = 0; i < length; i++){
     data[i][NODE] = recordArray[i][NODE];
     if(data[i][NODE] == node.getIp()){
       data[i][STATUS] = VALID;
+      data[i][SIZE] = to_string(size);
     }else{
       data[i][STATUS] = recordArray[i][STATUS];
     }
@@ -102,10 +103,30 @@ void ReplicaService::updateRecord(uint64_t key, PhysicalNode node){
   metastore_->set(to_string(key), json_str);
 }
 
+ChunkMgr* ReplicaService::getChunkMgr(){
+  return chunkMgr_.get();
+}
+
+Connection* ReplicaService::getConnection(string node){
+  map<std::string, Connection*>::iterator iter;  
+  iter = node2Connection.find(node);  
+  if(iter != node2Connection.end())  
+  {  
+    return iter->second;  
+  }  
+  else  
+  {  
+    cout<<"Connection with IP: "<<node<<" not found"<<endl;  
+  } 
+};
+
 void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
   ReplicaRequestContext rc = request->get_rc();
   auto rrc = ReplicaRequestReplyContext();
   switch(rc.type) {
+    /**
+     * REGISTER is reserved to maintain per node connection between DataNode's DataServerService and Proxy's ReplicaService
+     **/
     case REGISTER: {
       cout<<"Connection of "<<rc.node.getIp()<<" added"<<endl;
       node2Connection.insert(pair<std::string, Connection*>(rc.node.getIp(), rc.con));
@@ -130,7 +151,7 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
         removeReplica(rc.key);
       }
       addReplica(rc.key, rc.node);
-      updateRecord(rc.key, rc.node);
+      updateRecord(rc.key, rc.node, rc.size);
       unordered_set<PhysicalNode, PhysicalNodeHash> nodes = proxyServer_->getNodes(rc.key);
       if (nodes.count(rc.node)) {
         nodes.erase(rc.node);
@@ -158,7 +179,7 @@ void ReplicaService::handle_recv_msg(std::shared_ptr<ReplicaRequest> request) {
       uint32_t replicaNum = dataReplica_ < proxyServer_->getNodeNum() ? dataReplica_ : proxyServer_->getNodeNum();
       uint32_t minReplica = replicaNum < minReplica_ ? replicaNum : minReplica_;
       addReplica(rc.key, rc.node);
-      updateRecord(rc.key, rc.node);
+      updateRecord(rc.key, rc.node, rc.size);
       if (getReplica(rc.key).size() == minReplica) {
         proxyServer_->notifyClient(rc.key);
       }

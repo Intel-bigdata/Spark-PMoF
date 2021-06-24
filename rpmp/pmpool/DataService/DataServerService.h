@@ -23,6 +23,7 @@
 #include "pmpool/RLog.h"
 #include "pmpool/proxy/replicaService/ReplicaEvent.h"
 #include "pmpool/Protocol.h"
+#include "pmpool/AllocatorProxy.h"
 
 using moodycamel::BlockingConcurrentQueue;
 
@@ -97,7 +98,6 @@ public:
  void registerDataServer();
  void enqueue_recv_msg(std::shared_ptr<ReplicaRequestReply> repy);
  void handle_replica_msg(std::shared_ptr<ReplicaRequestReply> msg);
- void handle_replica_msg(std::shared_ptr<ReplicaRequest> request);
  // get RPMP channel
  std::shared_ptr<DataChannel> getChannel(string node, string port);
 private:

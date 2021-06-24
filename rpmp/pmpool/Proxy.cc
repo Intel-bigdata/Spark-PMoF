@@ -93,7 +93,7 @@ bool Proxy::launchActiveService() {
     return false;
   }
   tracker_ = std::make_shared<Tracker>(config_, log_, shared_from_this(), metastore_);
-  tracker_->getUnfinishedTask();
+  tracker_->scheduleUnfinishedTasks();
   return true;
 }
 

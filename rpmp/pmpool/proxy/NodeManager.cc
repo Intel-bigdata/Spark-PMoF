@@ -152,6 +152,7 @@ void NodeManager::printNodeStatus(){
       cout<<"host: " << record[HOST];
       cout<<"time: " << record[TIME];
       cout<<"status: " << record[STATUS];
+      cout<<"port: " << record[PORT];
   }
 }
 
@@ -164,6 +165,7 @@ void NodeManager::constructNodeStatus(Json::Value record){
   data[0][HOST] = record[HOST];
   data[0][TIME] = record[TIME];
   data[0][STATUS] = record[STATUS];
+  data[0][PORT] = record[PORT];
   root["data"] = data;
   string json_str = rootToString(root);
   #ifdef DEBUG
@@ -210,11 +212,13 @@ void NodeManager::addOrUpdateRecord(Json::Value record){
       new_data[i][HOST] = recordArray[i][HOST];
       new_data[i][TIME] = recordArray[i][TIME];
       new_data[i][STATUS] = recordArray[i][STATUS];
+      new_data[i][PORT] = recordArray[i][PORT];
     }
 
     new_data[size][HOST] = record[HOST];
     new_data[size][TIME] = record[TIME];
     new_data[size][STATUS] = record[STATUS];
+    new_data[size][PORT] = record[PORT];
     nodeConnect(record[HOST].asString(), record[PORT].asString());
     new_root["data"] = new_data;
     metastore_->set(NODE_STATUS, rootToString(new_root));

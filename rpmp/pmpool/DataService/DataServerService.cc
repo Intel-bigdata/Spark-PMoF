@@ -108,12 +108,12 @@ bool DataServerService::init() {
   proxyClient_->set_send_callback(sendCallback.get());
 
   proxyClient_->start();
-  registerDataServer();
   int res = build_connection();
   if (res == -1) {
     log_->get_console_log()->info("Failed to register data server!");
     return false;
   }
+  registerDataServer();
   return true;
 }
 
@@ -161,10 +161,6 @@ void DataServerService::setConnection(Connection *con) {
   lk.unlock();
 }
 
-void DataServerService::handle_replica_msg(std::shared_ptr<ReplicaRequest> request){
-
-}
-
 void DataServerService::handle_replica_msg(std::shared_ptr<ReplicaRequestReply> reply) {
   auto rrc = reply->get_rrc();
   if (rrc.type == REPLICATE) {
@@ -199,6 +195,47 @@ void DataServerService::handle_replica_msg(std::shared_ptr<ReplicaRequestReply> 
       send(rr->data_, rr->size_);
     }
     protocol_->reclaim_dram_buffer(rrc.key);
+  }else if(rrc.type == REPLICATE_DIRECT){
+    auto rc = ReplicaRequestContext();
+    rc.type = REPLICA_REPLY;
+    rc.key = rrc.key;
+    rc.rid = rrc.rid;
+    rc.src_address = rrc.src_address;
+    for (auto node : rrc.nodes) {
+      rc.node = node;
+      auto rr = std::make_shared<ReplicaRequest>(rc);
+      std::shared_ptr<DataChannel> channel = getChannel(node.getIp(), node.getPort());
+      std::shared_ptr<NetworkClient> networkClient = channel->networkClient;
+      std::shared_ptr<RequestHandler> requestHandler = channel->requestHandler;
+      RequestContext dataRc = {};
+      dataRc.type = REPLICATE_PUT;
+      dataRc.rid = rid_++;
+      dataRc.key = rrc.key;
+      dataRc.size = rrc.size;
+      //Get data address by allocatorProxy
+      auto bml = protocol_->getAllocatorProxy()->get_cached_chunk(rrc.key);
+      uint64_t address;
+      if (bml.size() == 1) {
+        address = protocol_->getAllocatorProxy()->get_virtual_address(bml[0].address);
+      } else {
+        fprintf(stderr, "key %lu has zero or more than one BlockMeta\n",
+                rrc.key);
+        throw;
+      }
+      try {
+        dataRc.src_address = networkClient->get_dram_buffer(
+            reinterpret_cast<char *>(address), rrc.size);
+      } catch (const char *msg) {
+        std::cout << "Replication work: " << msg << std::endl;
+      }
+      dataRc.src_rkey = networkClient->get_rkey();
+      auto dataRequest = std::make_shared<Request>(dataRc);
+      requestHandler->addTask(dataRequest);
+      requestHandler->wait(dataRequest);
+      networkClient->reclaim_dram_buffer(dataRc.src_address, dataRc.size);
+      rr->encode();
+      send(rr->data_, rr->size_);
+    }
   }
 }
 

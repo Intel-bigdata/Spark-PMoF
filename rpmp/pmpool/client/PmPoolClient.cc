@@ -214,7 +214,7 @@ uint64_t PmPoolClient::put(const string &key, const char *value,
   rc.rid = prc.rid;
   rc.size = size;
   rc.address = 0;
-  // allocate memory for RDMA read from client.
+  // allocate memory for RDMA read from data server. 
 #ifdef DEBUG
   std::cout << "[PmPoolClient::put start] " << key << "-" << rc.size
     << ", hashkey is " << key_uint << std::endl;
@@ -278,7 +278,7 @@ uint64_t PmPoolClient::get(const string &key, char *value, uint64_t size) {
   rc.rid = prc.rid;
   rc.size = size;
   rc.address = 0;
-  // allocate memory for RMA read from client.
+  // allocate memory for RMA write from data server.
   rc.src_address = networkClient->get_dram_buffer(nullptr, rc.size);
   rc.src_rkey = networkClient->get_rkey();
 #ifdef DEBUG
