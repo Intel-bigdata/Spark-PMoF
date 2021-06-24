@@ -49,9 +49,9 @@ void Tracker::getUnfinishedTask(std::string key, bool& has, string& node, uint64
   
   cout<<"key: "<<key<<endl;
   for(Json::ArrayIndex i = 0; i < length; i++){
-    cout<<"node: "<< recordArray[i][NODE];
-    cout<<"status: "<< recordArray[i][STATUS];
-    cout<<"size: "<< recordArray[i][SIZE];
+    cout<<"node: "<< recordArray[i][NODE]<<endl;
+    cout<<"status: "<< recordArray[i][STATUS]<<endl;
+    cout<<"size: "<< recordArray[i][SIZE]<<endl;
     if(STATUS == INVALID){
       has = true;
       std::string node_temp = recordArray[i][NODE].asString();
@@ -60,7 +60,8 @@ void Tracker::getUnfinishedTask(std::string key, bool& has, string& node, uint64
       nodes.insert(physicalNode);
     }else{
       node = recordArray[i][NODE].asString();
-      size = recordArray[i][SIZE].asUInt64();
+      std::string s_size = recordArray[i][SIZE].asString();
+      size = strtoull(s_size.c_str(), NULL, 0);
     }
   }
 }
@@ -107,7 +108,9 @@ void Tracker::scheduleUnfinishedTasks(){
   for(const auto& key: keys){
     index++;
     cout<<"count: "<<to_string(index)<<endl;
+    #ifdef DEBUG
     printValue(key);
+    #endif
     bool has = false;
     uint64_t size;
     std::string node;

@@ -95,6 +95,7 @@ void ReplicaService::updateRecord(uint64_t key, PhysicalNode node, uint64_t size
       data[i][SIZE] = to_string(size);
     }else{
       data[i][STATUS] = recordArray[i][STATUS];
+      data[i][SIZE] = to_string(size);
     }
   }
 

@@ -168,6 +168,7 @@ void DataServerService::handle_replica_msg(std::shared_ptr<ReplicaRequestReply> 
     rc.type = REPLICA_REPLY;
     rc.key = rrc.key;
     rc.rid = rrc.rid;
+    rc.size = rrc.size;
     rc.src_address = rrc.src_address;
     for (auto node : rrc.nodes) {
       rc.node = node;
