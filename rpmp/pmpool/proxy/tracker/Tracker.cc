@@ -6,8 +6,8 @@ Tracker::Tracker(){
 
 }
 
-Tracker::Tracker(std::shared_ptr <Config> config, std::shared_ptr<RLog> log, std::shared_ptr<Proxy> proxy, std::shared_ptr<MetastoreFacade> metastore) :
-    config_(config), log_(log), proxy_(proxy), metastore_(metastore)
+Tracker::Tracker(std::shared_ptr <Config> config, std::shared_ptr<RLog> log, std::shared_ptr<Proxy> proxy, std::shared_ptr<MetastoreFacade> metastore, std::shared_ptr<ReplicaService> replicaService) :
+    config_(config), log_(log), proxy_(proxy), metastore_(metastore), replicaService_(replicaService)
 {
 
 }
@@ -52,7 +52,7 @@ void Tracker::getUnfinishedTask(std::string key, bool& has, string& node, uint64
     cout<<"node: "<< recordArray[i][NODE]<<endl;
     cout<<"status: "<< recordArray[i][STATUS]<<endl;
     cout<<"size: "<< recordArray[i][SIZE]<<endl;
-    if(STATUS == INVALID){
+    if(recordArray[i][STATUS] == PENDING){
       has = true;
       std::string node_temp = recordArray[i][NODE].asString();
       std::string port = getPort(key);
@@ -131,6 +131,9 @@ void Tracker::scheduleUnfinishedTasks(){
  *
  **/
 void Tracker::scheduleTask(uint64_t key, uint64_t size, string node, unordered_set<PhysicalNode, PhysicalNodeHash> nodes){
+  for(auto elem: nodes){
+    cout<<elem.getIp()<<endl;
+  }
   auto rrc = ReplicaRequestReplyContext();
   rrc.type = REPLICATE_DIRECT;
   rrc.rid = rid_++;
@@ -138,6 +141,9 @@ void Tracker::scheduleTask(uint64_t key, uint64_t size, string node, unordered_s
   rrc.size = size;
   rrc.nodes = nodes;
   Connection* con = replicaService_->getConnection(node); 
+  if(con == nullptr){
+    return;
+  }
   rrc.con = con;    
   auto reply = std::make_shared<ReplicaRequestReply>(rrc);
   reply->encode();

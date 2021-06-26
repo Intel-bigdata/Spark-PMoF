@@ -118,6 +118,7 @@ Connection* ReplicaService::getConnection(string node){
   else  
   {  
     cout<<"Connection with IP: "<<node<<" not found"<<endl;  
+    return nullptr;
   } 
 };
 

@@ -106,7 +106,8 @@ public:
   void enqueue_recv_msg(std::shared_ptr<HeartbeatRequest> request);
   void handle_recv_msg(std::shared_ptr<HeartbeatRequest> request);
   bool startService();
-  
+  bool allConnected();
+  int64_t getCurrentTime();
 
 private:
   const string NODE_STATUS = "NODE_STATUS";
@@ -116,7 +117,6 @@ private:
   const string STATUS = "STATUS";
   const string LIVE = "LIVE";
   const string DEAD = "DEAD";
-  int64_t getCurrentTime();
   std::shared_ptr <std::map<string, NodeStatus>> nodeMap_;
   std::map<uint64_t, string> *hashToNode_;
   std::shared_ptr <NodeManagerWorker> worker_;

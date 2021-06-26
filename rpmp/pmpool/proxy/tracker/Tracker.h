@@ -17,7 +17,7 @@ class ReplicaRequest;
 class Tracker : public std::enable_shared_from_this<Tracker> {
 public:
   explicit Tracker();
-  explicit Tracker(std::shared_ptr<Config> config, std::shared_ptr <RLog> log, std::shared_ptr<Proxy> proxyServer, std::shared_ptr<MetastoreFacade> metastore);
+  explicit Tracker(std::shared_ptr<Config> config, std::shared_ptr <RLog> log, std::shared_ptr<Proxy> proxyServer, std::shared_ptr<MetastoreFacade> metastore, std::shared_ptr<ReplicaService> replicaService);
   ~Tracker();
   void scheduleUnfinishedTasks();
 

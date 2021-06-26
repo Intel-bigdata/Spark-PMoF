@@ -92,7 +92,16 @@ bool Proxy::launchActiveService() {
   if (!replicaService_->startService()) {
     return false;
   }
-  tracker_ = std::make_shared<Tracker>(config_, log_, shared_from_this(), metastore_);
+  tracker_ = std::make_shared<Tracker>(config_, log_, shared_from_this(), metastore_, replicaService_);
+  int wait_nodes_connect_timeout = 30;
+  int64_t startTime = nodeManager->getCurrentTime();
+  while(!nodeManager->allConnected()){
+    sleep(5);
+    int64_t currentTime = nodeManager->getCurrentTime();
+    if(currentTime - startTime > wait_nodes_connect_timeout * 1000){
+      break;
+    }
+  }
   tracker_->scheduleUnfinishedTasks();
   return true;
 }
