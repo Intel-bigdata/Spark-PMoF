@@ -93,7 +93,7 @@ bool Proxy::launchActiveService() {
     return false;
   }
   tracker_ = std::make_shared<Tracker>(config_, log_, shared_from_this(), metastore_, replicaService_);
-  int wait_nodes_connect_timeout = 30;
+  int wait_nodes_connect_timeout = config_->get_node_connect_timeout();
   int64_t startTime = nodeManager->getCurrentTime();
   while(!nodeManager->allConnected()){
     sleep(5);

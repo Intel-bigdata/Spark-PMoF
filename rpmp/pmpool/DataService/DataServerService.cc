@@ -221,7 +221,7 @@ void DataServerService::handle_replica_msg(std::shared_ptr<ReplicaRequestReply> 
       } else {
         fprintf(stderr, "key %lu has zero or more than one BlockMeta\n",
                 rrc.key);
-        throw;
+        return;
       }
       try {
         dataRc.src_address = networkClient->get_dram_buffer(
@@ -237,6 +237,7 @@ void DataServerService::handle_replica_msg(std::shared_ptr<ReplicaRequestReply> 
       rr->encode();
       send(rr->data_, rr->size_);
     }
+    protocol_->reclaim_dram_buffer(rrc.key);
   }
 }
 

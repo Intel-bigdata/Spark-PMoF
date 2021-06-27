@@ -424,6 +424,9 @@ public:
     void set_metastore_type(string metastore_type){metastore_type_ = metastore_type;};
     string get_metastore_type(){return metastore_type_;};
     
+    void set_node_connect_timeout(int proxy_node_connect_timeout){proxy_node_connect_timeout_ = proxy_node_connect_timeout;};
+    int get_node_connect_timeout(){return proxy_node_connect_timeout_;};
+
   private:
     string ip_;
     string port_;
@@ -450,6 +453,7 @@ public:
     string redis_ip_;
     string redis_port_;
     string metastore_type_;
+    int proxy_node_connect_timeout_;
 
     const string RPMP_NODE_LIST = "rpmp.node.list";
     const string RPMP_NETWORK_HEARTBEAT_INTERVAL = "rpmp.network.heartbeat-interval.sec";
@@ -473,6 +477,7 @@ public:
     const string RPMP_METASTORE_REDIS_IP = "rpmp.metastore.redis.ip";
     const string RPMP_METASTORE_REDIS_PORT = "rpmp.metastore.redis.port";
     const string RPMP_METASTORE_TYPE = "rpmp.metastore.type";
+    const string RPMP_PROXY_NODE_CONNECT_TIMEOUT = "rpmp.proxy.node.connect.timeout";
 
     const string DEFAULT_RPMP_NODE_LIST = "0.0.0.0";
     const string DEFAULT_RPMP_NETWORK_HEARTBEAT_INTERVAL = "3";
@@ -495,7 +500,8 @@ public:
     const string DEFAULT_RPMP_PROXY_LOAD_BALANCE_FACTOR = "5";
     const string DEFAULT_RPMP_METASTORE_REDIS_IP = "0.0.0.0";
     const string DEFAULT_RPMP_METASTORE_REDIS_PORT = "6379";
-    const string DEFAULT_RPMP_METASTORE_TYPE = "ROCKS";
+    const string DEFAULT_RPMP_METASTORE_TYPE = "REDIS";
+    const string DEFAULT_RPMP_PROXY_NODE_CONNECT_TIMEOUT = "30";
 };
 
 #endif  // PMPOOL_CONFIG_H_
