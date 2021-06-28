@@ -111,8 +111,8 @@ void Tracker::scheduleUnfinishedTasks(){
   int index = 0;
   for(const auto& key: keys){
     index++;
-    cout<<"count: "<<to_string(index)<<endl;
     #ifdef DEBUG
+    cout<<"count: "<<to_string(index)<<endl;
     printValue(key);
     #endif
     bool has = false;
@@ -134,9 +134,11 @@ void Tracker::scheduleUnfinishedTasks(){
  *
  **/
 void Tracker::scheduleTask(uint64_t key, uint64_t size, string node, unordered_set<PhysicalNode, PhysicalNodeHash> nodes){
+  #ifdef DEBUG
   for(auto elem: nodes){
     cout<<elem.getIp()<<endl;
   }
+  #endif
   auto rrc = ReplicaRequestReplyContext();
   rrc.type = REPLICATE_DIRECT;
   rrc.rid = rid_++;
