@@ -288,3 +288,21 @@ void DataServerService::registerDataServer() {
     }
   }
 }
+
+void DataServerService::registerDataServer(std::string proxy_addr) {
+  build_connection(proxy_addr);
+  while (true) {
+    ReplicaRequestContext rc = {};
+    rc.type = REGISTER;
+    rc.rid = rid_++;
+    rc.node = {host_, port_};
+    auto request = std::make_shared<ReplicaRequest>(rc);
+    requestHandler_->addTask(request);
+    try {
+      auto rrc = requestHandler_->get(request);
+      break;
+    } catch (const char *ex) {
+    std::cout << "Failed to register data server, try again" << std::endl;
+    }
+  }
+}

@@ -453,7 +453,7 @@ bool NodeManager::allConnected(){
         }
         string time_str = record[TIME].asString();
         int64_t time = strtol(time_str.c_str(), NULL, 0);
-        if ((currentTime - time) >  1000 * heartbeatInterval * 10){
+        if ((currentTime - time) >  1000 * heartbeatInterval){
           return false;
         }
       }

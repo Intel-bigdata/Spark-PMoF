@@ -110,6 +110,7 @@ public:
         set_metastore_redis_port(configs.find(RPMP_METASTORE_REDIS_PORT)->second); 
 
         set_metastore_type(configs.find(RPMP_METASTORE_TYPE)->second);
+        set_node_connect_timeout(stoi(configs.find(RPMP_PROXY_NODE_CONNECT_TIMEOUT)->second));
 
         set_log_path(configs.find(RPMP_LOG_PATH)->second);
         set_log_level(configs.find(RPMP_LOG_LEVEL)->second);

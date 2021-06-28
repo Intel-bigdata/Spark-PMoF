@@ -47,11 +47,15 @@ void Tracker::getUnfinishedTask(std::string key, bool& has, string& node, uint64
   Json::ArrayIndex length = recordArray.size(); 
   Json::Value data;
   
+  #ifdef DEBUG
   cout<<"key: "<<key<<endl;
+  #endif
   for(Json::ArrayIndex i = 0; i < length; i++){
+    #ifdef DEBUG
     cout<<"node: "<< recordArray[i][NODE]<<endl;
     cout<<"status: "<< recordArray[i][STATUS]<<endl;
     cout<<"size: "<< recordArray[i][SIZE]<<endl;
+    #endif
     if(recordArray[i][STATUS] == PENDING){
       has = true;
       std::string node_temp = recordArray[i][NODE].asString();
