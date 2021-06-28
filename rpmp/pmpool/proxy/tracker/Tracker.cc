@@ -121,8 +121,7 @@ void Tracker::scheduleUnfinishedTasks(){
     unordered_set<PhysicalNode, PhysicalNodeHash> nodes;
     getUnfinishedTask(key, has, node, size, nodes);
     if(has == true){
-      uint64_t key_uint;
-      Digest::computeKeyHash(key, &key_uint);
+      uint64_t key_uint = stoull(key);
       scheduleTask(key_uint, size, node, nodes);
     }
   }
