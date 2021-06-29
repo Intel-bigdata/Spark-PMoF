@@ -164,6 +164,10 @@ Protocol::~Protocol() {
   finalizeWorker_->join();
 }
 
+AllocatorProxy* Protocol::getAllocatorProxy(){
+  return allocatorProxy_.get();
+}
+
 int Protocol::init() {
   recvCallback_ = std::make_shared<RecvCallback>(
       shared_from_this(), networkServer_->get_chunk_mgr());

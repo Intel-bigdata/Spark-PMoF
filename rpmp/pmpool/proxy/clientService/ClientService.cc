@@ -75,6 +75,7 @@ void ClientService::constructJobStatus(Json::Value record, uint64_t key){
   Json::Value data;
   data[0][NODE] = record[NODE];
   data[0][STATUS] = record[STATUS];
+  data[0][SIZE] = record[SIZE];
   root["data"] = data;
   string json_str = rootToString(root);
   #ifdef DEBUG
@@ -96,6 +97,7 @@ void ClientService::addRecords(uint64_t key, unordered_set<PhysicalNode, Physica
   for(auto node: nodes){
     data[index][NODE] = node.getIp();
     data[index][STATUS] = PENDING;
+    data[index][SIZE] = "0";
     index++;
   }
   root["data"] = data;

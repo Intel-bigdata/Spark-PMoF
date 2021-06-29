@@ -29,6 +29,7 @@ const string STATUS = "STATUS";
 const string VALID = "VALID";
 const string INVALID = "INVALID";
 const string PENDING = "PENDING";
+const string SIZE = "SIZE";
 
 using moodycamel::BlockingConcurrentQueue;
 
@@ -73,11 +74,7 @@ class ReplicaShutdownCallback : public Callback {
 class ReplicaConnectCallback : public Callback {
  public:
   ReplicaConnectCallback() = default;
-  void operator()(void* param_1, void* param_2) override {
-#ifdef DEBUG
-    cout << "ReplicaService::ReplicaConnectCallback::operator() is called." << endl;
-#endif
-  }
+  void operator()(void* param_1, void* param_2) override;
 };
 
 class ReplicaWorker : public ThreadWrapper {
@@ -104,13 +101,14 @@ class ReplicaService : public std::enable_shared_from_this<ReplicaService> {
   void enqueue_recv_msg(std::shared_ptr<ReplicaRequest> msg);
   void handle_recv_msg(std::shared_ptr<ReplicaRequest> msg);
   void wait();
+  Connection* getConnection(string node);
+  ChunkMgr* getChunkMgr();
 
  private:
   void addReplica(uint64_t key, PhysicalNode node);
   std::unordered_set<PhysicalNode, PhysicalNodeHash> getReplica(uint64_t key);
   void removeReplica(uint64_t key);
-  void addRecords(uint64_t key, unordered_set<PhysicalNode, PhysicalNodeHash> nodes);
-  void updateRecord(uint64_t key, PhysicalNode node);
+  void updateRecord(uint64_t key, PhysicalNode node, uint64_t size);
   std::shared_ptr<ReplicaWorker> worker_;
   std::shared_ptr<ChunkMgr> chunkMgr_;
   std::shared_ptr<Config> config_;
@@ -132,6 +130,7 @@ class ReplicaService : public std::enable_shared_from_this<ReplicaService> {
   std::unordered_map<uint64_t, std::shared_ptr<ReplicaRequest>> prrcMap_;
   std::mutex prrcMtx;
   std::shared_ptr<Proxy> proxyServer_;
+  map<string, Connection*> node2Connection;
 };
 
 #endif  // RPMP_REPLICASERVICE_H

@@ -152,6 +152,7 @@ void NodeManager::printNodeStatus(){
       cout<<"host: " << record[HOST];
       cout<<"time: " << record[TIME];
       cout<<"status: " << record[STATUS];
+      cout<<"port: " << record[PORT];
   }
 }
 
@@ -164,6 +165,7 @@ void NodeManager::constructNodeStatus(Json::Value record){
   data[0][HOST] = record[HOST];
   data[0][TIME] = record[TIME];
   data[0][STATUS] = record[STATUS];
+  data[0][PORT] = record[PORT];
   root["data"] = data;
   string json_str = rootToString(root);
   #ifdef DEBUG
@@ -210,11 +212,13 @@ void NodeManager::addOrUpdateRecord(Json::Value record){
       new_data[i][HOST] = recordArray[i][HOST];
       new_data[i][TIME] = recordArray[i][TIME];
       new_data[i][STATUS] = recordArray[i][STATUS];
+      new_data[i][PORT] = recordArray[i][PORT];
     }
 
     new_data[size][HOST] = record[HOST];
     new_data[size][TIME] = record[TIME];
     new_data[size][STATUS] = record[STATUS];
+    new_data[size][PORT] = record[PORT];
     nodeConnect(record[HOST].asString(), record[PORT].asString());
     new_root["data"] = new_data;
     metastore_->set(NODE_STATUS, rootToString(new_root));
@@ -411,4 +415,59 @@ bool NodeManager::startService()
 
 void NodeManager::wait() {
   server_->wait();
+}
+
+/**
+ * Check whether all nodes listed in config have conncted
+ * 
+ **/
+bool NodeManager::allConnected(){
+  vector<string> nodes = config_->get_nodes();
+  int configured_size = nodes.size();
+  string rawJson = metastore_->get(NODE_STATUS);
+  const auto rawJsonLength = static_cast<int>(rawJson.length());
+  JSONCPP_STRING err;
+  Json::Value root;
+
+  Json::CharReaderBuilder builder;
+  const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+  if (!reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &root, &err)) {
+    std::cout << "Error occurred in checking node." << std::endl;
+  }
+
+  Json::Value recordArray = root["data"];
+  Json::ArrayIndex size = recordArray.size(); 
+
+  int heartbeatInterval = config_->get_heartbeat_interval();
+  int count = 0;
+
+  for(auto node: nodes){
+    int64_t currentTime = getCurrentTime();
+    bool found = false;
+    for (Json::ArrayIndex i = 0; i < size; i++){
+      Json::Value record = recordArray[i];
+      if(node == record[HOST].asString()){
+        found = true;
+        if(record[STATUS].asString() != LIVE){
+          return false;
+        }
+        string time_str = record[TIME].asString();
+        int64_t time = strtol(time_str.c_str(), NULL, 0);
+        if ((currentTime - time) >  1000 * heartbeatInterval){
+          return false;
+        }
+      }
+    }
+    if(found == false){
+      return false;
+    }
+    count++;
+  }
+
+  
+  if (count == configured_size){
+    return true;
+  }
+ 
+  return false;
 }

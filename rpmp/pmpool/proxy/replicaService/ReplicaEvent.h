@@ -26,7 +26,7 @@ class ReplicaService;
 class DataServiceRequestHandler;
 class DataServerService;
 
-enum ReplicaOpType : uint32_t { REPLICATE, REPLICA_REPLY };
+enum ReplicaOpType : uint32_t { REGISTER, REPLICATE, REPLICA_REPLY, REPLICATE_DIRECT };
 
 struct ReplicaRequestMsg {
   template <class Archive>
@@ -81,6 +81,8 @@ struct ReplicaRequestReplyContext {
 
 class ReplicaRequestReply {
  public:
+  char* data_ = nullptr;
+  uint64_t size_ = 0;
   ReplicaRequestReply() = delete;
   explicit ReplicaRequestReply(ReplicaRequestReplyContext& requestReplyContext)
       : data_(nullptr), size_(0), requestReplyContext_(requestReplyContext){};
@@ -145,8 +147,6 @@ class ReplicaRequestReply {
     friend ProxyServer;
     friend Protocol;
     friend ReplicaService;
-  char* data_ = nullptr;
-  uint64_t size_ = 0;
   ReplicaRequestReplyContext requestReplyContext_;
 };
 

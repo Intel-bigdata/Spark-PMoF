@@ -95,6 +95,14 @@ public:
     // notify RPMP client replication response
     void notifyClient(uint64_t key);
     private:
+    /**
+     * JOB_STATUS: 
+     *            NODES: {
+     *                    NODE:
+     *                    STATUS:
+     *                    SIZE:
+     *
+     **/
     const string JOB_STATUS = "JOB_STATUS";
     const string NODES = "NODES";
     const string NODE = "NODE";
@@ -102,6 +110,7 @@ public:
     const string VALID = "VALID";
     const string INVALID = "INVALID";
     const string PENDING = "PENDING";
+    const string SIZE = "SIZE";
     void enqueue_finalize_msg(std::shared_ptr<ProxyRequestReply> reply);
     void handle_finalize_msg(std::shared_ptr<ProxyRequestReply> reply);
     // std::vector<std::shared_ptr<Worker>> workers_;

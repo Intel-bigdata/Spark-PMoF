@@ -13,6 +13,7 @@
 #include "pmpool/queue/concurrentqueue.h"
 #include "pmpool/Config.h"
 #include "pmpool/RLog.h"
+#include "pmpool/proxy/tracker/Tracker.h"
 #include "pmpool/proxy/clientService/ClientService.h"
 #include "pmpool/proxy/replicaService/ReplicaService.h"
 #include "pmpool/proxy/metastore/MetastoreFacade.h"
@@ -20,6 +21,7 @@
 using moodycamel::BlockingConcurrentQueue;
 
 class Proxy;
+class Tracker;
 
 class Proxy : public std::enable_shared_from_this<Proxy>{
 public:
@@ -57,6 +59,7 @@ public:
     uint32_t dataReplica_;
     std::shared_ptr<ClientService> clientService_;
     std::shared_ptr<ReplicaService> replicaService_;
+    std::shared_ptr<Tracker> tracker_;
     std::unordered_map<uint64_t, std::unordered_set<PhysicalNode, PhysicalNodeHash>> replicaMap_;
     std::mutex replica_mtx;
     // Standby service

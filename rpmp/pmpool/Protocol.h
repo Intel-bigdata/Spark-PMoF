@@ -173,6 +173,7 @@ class Protocol : public std::enable_shared_from_this<Protocol> {
   std::shared_ptr<Config> config_;
   std::shared_ptr<RLog> log_;
   uint64_t num_requests_ = 0;
+  AllocatorProxy* getAllocatorProxy();
 
  private:
   std::shared_ptr<NetworkServer> networkServer_;

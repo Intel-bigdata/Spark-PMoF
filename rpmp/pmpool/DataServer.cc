@@ -13,11 +13,6 @@ DataServer::DataServer(std::shared_ptr<Config> config, std::shared_ptr<RLog> log
     : config_(config), log_(log) {}
 
 int DataServer::init() {
-  /// initialize heartbeat client
-  heartbeatClient_ = std::make_shared<HeartbeatClient>(config_, log_);
-  CHK_ERR("heartbeat client init", heartbeatClient_->init());
-  log_->get_console_log()->info("heartbeat client initialized");
-
   networkServer_ = std::make_shared<NetworkServer>(config_, log_);
   CHK_ERR("network server init", networkServer_->init());
   log_->get_file_log()->info("network server initialized.");
@@ -35,6 +30,11 @@ int DataServer::init() {
   networkServer_->start();
   log_->get_file_log()->info("network server started.");
   log_->get_console_log()->info("RPMP started.");
+
+  /// initialize heartbeat client
+  heartbeatClient_ = std::make_shared<HeartbeatClient>(config_, log_);
+  CHK_ERR("heartbeat client init", heartbeatClient_->init());
+  log_->get_console_log()->info("heartbeat client initialized");
 
   std::shared_ptr<ConnectionShutdownCallback> shutdownCallback =
       std::make_shared<ConnectionShutdownCallback>(heartbeatClient_, protocol_->getDataService());
@@ -71,9 +71,5 @@ void ConnectionShutdownCallback::operator()(void* param_1, void* param_2) {
   // TODO: combine two communication paths (HeartbeatClient/DataServerService) into single one.
   // re-register to new active proxy.
   string activeProxyAddr = heartbeatClient_->getActiveProxyAddr();
-  int ret = dataService_->build_connection(activeProxyAddr);
-  if (ret == -1) {
-    std::cout << "Failed to register to " << activeProxyAddr << "due to connection issue.\n";
-    return;
-  }
+  dataService_->registerDataServer(activeProxyAddr);
 }
