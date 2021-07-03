@@ -172,6 +172,7 @@ void NodeManager::constructNodeStatus(Json::Value record){
   cout<<"NodeManager::constructNodeStatus::json_str "<<json_str<<endl;
   #endif
   metastore_->set(NODE_STATUS, json_str);
+  nodeConnect(record[HOST].asString(), record[PORT].asString());
 }
 
 
@@ -422,6 +423,10 @@ void NodeManager::wait() {
  * 
  **/
 bool NodeManager::allConnected(){
+  int exist = metastore_->exists(NODE_STATUS);
+  if (exist == 0){
+    return false;
+  }
   vector<string> nodes = config_->get_nodes();
   int configured_size = nodes.size();
   string rawJson = metastore_->get(NODE_STATUS);
