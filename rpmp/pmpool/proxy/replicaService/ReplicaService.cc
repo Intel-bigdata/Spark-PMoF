@@ -81,7 +81,11 @@ void ReplicaService::updateRecord(uint64_t key, PhysicalNode node, uint64_t size
   const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
   if (!reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &root,
                       &err)) {
-    std::cout << "Error occurred in UpdateRecord." << std::endl;
+    #ifndef DEBUG
+    std::cout << "key: " << key <<endl;
+    std::cout << "rawJson: " << rawJson.c_str() <<endl;
+    #endif
+    std::cout << "ReplicaService::Error occurred in UpdateRecord." << std::endl;
   }
 
   Json::Value recordArray = root["data"];

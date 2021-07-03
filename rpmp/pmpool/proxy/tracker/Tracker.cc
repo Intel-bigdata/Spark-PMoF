@@ -40,7 +40,7 @@ void Tracker::getUnfinishedTask(std::string key, bool& has, string& node, uint64
   const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
   if (!reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &root,
                       &err)) {
-    std::cout << "Error occurred in UpdateRecord." << std::endl;
+    std::cout << "Tracker::getUnfinishedTask::Error occurred in UpdateRecord." << std::endl;
   }
 
   Json::Value recordArray = root["data"];
@@ -175,7 +175,7 @@ void Tracker::printValue(std::string key){
   const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
   if (!reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &root,
                       &err)) {
-    std::cout << "Error occurred in UpdateRecord." << std::endl;
+    std::cout << "Tracker::printValue::Error occurred in UpdateRecord." << std::endl;
   }
 
   Json::Value recordArray = root["data"];
