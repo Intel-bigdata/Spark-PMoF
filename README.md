@@ -18,7 +18,7 @@ Make sure you got [HPNL](https://github.com/Intel-bigdata/HPNL) installed.
 
 ```shell
 git clone https://github.com/Intel-bigdata/Spark-PMoF.git
-cd Spark-PMoF; mvn package -DskipTests
+cd Spark-PMoF; mvn package -DskipTests -Pspark-2
 ```
 
 If the pmem hardware is ready,it's useful to test by removing the `-DskipTests` option:
