@@ -15,23 +15,35 @@
     <groupId>com.intel.spark-pmof.java</groupId>
     <artifactId>java</artifactId>
     <version>1.0</version>
+    <properties>
+      <spark.version>2.4.4</spark.version>
+      <scala.binary.version>2.12</scala.binary.version>
+    </properties>
+    <profiles>
+      <profile>
+        <id>spark-2</id>
+        <properties>
+          <scala.binary.version>2.11</scala.binary.version>
+        </properties>
+      </profile>
+    </profiles>
 
     <dependencies>
         <dependency>
             <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_2.11</artifactId>
-            <version>2.4.4</version>
+            <artifactId>spark-core_${scala.binary.version}</artifactId>
+            <version>${spark.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
-            <artifactId>spark-network-common_2.11</artifactId>
-            <version>2.4.4</version>
+            <artifactId>spark-network-common_${scala.binary.version}</artifactId>
+            <version>${spark.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_2.11</artifactId>
-            <version>2.4.4</version>
+            <artifactId>spark-core_${scala.binary.version}</artifactId>
+            <version>${spark.version}</version>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
@@ -47,7 +59,7 @@
         </dependency>
         <dependency>
             <groupId>org.scalatest</groupId>
-            <artifactId>scalatest_2.11</artifactId>
+            <artifactId>scalatest_${scala.binary.version}</artifactId>
             <version>3.0.3</version>
             <scope>test</scope>
         </dependency>
@@ -165,7 +177,7 @@
               -->
               <SPARK_DIST_CLASSPATH>${test_classpath}</SPARK_DIST_CLASSPATH>
               <SPARK_PREPEND_CLASSES>1</SPARK_PREPEND_CLASSES>
-              <SPARK_SCALA_VERSION>2.11</SPARK_SCALA_VERSION>
+              <SPARK_SCALA_VERSION>${scala.binary.version}</SPARK_SCALA_VERSION>
               <SPARK_TESTING>1</SPARK_TESTING>
               <JAVA_HOME>${test.java.home}</JAVA_HOME>
             </environmentVariables>
